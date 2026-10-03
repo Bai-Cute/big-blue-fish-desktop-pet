@@ -17,45 +17,84 @@ public partial class MainWindow
         weather.Click += async (_, _) => { companionContextMenu.IsOpen = false; await SpeakCompanionWeather(); };
         companionContextMenu.Items.Add(settings);
         companionContextMenu.Items.Add(weather);
+        var test = new MenuItem { Header = "吐字测试" };
+        test.Click += async (_, _) => { companionContextMenu.IsOpen = false; await SpeakCompanionTest(); };
+        companionContextMenu.Items.Add(test);
     }
 
     private async Task SpeakCompanionWeather()
     {
-        if (weatherRequestPending || companionClosed) return;
+        if (weatherRequestPending || speechTestPending || companionClosed) return;
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
-            ShowCompanionBubble("主人，请先在设置里启用本地大模型，再来查看天气吧～");
+            ShowCompanionNotice("主人，请先在设置里启用本地大模型，再来查看天气吧～");
             return;
         }
         if (!brain.CanRunOnCurrentPower)
         {
-            ShowCompanionBubble("主人，现在已按设置暂停模型。插上电，或关闭拔电暂停选项后，就能播报天气啦～");
+            ShowCompanionNotice("主人，现在已按设置暂停模型。插上电，或关闭拔电暂停选项后，就能播报天气啦～");
             return;
         }
         weatherRequestPending = true;
+        long version = ++speechRequestVersion;
         string regionCode = preferences.WeatherRegionCode;
         try
         {
-            ShowCompanionBubble("主人，正在查看" + CompanionRegions.FullName(CompanionRegions.District(regionCode)) + "的天气～");
+            ShowCompanionNotice("主人，正在查看" + CompanionRegions.FullName(CompanionRegions.District(regionCode)) + "的天气～");
             // Let an in-flight warm-up or utterance finish; automatic speech yields to this request.
             var deadline = DateTime.UtcNow.AddSeconds(100);
             while (brain.Busy && DateTime.UtcNow < deadline && !companionClosed && brain.CanRunOnCurrentPower)
                 await Task.Delay(100);
-            if (companionClosed || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || regionCode != preferences.WeatherRegionCode)
+            if (version != speechRequestVersion || companionClosed || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || regionCode != preferences.WeatherRegionCode)
                 return;
-            if (brain.Busy) { ShowCompanionBubble("主人，模型暂时还在忙，请稍后再试一下～"); return; }
+            if (brain.Busy) { ShowCompanionNotice("主人，模型暂时还在忙，请稍后再试一下～"); return; }
             var text = await brain.GenerateWeather();
-            if (!companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled
+            if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled
                 && brain.CanRunOnCurrentPower && regionCode == preferences.WeatherRegionCode)
             {
-                ShowCompanionBubble(text.Length > 0 ? text : "主人，" + brain.Status + "。");
-                if (text.Length > 0) PlayCompanion("wave");
+                if (text.Length > 0) { ShowCompanionBubble(text); PlayCompanion("wave"); }
+                else ShowCompanionNotice("主人，" + brain.Status + "。");
             }
         }
         finally
         {
             weatherRequestPending = false;
+            nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
+        }
+    }
+
+    private async Task SpeakCompanionTest()
+    {
+        if (speechTestPending || companionClosed) return;
+        if (hiddenByUser) RestoreCompanion();
+        if (!preferences.ModelEnabled || !brain.CanRunOnCurrentPower)
+        {
+            ShowCompanionNotice("主人，当前设置暂停了模型，请启用模型并确认供电设置后再测试～");
+            return;
+        }
+        speechTestPending = true;
+        long version = ++speechRequestVersion;
+        try
+        {
+            ShowCompanionNotice("主人，正在等待本地模型生成测试短句（" + (brain.UseGpu ? "显卡加速" : "CPU") + "）～");
+            var deadline = DateTime.UtcNow.AddSeconds(100);
+            while (brain.Busy && DateTime.UtcNow < deadline && !companionClosed && brain.CanRunOnCurrentPower)
+                await Task.Delay(100);
+            if (companionClosed || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
+            if (brain.Busy) { ShowCompanionNotice("主人，模型暂时还在忙，请稍后再试一下～"); return; }
+            // A real ordinary model generation, using the same GPU/CPU configuration as normal speech.
+            var text = await brain.Generate(false, false);
+            if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden
+                && preferences.ModelEnabled && brain.CanRunOnCurrentPower)
+            {
+                if (text.Length > 0) { ShowCompanionBubble(text); PlayCompanion("wave"); }
+                else ShowCompanionNotice("主人，吐字测试未能生成文字：" + brain.Status + "。");
+            }
+        }
+        finally
+        {
+            speechTestPending = false;
             nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
         }
     }

@@ -25,6 +25,7 @@
 | `VPet-Simulator.Windows/Companion/CompanionRegions.cs` | 省市区层级与定位 |
 | `VPet-Simulator.Windows/Companion/CompanionWeather.cs` | 天气请求、天气代码中文映射和按地点缓存 |
 | `VPet-Simulator.Windows/Companion/CompanionBrain.cs` | 模型启动、推理、电池策略和提示词 |
+| `VPet-Simulator.Windows/Companion/CompanionSpeech.cs` | 所有模型回复的逐字显示、Unicode 字符边界、替换和取消 |
 | `VPet-Simulator.Windows/Companion/CompanionEdgeLayout.cs` | 贴边、独立气泡窗口和 DPI 换算 |
 | `VPet-Simulator.Windows/Companion/CompanionNewsGate.cs` | 新闻概率、静默期和每日上限 |
 | `VPet-Simulator.Core/Graph/PNGAnimation.cs` | 动画读取和蓝色渲染 |

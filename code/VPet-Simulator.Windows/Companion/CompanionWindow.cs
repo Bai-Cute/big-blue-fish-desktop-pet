@@ -22,6 +22,9 @@ public partial class MainWindow
     private DispatcherTimer companionTimer = null !;
     private Border bubble = null !;
     private TextBlock bubbleText = null !;
+    private CompanionSpeech speech = null!;
+    private long speechRequestVersion;
+    private bool speechTestPending;
     private Grid companionLayout = null !;
     private Window? companionSettings;
     private ContextMenu companionContextMenu = null!;
@@ -43,6 +46,8 @@ public partial class MainWindow
     private double SpriteSize => 280 * preferences.Scale;
     internal double CompanionSpriteSize => SpriteSize;
     internal Border CompanionBubble => bubble;
+    internal TextBlock CompanionBubbleText => bubbleText;
+    internal string CompanionBubbleLayoutText => speech?.FullText ?? bubbleText.Text;
 
     private void InitializeCompanion()
     {
@@ -115,6 +120,7 @@ public partial class MainWindow
         dismiss.Click += (_, e) =>
         {
             e.Handled = true;
+            speech.Cancel();
             bubble.Visibility = Visibility.Collapsed;
         };
         bubbleContent.Children.Add(dismiss);
@@ -132,6 +138,7 @@ public partial class MainWindow
             Child = bubbleContent
         };
         companionLayout.Children.Add(bubble);
+        speech = new CompanionSpeech(bubbleText, bubble, () => CompanionEdgeLayout.Refresh(this), ResetBubbleDeadline);
         Content = companionLayout;
         ApplyCompanionScale(false);
         var a = SystemParameters.WorkArea;
@@ -365,10 +372,11 @@ public partial class MainWindow
 
     private void ShowCompanionBubble(string text)
     {
-        bubbleText.Text = text;
-        bubble.Visibility = Visibility.Visible;
-        ResetBubbleDeadline();
+        bubbleUntil = DateTime.MaxValue;
+        speech.Show(text, true);
     }
+
+    private void ShowCompanionNotice(string text) => speech.Show(text, false);
 
     private async void CompanionTick(object? sender, EventArgs e)
     {
@@ -393,6 +401,9 @@ public partial class MainWindow
                         break;
                     case "weather":
                         _ = SpeakCompanionWeather();
+                        break;
+                    case "speech-test":
+                        _ = SpeakCompanionTest();
                         break;
                     case "close-settings":
                         companionSettings?.Close();
@@ -538,7 +549,7 @@ public partial class MainWindow
             }
         }
 
-        if (now < nextSpeech || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
+        if (now < nextSpeech || brain.Busy || weatherRequestPending || speechTestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
             return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600)
         {
@@ -547,8 +558,9 @@ public partial class MainWindow
         }
 
         nextSpeech = now.AddMinutes(preferences.SpeechMinMinutes + companionRandom.Next(0, 8));
+        long version = speechRequestVersion;
         var text = await brain.Generate(preferences.PublicInfo, preferences.ForegroundEnabled);
-        if (!companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower && text.Length > 0 && CompanionNative.IdleSeconds >= 5)
+        if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower && text.Length > 0 && CompanionNative.IdleSeconds >= 5)
         {
             ShowCompanionBubble(text);
             PlayCompanion("wave");
@@ -561,6 +573,7 @@ public partial class MainWindow
         menu.Items.Add("显示桌宠", null, (_, _) => Dispatcher.Invoke(RestoreCompanion));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenCompanionSettings));
         menu.Items.Add("天气", null, async (_, _) => await Dispatcher.InvokeAsync(SpeakCompanionWeather).Task.Unwrap());
+        menu.Items.Add("吐字测试", null, async (_, _) => await Dispatcher.InvokeAsync(SpeakCompanionTest).Task.Unwrap());
         menu.Items.Add("关闭桌宠", null, (_, _) => Dispatcher.Invoke(() => base.Close()));
         notifyIcon = new Forms.NotifyIcon
         {
@@ -583,6 +596,7 @@ public partial class MainWindow
     private void HideCompanion()
     {
         hiddenByUser = true;
+        speech.Cancel();
         if (brain.CanRunOnCurrentPower)
             brain.CancelGeneration();
         else
@@ -824,6 +838,7 @@ public partial class MainWindow
         companionClosed = true;
         companionContextMenu.IsOpen = false;
         companionTimer?.Stop();
+        speech?.Dispose();
         brain?.Dispose();
         SaveCompanion();
         companionSettings?.Close();

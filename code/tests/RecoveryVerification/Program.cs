@@ -202,6 +202,34 @@ internal static class Program
         var preferences = Read(w, "preferences");
         var bubble = (Border)Read(w, "bubble");
         var text = (TextBlock)Read(w, "bubbleText");
+        Invoke(w, "ShowCompanionBubble", "主人，天气正在查询～");
+        Pump();
+        var regressionPopup = w.OwnedWindows.Cast<Window>().Single();
+        double shortHeight = regressionPopup.Height;
+        string longWeather = "主人，云霄县现在大部晴朗，气温24.3度，体感挺热。今天最高能到28.5度，最低21.6度，降水概率为百分之十，出门可以带上水杯，记得补充水分哦。";
+        var revealClock = System.Diagnostics.Stopwatch.StartNew();
+        Invoke(w, "ShowCompanionBubble", longWeather);
+        Pump();
+        Check(regressionPopup.Height > shortHeight + 20, "Visible bubble retained the old short-text height; weather was clipped");
+        var speech = Read(w, "speech");
+        Check(Property<bool>(speech, "IsTyping") && text.Text.Length < longWeather.Length, "Speech did not reveal progressively");
+        int initialCharacters = text.Text.Length;
+        Wait(() => text.Text.Length > initialCharacters, 2, "Speech stalled after its initial fragment");
+        double reservedHeight = regressionPopup.Height;
+        Wait(() => !Property<bool>(speech, "IsTyping"), 8, "Speech took too long to finish");
+        double revealSeconds = revealClock.Elapsed.TotalSeconds;
+        Check(text.Text == longWeather && revealSeconds < 5, "Full reply was delayed or incomplete");
+        Check(Math.Abs(regressionPopup.Height - reservedHeight) < 1, "Typing changed the reserved full-reply height");
+        Check(regressionPopup.Height >= text.ActualHeight + bubble.Padding.Top + bubble.Padding.Bottom,
+            "Final weather lines still clipped");
+        DateTime dwellDeadline = (DateTime)Read(w, "bubbleUntil");
+        Check((dwellDeadline - DateTime.UtcNow).TotalSeconds > 28, "Dwell timer started before speech finished");
+        Invoke(w, "ShowCompanionBubble", "主人，鲸鱼👩‍💻小尾巴正在测试组合字符哦～");
+        Pump();
+        Invoke(w, "ShowCompanionBubble", "主人，替换后的短句～");
+        Wait(() => !Property<bool>(speech, "IsTyping"), 4, "Replacement speech did not finish");
+        Check(text.Text == "主人，替换后的短句～", "Old typing timer overwrote replacement speech");
+        Console.WriteLine($"Typing regression: {longWeather.Length} characters in {revealSeconds:F2}s, full bubble reserved immediately.");
         var dpi = VisualTreeHelper.GetDpi(w);
         int corners = 0;
         foreach (double scale in new[]
@@ -275,6 +303,7 @@ internal static class Program
         buttons[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         Pump();
         Check(bubble.Visibility == Visibility.Collapsed, "Dismiss did not collapse bubble");
+        Check(!Property<bool>(speech, "IsTyping"), "Dismiss did not cancel typing");
         Invoke(w, "ShowCompanionBubble", "主人，下一句也能正常出现～");
         Pump();
         Check(bubble.Visibility == Visibility.Visible, "Next bubble did not appear");
@@ -283,7 +312,7 @@ internal static class Program
         Pump();
         var contextMenu = (ContextMenu)Read(w, "companionContextMenu");
         Check(contextMenu.IsOpen && Read(w, "companionSettings") == null, "Right-click bypassed context menu");
-        Check(contextMenu.Items.Cast<MenuItem>().Select(x => x.Header.ToString()).SequenceEqual(new[] { "设置", "天气" }), "Right-click menu differs");
+        Check(contextMenu.Items.Cast<MenuItem>().Select(x => x.Header.ToString()).SequenceEqual(new[] { "设置", "天气", "吐字测试" }), "Right-click menu differs");
         ((MenuItem)contextMenu.Items[0]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Pump();
         var settings = (Window)Read(w, "companionSettings");
@@ -356,11 +385,22 @@ internal static class Program
         Set(preferences, "ModelEnabled", true);
         ((MenuItem)contextMenu.Items[1]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         Wait(() => !(bool)Read(w, "weatherRequestPending"), 110, "Manual weather timed out");
+        Wait(() => !Property<bool>(speech, "IsTyping"), 8, "Weather typing timed out");
         string weatherUtterance = text.Text;
         Check(weatherUtterance.Length > 10 && !weatherUtterance.Contains("暂时无法") && !weatherUtterance.Contains("正在查看")
             && System.Text.RegularExpressions.Regex.IsMatch(weatherUtterance, "[0-9]"), "Weather menu did not produce natural-language weather: " + weatherUtterance);
         Check(Property<int?>(brain, "RunnerPid") == pid, "Weather did not reuse resident model");
         Console.WriteLine("Weather broadcast: " + weatherUtterance);
+        Check(Property<bool>(brain, "UseGpu"), "GPU setting disabled during model test");
+        ((MenuItem)contextMenu.Items[2]).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        Check((bool)Read(w, "speechTestPending"), "Speech test bypassed model generation");
+        Wait(() => !(bool)Read(w, "speechTestPending"), 110, "Model speech test timed out");
+        Wait(() => !Property<bool>(speech, "IsTyping"), 8, "Model test typing timed out");
+        string testUtterance = text.Text;
+        Check(testUtterance.Length > 10 && !testUtterance.Contains("未能生成") && !testUtterance.Contains("正在等待"),
+            "Speech test returned a placeholder rather than model text: " + testUtterance);
+        Check(Property<int?>(brain, "RunnerPid") == pid, "Speech test did not use the resident GPU-configured model");
+        Console.WriteLine("GPU model speech test: " + testUtterance);
         Set(preferences, "StopModelOnBattery", true);
         Invoke(w, "ApplyCompanionPowerPolicy");
         Check(!Property<bool>(brain, "CanRunOnCurrentPower"), "Enabled battery restriction did not block model");
@@ -422,7 +462,8 @@ internal static class Program
                 Check(Equals(oldBrain.GetMethod(name, Access)!.Invoke(null, new[] { value }), newBrain.GetMethod(name, Access)!.Invoke(null, new[] { value })), name + " behavioral parity failed");
         File.WriteAllText(Path.Combine(sandbox, "result.json"), System.Text.Json.JsonSerializer.Serialize(new { passed = true, checks, corners,
             provinceCount = 34, modelGeneration = utterance, weatherGeneration = weatherUtterance,
-            batteryPolicyBothModes = true, modelProcessExited = true, installedReferenceHashes = "see provenance.json" }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            batteryPolicyBothModes = true, modelProcessExited = true, typingSeconds = revealSeconds,
+            modelSpeechTest = testUtterance, gpuConfigured = true, installedReferenceHashes = "see provenance.json" }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         Console.WriteLine($"PASS: {checks} checks; {corners} real-window corner layouts; both battery modes and weather broadcast passed.");
     }
 }

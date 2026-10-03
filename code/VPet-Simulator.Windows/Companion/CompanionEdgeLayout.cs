@@ -17,6 +17,9 @@ public static class CompanionEdgeLayout
     {
         private readonly Window pet;
         private readonly Border bubble;
+        private readonly System.Windows.Controls.TextBlock text;
+        private readonly System.Windows.Controls.TextBlock measuringText = new();
+        private readonly DependencyPropertyDescriptor textChange;
         private Window? popup;
         private bool updating;
         private bool closed;
@@ -26,6 +29,9 @@ public static class CompanionEdgeLayout
         {
             pet = w;
             bubble = ((VPet_Simulator.Windows.MainWindow)w).CompanionBubble;
+            text = ((VPet_Simulator.Windows.MainWindow)w).CompanionBubbleText;
+            textChange = DependencyPropertyDescriptor.FromProperty(System.Windows.Controls.TextBlock.TextProperty, typeof(System.Windows.Controls.TextBlock));
+            textChange.AddValueChanged(text, Changed);
             visibility = DependencyPropertyDescriptor.FromProperty(UIElement.VisibilityProperty, typeof(Border));
             visibility.AddValueChanged(bubble, Changed);
             pet.Loaded += Loaded;
@@ -80,6 +86,7 @@ public static class CompanionEdgeLayout
         {
             closed = true;
             visibility.RemoveValueChanged(bubble, Changed);
+            textChange.RemoveValueChanged(text, Changed);
             if (popup != null)
             {
                 popup.Content = null;
@@ -154,10 +161,18 @@ public static class CompanionEdgeLayout
                 Rect petBounds = PetBounds(pet);
                 double maximumWidth = Math.Max(1.0, Math.Min(300.0, area.Width - 16.0));
                 bubble.MaxWidth = maximumWidth;
-                bubble.InvalidateMeasure();
-                bubble.Measure(new System.Windows.Size(maximumWidth, double.PositiveInfinity));
-                double bubbleWidth = Math.Min(maximumWidth, bubble.DesiredSize.Width);
-                double bubbleHeight = Math.Min(Math.Max(1.0, area.Height - 16.0), bubble.DesiredSize.Height);
+                measuringText.Text = ((VPet_Simulator.Windows.MainWindow)pet).CompanionBubbleLayoutText;
+                measuringText.FontFamily = text.FontFamily;
+                measuringText.FontSize = text.FontSize;
+                measuringText.FontWeight = text.FontWeight;
+                measuringText.TextWrapping = text.TextWrapping;
+                measuringText.Margin = text.Margin;
+                double horizontal = bubble.Padding.Left + bubble.Padding.Right + bubble.BorderThickness.Left + bubble.BorderThickness.Right;
+                double vertical = bubble.Padding.Top + bubble.Padding.Bottom + bubble.BorderThickness.Top + bubble.BorderThickness.Bottom;
+                measuringText.Measure(new System.Windows.Size(Math.Max(1, maximumWidth - horizontal), double.PositiveInfinity));
+                double bubbleWidth = Math.Min(maximumWidth, Math.Max(26, measuringText.DesiredSize.Width) + horizontal);
+                measuringText.Measure(new System.Windows.Size(Math.Max(1, bubbleWidth - horizontal), double.PositiveInfinity));
+                double bubbleHeight = Math.Min(Math.Max(1.0, area.Height - 16.0), Math.Max(22, measuringText.DesiredSize.Height) + vertical);
                 double left = Limit(pet.Left + petBounds.Left + petBounds.Width / 2.0 - bubbleWidth / 2.0, area.Left + 8.0, area.Right - bubbleWidth - 8.0);
                 double top = pet.Top + petBounds.Top - bubbleHeight - 10.0;
                 if (top < area.Top + 8.0)
@@ -248,6 +263,8 @@ public static class CompanionEdgeLayout
         w.Top = top;
         follower.Update();
     }
+
+    public static void Refresh(Window w) => followers.GetValue(w, x => new Follow(x)).Update();
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint hwnd, int index);

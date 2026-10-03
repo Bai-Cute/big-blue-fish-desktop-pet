@@ -1,4 +1,4 @@
-param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version='0.2.1')
+param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version='0.2.2')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 if($Version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$'){throw '版本号格式应为 0.2.0 或 0.2.0-test1。'}
