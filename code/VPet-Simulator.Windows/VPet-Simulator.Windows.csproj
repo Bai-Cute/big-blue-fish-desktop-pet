@@ -1,0 +1,274 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <ItemGroup><None Update="vpeticon.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
+    <ItemGroup><None Update="vpeticon.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
+	<PropertyGroup>
+		<TargetFramework>net10.0-windows7.0</TargetFramework>
+        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+		<OutputType>WinExe</OutputType>
+		<RootNamespace>VPet_Simulator.Windows</RootNamespace>
+		<LangVersion>latest</LangVersion>
+		<PublishUrl>publish\</PublishUrl>
+		<Install>true</Install>
+		<InstallFrom>Disk</InstallFrom>
+		<UpdateEnabled>false</UpdateEnabled>
+		<UpdateMode>Foreground</UpdateMode>
+		<UpdateInterval>7</UpdateInterval>
+		<UpdateIntervalUnits>Days</UpdateIntervalUnits>
+		<UpdatePeriodically>false</UpdatePeriodically>
+		<UpdateRequired>false</UpdateRequired>
+		<MapFileExtensions>true</MapFileExtensions>
+		<ApplicationRevision>0</ApplicationRevision>
+		<ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+		<IsWebBootstrapper>false</IsWebBootstrapper>
+		<UseApplicationTrust>false</UseApplicationTrust>
+		<BootstrapperEnabled>true</BootstrapperEnabled>
+		<UseWPF>true</UseWPF>
+		<UseWindowsForms>true</UseWindowsForms>
+		<ImportWindowsDesktopTargets>true</ImportWindowsDesktopTargets>
+		<ApplicationIcon>vpeticon.ico</ApplicationIcon>
+
+		<Platforms>x86;x64</Platforms>
+
+		<AssemblyTitle>虚拟桌宠模拟器</AssemblyTitle>
+		<Description>VPET的独立窗口实现</Description>
+		<Company>LB Game</Company>
+		<AssemblyVersion>1.0.0.0</AssemblyVersion>
+		<FileVersion>1.0.0.0</FileVersion>
+		<Product>VPet-Simulator.Windows</Product>
+		<Copyright>Copyright © exLB.org 2022</Copyright>
+		<StartupObject>VPet_Simulator.Windows.App</StartupObject>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+		<PlatformTarget>x64</PlatformTarget>
+		<OutputPath>bin\x64\Debug\</OutputPath>
+		<DefineConstants>$(DefineConstants);X64;BDAY</DefineConstants>
+		<NoWarn>1701;1702</NoWarn>
+		<DebugType>embedded</DebugType>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+		<PlatformTarget>x64</PlatformTarget>
+		<OutputPath>bin\x64\Release\</OutputPath>
+		<DefineConstants>$(DefineConstants);X64;BDAY</DefineConstants>
+		<NoWarn>1701;1702</NoWarn>
+		<DebugType>embedded</DebugType>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+		<PlatformTarget>x86</PlatformTarget>
+		<OutputPath>bin\x86\Debug\</OutputPath>
+		<NoWarn>1701;1702</NoWarn>
+		<DebugType>embedded</DebugType>
+		<DefineConstants>$(DefineConstants);BDAY</DefineConstants>
+	</PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+		<PlatformTarget>x86</PlatformTarget>
+		<OutputPath>bin\x86\Release\</OutputPath>
+		<NoWarn>1701;1702</NoWarn>
+		<DebugType>embedded</DebugType>
+		<DefineConstants>$(DefineConstants);BDAY</DefineConstants>
+	</PropertyGroup>
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Reflection.AssemblyTrademarkAttribute">
+			<_Parameter1>exLB.org</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Remove="GameAssets\**" />
+		<Compile Remove="mod\**" />
+		<EmbeddedResource Remove="GameAssets\**" />
+		<EmbeddedResource Remove="mod\**" />
+		<None Remove="GameAssets\**" />
+		<None Remove="mod\**" />
+		<Page Remove="GameAssets\**" />
+		<Page Remove="mod\**" />
+	</ItemGroup>
+	<ItemGroup>
+		<None Remove="mklink.bat" />
+		<None Remove="Res\Gallery.png" />
+		<None Remove="Res\hash0.png" />
+		<None Remove="Res\hash1.png" />
+		<None Remove="Res\hash2.png" />
+		<None Remove="Res\hash3.png" />
+		<None Remove="Res\hash4.png" />
+		<None Remove="Res\hash5.png" />
+		<None Remove="Res\hash6.png" />
+		<None Remove="Res\hash7.png" />
+		<None Remove="Res\hash8.png" />
+		<None Remove="Res\img\error.png" />
+		<None Remove="Res\img\rank1.png" />
+		<None Remove="Res\img\rank2.png" />
+		<None Remove="Res\img\rank3.png" />
+		<None Remove="Res\img\rank4.png" />
+		<None Remove="Res\img\rank5.png" />
+		<None Remove="Res\img\rank6.png" />
+		<None Remove="Res\img\rbgb.png" />
+		<None Remove="Res\img\rbgt.png" />
+		<None Remove="Res\img\r_autobuy_1.png" />
+		<None Remove="Res\img\r_autobuy_2.png" />
+		<None Remove="Res\img\r_autobuy_3.png" />
+		<None Remove="Res\img\r_autobuy_4.png" />
+		<None Remove="Res\img\r_level_1.png" />
+		<None Remove="Res\img\r_level_2.png" />
+		<None Remove="Res\img\r_level_3.png" />
+		<None Remove="Res\img\r_level_4.png" />
+		<None Remove="Res\img\r_level_5.png" />
+		<None Remove="Res\img\r_mod_1.png" />
+		<None Remove="Res\img\r_mod_2.png" />
+		<None Remove="Res\img\r_mod_3.png" />
+		<None Remove="Res\img\r_mostfood_Drink.png" />
+		<None Remove="Res\img\r_mostfood_Drug.png" />
+		<None Remove="Res\img\r_mostfood_Food.png" />
+		<None Remove="Res\img\r_mostfood_Functional.png" />
+		<None Remove="Res\img\r_mostfood_Gift.png" />
+		<None Remove="Res\img\r_mostfood_Meal.png" />
+		<None Remove="Res\img\r_mostfood_Snack.png" />
+		<None Remove="Res\img\r_singleexp_1.png" />
+		<None Remove="Res\img\r_singleexp_2.png" />
+		<None Remove="Res\img\r_singleexp_3.png" />
+		<None Remove="Res\img\r_singleexp_4.png" />
+		<None Remove="Res\img\r_singleexp_5.png" />
+		<None Remove="Res\img\r_singlemoney_1.png" />
+		<None Remove="Res\img\r_singlemoney_2.png" />
+		<None Remove="Res\img\r_singlemoney_3.png" />
+		<None Remove="Res\img\r_singlemoney_4.png" />
+		<None Remove="Res\img\r_timelength_1.png" />
+		<None Remove="Res\img\r_timelength_2.png" />
+		<None Remove="Res\img\r_timelength_3.png" />
+		<None Remove="Res\img\r_timelength_4.png" />
+		<None Remove="Res\img\r_timelength_5.png" />
+		<None Remove="Res\img\r_worktime_1.png" />
+		<None Remove="Res\img\r_worktime_2.png" />
+		<None Remove="Res\img\r_worktime_3.png" />
+		<None Remove="Res\img\r_worktime_4.png" />
+		<None Remove="Res\img\r_worktime_5.png" />
+		<None Remove="Res\img\r_worktime_6.png" />
+		<None Remove="Res\Inventory.png" />
+		<None Remove="Res\player.png" />
+		<None Remove="RichPresence.vdf" />
+		<None Remove="快捷键通用注解.md" />
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Res\Font\OPPOSans B.ttf" />
+		<Resource Include="Res\Font\OPPOSans R.ttf" />
+		<Resource Include="Res\Gallery.png" />
+		<Resource Include="Res\hash0.png" />
+		<Resource Include="Res\hash1.png" />
+		<Resource Include="Res\hash2.png" />
+		<Resource Include="Res\hash3.png" />
+		<Resource Include="Res\hash4.png" />
+		<Resource Include="Res\hash5.png" />
+		<Resource Include="Res\hash6.png" />
+		<Resource Include="Res\hash7.png" />
+		<Resource Include="Res\hash8.png" />
+		<Resource Include="Res\img\error.png" />
+		<Resource Include="Res\img\rank2.png" />
+		<Resource Include="Res\img\rank1.png" />
+		<Resource Include="Res\img\rank3.png" />
+		<Resource Include="Res\img\rbgb.png" />
+		<Resource Include="Res\img\r_mostfood_Food.png" />
+		<Resource Include="Res\Inventory.png" />
+		<Resource Include="Res\player.png" />
+		<Resource Include="Res\remixicon.ttf" />
+		<Resource Include="vpeticon.ico">
+		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</Resource>
+	</ItemGroup>
+	<ItemGroup>
+		<Compile Update="Properties\Settings.Designer.cs">
+			<DesignTimeSharedInput>True</DesignTimeSharedInput>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Settings.settings</DependentUpon>
+		</Compile>
+		<Compile Update="Properties\Resources.Designer.cs">
+			<AutoGen>True</AutoGen>
+			<DesignTime>True</DesignTime>
+			<DependentUpon>Resources.resx</DependentUpon>
+		</Compile>
+		<Compile Update="WinDesign\Gallery\UnLockedGalleryItemUc.xaml.cs">
+		  <SubType>Code</SubType>
+		</Compile>
+	</ItemGroup>
+	<ItemGroup>
+		<Resource Include="Res\TopLogo2019.PNG" />
+		<Resource Include="Res\BetterBuy.png" />
+		<Resource Include="Res\vpeticon.png" />
+		<Resource Include="Res\hash.png" />
+		<None Update="Properties\Settings.settings">
+			<Generator>SettingsSingleFileGenerator</Generator>
+			<LastGenOutput>Settings.Designer.cs</LastGenOutput>
+		</None>
+		<None Update="steam_api.dll">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="steam_api64.dll">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<EmbeddedResource Update="Properties\Resources.resx">
+			<Generator>ResXFileCodeGenerator</Generator>
+			<LastGenOutput>Resources.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Include="..\.editorconfig" Link=".editorconfig" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Resource Include="Res\img\rbgt.png" />
+	  <Resource Include="Res\img\r_autobuy_1.png" />
+	  <Resource Include="Res\img\r_autobuy_2.png" />
+	  <Resource Include="Res\img\r_autobuy_3.png" />
+	  <Resource Include="Res\img\r_autobuy_4.png" />
+	  <Resource Include="Res\img\r_level_1.png" />
+	  <Resource Include="Res\img\r_level_2.png" />
+	  <Resource Include="Res\img\r_level_3.png" />
+	  <Resource Include="Res\img\r_level_4.png" />
+	  <Resource Include="Res\img\r_level_5.png" />
+	  <Resource Include="Res\img\r_mod_1.png" />
+	  <Resource Include="Res\img\r_mod_2.png" />
+	  <Resource Include="Res\img\r_mod_3.png" />
+	  <Resource Include="Res\img\r_mostfood_Drink.png" />
+	  <Resource Include="Res\img\r_mostfood_Drug.png" />
+	  <Resource Include="Res\img\r_mostfood_Functional.png" />
+	  <Resource Include="Res\img\r_mostfood_Gift.png" />
+	  <Resource Include="Res\img\r_mostfood_Meal.png" />
+	  <Resource Include="Res\img\r_mostfood_Snack.png" />
+	  <Resource Include="Res\img\r_singleexp_1.png" />
+	  <Resource Include="Res\img\r_singleexp_2.png" />
+	  <Resource Include="Res\img\r_singleexp_3.png" />
+	  <Resource Include="Res\img\r_singleexp_4.png" />
+	  <Resource Include="Res\img\r_singleexp_5.png" />
+	  <Resource Include="Res\img\r_singlemoney_1.png" />
+	  <Resource Include="Res\img\r_singlemoney_2.png" />
+	  <Resource Include="Res\img\r_singlemoney_3.png" />
+	  <Resource Include="Res\img\r_singlemoney_4.png" />
+	  <Resource Include="Res\img\r_timelength_1.png" />
+	  <Resource Include="Res\img\r_timelength_2.png" />
+	  <Resource Include="Res\img\r_timelength_3.png" />
+	  <Resource Include="Res\img\r_timelength_4.png" />
+	  <Resource Include="Res\img\r_timelength_5.png" />
+	  <Resource Include="Res\img\r_worktime_1.png" />
+	  <Resource Include="Res\img\r_worktime_2.png" />
+	  <Resource Include="Res\img\r_worktime_3.png" />
+	  <Resource Include="Res\img\r_worktime_4.png" />
+	  <Resource Include="Res\img\r_worktime_5.png" />
+	  <Resource Include="Res\img\r_worktime_6.png" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Facepunch.Steamworks" Condition="'$(Platform)' == 'x64'" Version="2.3.3" />
+		<PackageReference Include="Facepunch.Steamworks.win32" Condition="'$(Platform)' == 'x86'" Version="2.3.3" />
+		<PackageReference Include="LinePutScript" Version="1.11.9" />
+		<PackageReference Include="LinePutScript.Localization.WPF" Version="1.0.7" />
+		<PackageReference Include="NAudio" Version="3.0.1" />
+		<PackageReference Include="Panuon.WPF" Version="1.1.3" />
+		<PackageReference Include="Panuon.WPF.UI" Version="1.2.4.10" />
+		<PackageReference Include="WpfAnimatedGif" Version="2.0.2" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\VPet-Simulator.Core\VPet-Simulator.Core.csproj" />
+	  <ProjectReference Include="..\VPet-Simulator.Windows.Interface\VPet-Simulator.Windows.Interface.csproj" />
+	</ItemGroup>
+  <ItemGroup>
+    <Content Include="assets\pet\**\*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="assets\regions\china-regions.json" />
+  </ItemGroup>
+</Project>

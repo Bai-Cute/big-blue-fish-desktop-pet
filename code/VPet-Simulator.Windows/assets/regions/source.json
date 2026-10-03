@@ -1,0 +1,12 @@
+{
+  "repository": "https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov",
+  "commit": "c6c6e35bea3066d674efe2cded189dc57a86e7d8",
+  "release": "2025.251231.260403",
+  "license": "MIT",
+  "rows": 3635,
+  "inputSha256": {
+    "level3.csv": "dd5a1594565b65fa3fea5ce4b9935e0b28908226949ae44f07ebfd533428e8ff",
+    "geo.csv": "ac2641b1cb137d099779f49b21b965919591af9d82a29a911f6270530fef8ed7"
+  },
+  "coordinateNote": "District centers; mainland GCJ-02 approximately converted to WGS84. Not a street-level forecast."
+}

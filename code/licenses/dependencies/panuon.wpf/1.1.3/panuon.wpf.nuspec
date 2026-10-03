@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2011/08/nuspec.xsd">
+  <metadata>
+    <id>Panuon.WPF</id>
+    <version>1.1.3</version>
+    <authors>Mochengvia</authors>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <license type="expression">Apache-2.0</license>
+    <licenseUrl>https://licenses.nuget.org/Apache-2.0</licenseUrl>
+    <icon>icon.png</icon>
+    <projectUrl>https://github.com/Panuon/Panuon.WPF</projectUrl>
+    <iconUrl>https://user-images.githubusercontent.com/23360265/158532699-0810cf96-ae08-4b36-9eb2-df6d2a6e6e10.jpg</iconUrl>
+    <description>The core library of the WPF Platform series of open source libraries.</description>
+    <copyright>Copyright ©2018-2022 Panuon Group (open source orgnization).</copyright>
+    <tags>wpf</tags>
+  </metadata>
+</package>

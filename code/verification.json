@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-04",
+  "version": "0.2.1",
+  "configuration": "Release x64",
+  "buildErrors": 0,
+  "checks": 187,
+  "realWindowCornerCases": 24,
+  "provinceCount": 34,
+  "cityCount": 392,
+  "districtCount": 3209,
+  "settingsCascadeAndPersistence": true,
+  "contextMenuClicks": true,
+  "weatherCacheAndFailureRecovery": true,
+  "batteryPolicyBothModes": true,
+  "powerSimulation": "Windows power override in test mode; not physical unplug",
+  "modelProcessExited": true,
+  "selfContainedEntryTest": {
+    "ready": true,
+    "visible": true,
+    "onBattery": true,
+    "modelResident": true,
+    "region": "110101",
+    "weather": "主人，东城区现在是大部晴朗，气温 15.5 度，体感有点凉快。今天最高 20.8 度、最低 14.6 度，降水概率为零，您出门记得添件外套哦。",
+    "selfContained": true
+  },
+  "fullUpstreamGameTested": false
+}

@@ -1,0 +1,32 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>NAudio.Core</id>
+    <version>3.0.1</version>
+    <authors>Mark Heath</authors>
+    <license type="expression">MIT</license>
+    <licenseUrl>https://licenses.nuget.org/MIT</licenseUrl>
+    <icon>naudio-icon.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://naudio.github.io/NAudio/</projectUrl>
+    <description>Core audio types, wave format and provider interfaces, sample providers, file readers/writers, DSP, and resampling for the NAudio audio library.</description>
+    <releaseNotes>A patch release. The headline fix is packaging: the `NAudio` and `NAudio.Extras`
+meta-packages now ship a plain `net9.0-windows` leg, so WinForms and WPF projects
+targeting `netX.0-windows` get the full Windows stack again.
+
+ * **Breaking:** `AudioFileReader` now throws `NotSupportedException` instead of `InvalidOperationException` when the cross-platform build is asked for a format it cannot read, and the messages simply state that rather than suggesting an `NAudio.Wasapi` install that could never have helped (#1407)
+ * Fixed the `NAudio` and `NAudio.Extras` meta-packages resolving their portable `net9.0` asset on projects targeting a plain `netX.0-windows` TFM (the WinForms/WPF template default), which silently dropped the entire Windows stack — no `WaveOut`, WASAPI, Media Foundation, ASIO, DMO or WinForms types, and `AudioFileReader` throwing "MP3 file reading requires the NAudio.Wasapi package". Both packages now also ship a plain `net9.0-windows` leg (#1407)
+ * Projects on a plain `netX.0-windows` TFM may now see `CA1416` warnings when calling WASAPI process-loopback capture. The warning is correct — those callers do need an `OperatingSystem.IsWindowsVersionAtLeast(10, 0, 19041)` guard — and was previously hidden because the only Windows asset available already implied that floor (#1407)
+ * Sample and tool apps now roll forward onto newer .NET runtimes, so running them no longer requires the .NET 9 runtime to be installed (#1408)
+ * Fixed `AiffFileReader` reporting too long a `Length` and throwing `IndexOutOfRangeException` when the SSND chunk declares a non-zero offset (#1405)
+ * Fixed `AiffFileReader.Read` throwing `IndexOutOfRangeException` when the source stream returns fewer bytes than requested (#1405)</releaseNotes>
+    <copyright>© Mark Heath 2026</copyright>
+    <tags>C# .NET audio sound</tags>
+    <repository type="git" url="https://github.com/naudio/NAudio" commit="0f6b856dd16396fe0fa5bbe58d140b47b048306f" />
+    <dependencies>
+      <group targetFramework="net9.0">
+        <dependency id="System.Numerics.Tensors" version="9.0.0" exclude="Build,Analyzers" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

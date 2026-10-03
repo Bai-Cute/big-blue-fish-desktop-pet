@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>Panuon.WPF.UI</id>
+    <version>1.2.4.10</version>
+    <authors>Panuon</authors>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <license type="expression">Apache-2.0</license>
+    <licenseUrl>https://licenses.nuget.org/Apache-2.0</licenseUrl>
+    <icon>icon.png</icon>
+    <projectUrl>https://github.com/Panuon/Panuon.WPF.UI</projectUrl>
+    <description>A professional UI engine for customization.</description>
+    <copyright>Copyright ©2018-2024 Panuon.</copyright>
+    <tags>wpf ui control</tags>
+    <dependencies>
+      <group targetFramework=".NETFramework4.5.2">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework=".NETFramework4.6.2">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework=".NETFramework4.7.2">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework=".NETFramework4.8">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework=".NETCoreApp3.1">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework="net5.0-windows">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework="net6.0-windows">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework="net7.0-windows">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+      <group targetFramework="net8.0-windows">
+        <dependency id="Panuon.WPF" version="1.1.3" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>LinePutScript</id>
+    <version>1.11.9</version>
+    <authors>LorisYounger</authors>
+    <owners></owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="file">LICENSE</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+    <icon>Lineput.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://github.com/LorisYounger/LinePutScript</projectUrl>
+    <description>LinePutScript是一种数据交换格式定义行读取结构和描述其内容的标准语言
+本类库可以更轻松的创建,修改,保存LinePutScript</description>
+    <summary>LinePutScript是一种数据交换格式定义行读取结构和描述其内容的标准语言
+本类库可以更轻松的创建,修改,保存LinePutScript</summary>
+    <releaseNotes>1.11.0: 新增包装类Line/Sub和性能优化
+新增 Line_C/Sub_C 支持包装类读写
+支持 NetStandard
+1.11.1 添加新参数 和 修复LineC序列化错误
+LineAttribute 新增 `ignore`, 指示跳过不序列化某些内容
+LPSConvert 转换 新增 `convertNoneLineAttribute`, 指示是否序列化不包含 `LineAttribute` 标记的参数
+修复 `Line_C` 不序列化  `LineAttribute` 标记的参数
+1.11.2: 修复在没有行内容的情况下注释失效
+1.11.3: 修复`Sub.Split`描述与功能对应不上的错误
+1.11.4: 为序列化添加 是否转换不带LineAttribute的类 可选参数
+1.11.5: 支持序列化 Structure 和 去除属性后备字段
+1.11.6 修复转换String时未进行转义和完善功能
+1.11.7 支持`/null`参数, 允许在序列化时保持空List不为null
+1.11.8 Convert为String做额外检查,兼容NetStand
+1.11.9 支持循环List&lt;Class&gt;嵌套</releaseNotes>
+    <copyright>LB Copyright © 2018</copyright>
+    <dependencies>
+      <group targetFramework=".NETFramework4.6.2" />
+      <group targetFramework=".NETCoreApp3.1" />
+      <group targetFramework="net6.0" />
+      <group targetFramework="net8.0" />
+      <group targetFramework=".NETStandard2.0">
+        <dependency id="Microsoft.CSharp" version="4.7.0" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

@@ -1,0 +1,55 @@
+﻿<Application x:Class="VPet_Simulator.Windows.App" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:VPet_Simulator.Windows"
+        xmlns:pu="https://opensource.panuon.com/wpf-ui" StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary>
+                    <FontFamily x:Key="MainFont">
+                        /VPet-Simulator.Windows;component/Res/Font/#OPPOSans R
+                    </FontFamily>
+                    <FontFamily x:Key="RemixIcon">
+                        /VPet-Simulator.Windows;component/Res/#remixicon
+                    </FontFamily>
+                </ResourceDictionary>
+                <ResourceDictionary>
+                    <pu:GlobalSettings x:Key="globalSettings" FontFamily="{StaticResource MainFont}" FontSize="14"
+                            IconFontFamily="/VPet-Simulator.Windows;component/Res/#remixicon" IconFontSize="16" />
+
+                    <pu:MessageBoxXSettings x:Key="messageBoxSettings">
+                        <pu:MessageBoxXSettings.WindowXStyle>
+                            <Style TargetType="pu:WindowX"
+                                   BasedOn="{StaticResource {x:Static pu:MessageBoxX.WindowXStyleKey}}">
+                                <Setter Property="pu:WindowXCaption.Background"
+                                        Value="{DynamicResource DARKPrimary}" />
+                                <Setter Property="pu:WindowXCaption.Foreground"
+                                        Value="{DynamicResource DARKPrimaryText}" />
+                            </Style>
+                        </pu:MessageBoxXSettings.WindowXStyle>
+
+                    </pu:MessageBoxXSettings>
+
+                    <pu:ToastSettings x:Key="toastSettings">
+                        <pu:ToastSettings.LabelStyle>
+                            <Style TargetType="Label"
+                                   BasedOn="{StaticResource {x:Static pu:Toast.LabelStyleKey}}">
+                                <Setter Property="Padding"
+                                        Value="25,15" />
+                                <Setter Property="Background"
+                                        Value="{DynamicResource DARKPrimaryText}" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource DARKPrimary}" />
+                                <Setter Property="pu:LabelHelper.CornerRadius"
+                                        Value="5" />
+                                <Setter Property="pu:LabelHelper.ShadowColor"
+                                        Value="{DynamicResource ShadowColor}" />
+                            </Style>
+                        </pu:ToastSettings.LabelStyle>
+
+                    </pu:ToastSettings>
+                </ResourceDictionary>
+                <ResourceDictionary Source="/VPet-Simulator.Windows.Interface;component/ResourceStyle.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

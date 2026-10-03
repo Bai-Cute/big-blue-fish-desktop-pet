@@ -1,0 +1,17 @@
+**/bin/
+**/obj/
+.vs/
+.verification/
+*.user
+*.suo
+*.gguf
+**/cache/
+**/models/
+**/runtime/
+**/preferences.json*
+**/news-last-day.txt*
+**/companion.lock
+**/companion-errors.log
+**/ready.status
+**/test-status.json
+**/test-command.txt

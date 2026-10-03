@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2012/06/nuspec.xsd">
+  <metadata>
+    <id>WpfAnimatedGif</id>
+    <version>2.0.2</version>
+    <title>WPF Animated GIF</title>
+    <authors>Thomas Levesque</authors>
+    <license type="expression">Apache-2.0</license>
+    <licenseUrl>https://licenses.nuget.org/Apache-2.0</licenseUrl>
+    <projectUrl>https://github.com/XamlAnimatedGif/WpfAnimatedGif</projectUrl>
+    <description>A library to display animated GIF images in WPF</description>
+    <releaseNotes>https://github.com/XamlAnimatedGif/WpfAnimatedGif/releases</releaseNotes>
+    <tags>wpf animated gif</tags>
+    <repository type="git" url="https://github.com/XamlAnimatedGif/WpfAnimatedGif.git" commit="2937f9d314c0139eaa8d08ece581f58abed984b1" />
+    <dependencies>
+      <group targetFramework=".NETFramework3.5" />
+      <group targetFramework=".NETFramework4.0" />
+      <group targetFramework=".NETCoreApp3.0" />
+    </dependencies>
+    <frameworkReferences>
+      <group targetFramework=".NETCoreApp3.0">
+        <frameworkReference name="Microsoft.WindowsDesktop.App.WPF" />
+      </group>
+      <group targetFramework=".NETFramework3.5" />
+      <group targetFramework=".NETFramework4.0" />
+    </frameworkReferences>
+  </metadata>
+</package>

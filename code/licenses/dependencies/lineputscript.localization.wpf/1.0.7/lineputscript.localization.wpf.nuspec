@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>LinePutScript.Localization.WPF</id>
+    <version>1.0.7</version>
+    <authors>LorisYounger</authors>
+    <owners></owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <license type="file">LICENSE</license>
+    <licenseUrl>https://aka.ms/deprecateLicenseUrl</licenseUrl>
+    <icon>Localization.png</icon>
+    <readme>README.md</readme>
+    <projectUrl>https://github.com/LorisYounger/LinePutScript.Localization.WPF</projectUrl>
+    <description>WPF本地化类库, 
+支持文本和数值(不同语言的控件位置大小)
+支持翻译接口(用于网络翻译等)
+支持自动生成所需翻译文档</description>
+    <summary>WPF本地化类库, 支持文本和数值(不同语言的控件位置大小), 支持翻译接口(用于网络翻译等), 支持自动生成所需翻译文档</summary>
+    <releaseNotes>1.0.1: 支持StringFormart
+1.0.2: 支持快捷调用
+1.0.3: 双项绑定兼容
+1.0.4: 换行符(\n)兼容
+1.0.5&amp;6: 换行符(\r)兼容
+1.0.7: 相关类转换为public</releaseNotes>
+    <copyright>exLB.org © 2023</copyright>
+    <dependencies>
+      <group targetFramework=".NETFramework4.6.2">
+        <dependency id="LinePutScript" version="1.8.3" />
+      </group>
+      <group targetFramework="net6.0">
+        <dependency id="LinePutScript" version="1.8.3" />
+      </group>
+    </dependencies>
+  </metadata>
+</package>

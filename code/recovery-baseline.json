@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-03",
+  "sdk": "10.0.401",
+  "configuration": "Release x64",
+  "buildErrors": 0,
+  "buildWarnings": "2 upstream SYSLIB0057 warnings, each also emitted for WPF temporary project",
+  "checks": 157,
+  "realWindowCornerCases": 24,
+  "localModelGenerated": true,
+  "localModelStopped": true,
+  "entryPointReady": true,
+  "entryPointBubbleVisible": true,
+  "sourceAssets": 1006,
+  "upstreamCommit": "2e99a42ebeff71d792118f2e8de744b773042f8d",
+  "excludedPriorRecovery": true
+}
