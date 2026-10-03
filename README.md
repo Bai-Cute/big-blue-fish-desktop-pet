@@ -73,4 +73,4 @@ https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e486
 
 ## 开发与维护
 
-如果你希望修改桌宠行为、增加动作、调整天气逻辑或改进模型交互，请先阅读 [AGENTS.md](AGENTS.md)、[完整功能规格](docs/AGENT_FUNCTIONAL_SPEC.md) 和 [本地 Git 交接说明](docs/LOCAL_GIT_HANDOFF.md)。欢迎通过 GitHub Issues 提交问题、改进建议和使用反馈。
+如果你希望修改桌宠行为、增加动作、调整天气逻辑或改进模型交互，可以从 [开发说明](code/README.md) 开始。欢迎通过 GitHub Issues 提交问题、改进建议和使用反馈。

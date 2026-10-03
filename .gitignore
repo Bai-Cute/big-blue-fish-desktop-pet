@@ -19,3 +19,6 @@
 **/test-render.png
 /release/*
 !/release/README.md
+/AGENTS.md
+/docs/AGENT_FUNCTIONAL_SPEC.md
+/docs/LOCAL_GIT_HANDOFF.md
