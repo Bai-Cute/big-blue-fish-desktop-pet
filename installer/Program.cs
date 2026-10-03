@@ -36,67 +36,118 @@ internal sealed class InstallerForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
-        ClientSize = new Size(660, 410);
         Font = new Font("Microsoft YaHei UI", 10F);
+        AutoScaleDimensions = new SizeF(96F, 96F);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        ClientSize = new Size(660, 480);
+        MinimumSize = new Size(676, 0);
+        AutoSize = true;
+        AutoSizeMode = AutoSizeMode.GrowAndShrink;
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 1,
+            RowCount = 9,
+            Padding = new Padding(32, 26, 32, 26)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        for (var row = 0; row < layout.RowCount; row++)
+            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        Controls.Add(layout);
 
         var title = new Label
         {
             Text = "安装蓝色大肥鱼",
             Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
             AutoSize = true,
-            Location = new Point(34, 26)
+            Margin = new Padding(0, 0, 0, 12)
         };
-        Controls.Add(title);
+        layout.Controls.Add(title, 0, 0);
 
         var intro = new Label
         {
             Text = "这只可爱的桌宠会把程序和本地 4B 模型安装到电脑中。安装过程中需要联网下载模型。",
-            AutoSize = false,
-            Size = new Size(590, 46),
-            Location = new Point(36, 72)
+            AutoSize = true,
+            MaximumSize = new Size(596, 0),
+            Margin = new Padding(0, 0, 0, 22)
         };
-        Controls.Add(intro);
+        layout.Controls.Add(intro, 0, 1);
 
-        var folderLabel = new Label { Text = "安装位置", AutoSize = true, Location = new Point(36, 135) };
-        Controls.Add(folderLabel);
+        var folderLabel = new Label { Text = "安装位置", AutoSize = true, Margin = new Padding(0, 0, 0, 8) };
+        layout.Controls.Add(folderLabel, 0, 2);
+        var folderRow = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            AutoSize = true,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0, 0, 0, 22)
+        };
+        folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+        folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        folderRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         destination.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "蓝色大肥鱼");
-        destination.Location = new Point(36, 162);
-        destination.Size = new Size(510, 32);
-        Controls.Add(destination);
-        var browse = new Button { Text = "浏览…", Location = new Point(556, 161), Size = new Size(70, 33) };
+        destination.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        destination.Margin = new Padding(0, 0, 12, 0);
+        folderRow.Controls.Add(destination, 0, 0);
+        var browse = new Button
+        {
+            Text = "浏览…", AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            MinimumSize = new Size(90, 40),
+            Padding = new Padding(12, 4, 12, 4),
+            Margin = Padding.Empty
+        };
         browse.Click += (_, _) => ChooseFolder();
-        Controls.Add(browse);
+        folderRow.Controls.Add(browse, 1, 0);
+        layout.Controls.Add(folderRow, 0, 3);
 
         var model = new Label
         {
             Text = "模型约 2.7 GB。下载完成后会自动校验文件，校验通过才会继续安装。",
-            AutoSize = false,
-            Size = new Size(590, 28),
-            Location = new Point(36, 215)
+            AutoSize = true,
+            MaximumSize = new Size(596, 0),
+            Margin = new Padding(0, 0, 0, 10)
         };
-        Controls.Add(model);
+        layout.Controls.Add(model, 0, 4);
         source.Text = "模型下载源：Hugging Face（点击打开）";
         source.AutoSize = true;
         source.LinkColor = Color.FromArgb(55, 105, 170);
-        source.Location = new Point(36, 246);
+        source.MaximumSize = new Size(596, 0);
+        source.Margin = new Padding(0, 0, 0, 24);
         source.Click += (_, _) => Process.Start(new ProcessStartInfo(ModelUrl) { UseShellExecute = true });
-        Controls.Add(source);
+        layout.Controls.Add(source, 0, 5);
 
-        progress.Location = new Point(36, 292);
-        progress.Size = new Size(590, 23);
+        progress.Dock = DockStyle.Fill;
+        progress.Height = 23;
+        progress.Margin = new Padding(0, 0, 0, 12);
         progress.Style = ProgressBarStyle.Continuous;
-        Controls.Add(progress);
+        layout.Controls.Add(progress, 0, 6);
         status.Text = "准备安装";
-        status.AutoSize = false;
-        status.Size = new Size(590, 28);
-        status.Location = new Point(36, 325);
-        Controls.Add(status);
+        status.AutoSize = true;
+        status.MaximumSize = new Size(596, 0);
+        status.Margin = new Padding(0, 0, 0, 20);
+        layout.Controls.Add(status, 0, 7);
 
         install.Text = "开始安装";
-        install.Size = new Size(130, 38);
-        install.Location = new Point(496, 360);
+        install.AutoSize = true;
+        install.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        install.MinimumSize = new Size(130, 42);
+        install.Padding = new Padding(18, 6, 18, 6);
+        install.Margin = Padding.Empty;
+        install.Anchor = AnchorStyles.Right;
         install.Click += async (_, _) => await InstallClickedAsync();
-        Controls.Add(install);
+        layout.Controls.Add(install, 0, 8);
+        layout.Layout += (_, _) =>
+        {
+            var width = Math.Max(1, layout.ClientSize.Width - layout.Padding.Horizontal);
+            foreach (var label in new Label[] { title, intro, model, source, status })
+                if (label.MaximumSize.Width != width)
+                    label.MaximumSize = new Size(width, 0);
+        };
     }
 
     private void ChooseFolder()
