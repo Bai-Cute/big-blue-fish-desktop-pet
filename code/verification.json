@@ -51,5 +51,26 @@
     "modelTestUsesRealGeneration": true,
     "vulkanLoaded": true,
     "gpuArguments": true
+  },
+  "publicRelease0_1_1": {
+    "date": "2026-10-04",
+    "configuration": "Release x64 self-contained",
+    "buildErrors": 0,
+    "targetedChecks": 20,
+    "oldNoticeDisappearanceReproduced": true,
+    "exactBatteryNotice": "主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。",
+    "weatherAndTestNoticePassed": true,
+    "noticeTypesProgressively": true,
+    "fiveSecondAndUnlimitedDwellPassed": true,
+    "repeatedPowerEventsPreserveNotice": true,
+    "blockedRequestDoesNotStartModel": true,
+    "realCpuInferencePassed": true,
+    "powerPauseClearsModelReplyAndUnloadsRunner": true,
+    "powerSimulation": "TestPowerOverride",
+    "releasePayloadCrcPassed": true,
+    "releasePayloadEntries": 1600,
+    "actualSelfContainedEntryPassed": true,
+    "releaseEntryModelText": "哎呀，凌晨四点还在敲代码呢，主人辛苦啦～ 小尾巴悄悄给主人披件小外套哦，别冻着呀！",
+    "userPreferencesHashUnchanged": true
   }
 }

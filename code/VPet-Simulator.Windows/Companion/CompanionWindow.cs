@@ -23,6 +23,7 @@ public partial class MainWindow
     private Border bubble = null !;
     private TextBlock bubbleText = null !;
     private CompanionSpeech speech = null!;
+    private bool bubbleIsModelReply;
     private long speechRequestVersion;
     private bool speechTestPending;
     private Grid companionLayout = null !;
@@ -263,7 +264,7 @@ public partial class MainWindow
         if (!brain.CanRunOnCurrentPower)
         {
             brain.Stop();
-            bubble.Visibility = Visibility.Collapsed;
+            ClearCompanionModelReply();
         }
         nextWarmup = DateTime.MinValue;
     }
@@ -372,11 +373,24 @@ public partial class MainWindow
 
     private void ShowCompanionBubble(string text)
     {
+        bubbleIsModelReply = true;
         bubbleUntil = DateTime.MaxValue;
         speech.Show(text, true);
     }
 
-    private void ShowCompanionNotice(string text) => speech.Show(text, false);
+    private void ShowCompanionNotice(string text, bool animate = false)
+    {
+        bubbleIsModelReply = false;
+        bubbleUntil = DateTime.MaxValue;
+        speech.Show(text, animate);
+    }
+
+    private void ClearCompanionModelReply()
+    {
+        if (!bubbleIsModelReply) return;
+        speech.Cancel();
+        bubble.Visibility = Visibility.Collapsed;
+    }
 
     private async void CompanionTick(object? sender, EventArgs e)
     {
@@ -473,7 +487,7 @@ public partial class MainWindow
         {
             if (brain.Busy || brain.RunnerPid != null)
                 brain.Stop();
-            bubble.Visibility = Visibility.Collapsed;
+            ClearCompanionModelReply();
         }
         else if (preferences.ModelEnabled && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
         {

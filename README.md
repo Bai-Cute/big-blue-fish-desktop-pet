@@ -8,7 +8,7 @@
 
 蓝色大肥鱼内置 4B 本地模型，可以联网读取天气、科技新闻和用户当前的工作内容，再以女仆人设在电脑里弹出聊天气泡，温柔可爱地表达对用户的关心。模型只进行单次输出，没有对话记忆，也不能与用户连续聊天。用户在电脑上的行为不会被上传到云端，也不会被保存到本地。
 
-桌宠内置多种可爱的动作和表情，会轮流播放等待、开心、害羞、睡觉、伸展、挥手等动作。笔记本电脑离开电源时，桌宠可以自动停止模型推理并将模型移出内存，以改善续航；这个行为也可以在设置中调整。
+桌宠内置多种可爱的动作和表情，会轮流播放等待、开心、害羞、睡觉、伸展、挥手等动作。笔记本电脑离开电源时，桌宠可以自动停止模型推理并将模型移出内存，以改善续航；这个行为也可以在设置中调整。离电暂停期间点击天气或吐字测试，她会在气泡里提醒主人可以到设置里调节。
 
 <p align="center">
   <img src="docs/images/bigbluefish-rest-transparent.png" width="48%" alt="休息状态" />
@@ -50,7 +50,7 @@ https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e486
 构建一键安装器需要一个已经核对过的 llama.cpp 运行时目录：
 
 ```powershell
-./tools/Build-Installer.ps1 -Version 0.1.0 -RuntimeDirectory "运行时目录"
+./tools/Build-Installer.ps1 -Version 0.1.1 -RuntimeDirectory "运行时目录"
 ```
 
 安装器自身携带桌宠程序和运行时；模型由安装器在安装过程中从固定来源下载，不会被写入 Git 仓库。
@@ -69,7 +69,7 @@ https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e486
 
 ## 项目结构
 
-`code/` 保存 C#、XAML、动画、地区数据、测试程序和依赖锁文件；`installer/` 保存一键安装器的源码；`tools/` 保存构建发布与模型配置工具；`docs/` 保存项目功能规格、维护交接说明和 README 图片；`release/` 保存发布说明模板。
+`code/` 保存 C#、XAML、动画、地区数据、测试程序和依赖锁文件；`installer/` 保存一键安装器的源码；`tools/` 保存构建发布与模型配置工具；`docs/` 保存 README 图片；`release/` 保存发布说明模板。
 
 ## 开发与维护
 

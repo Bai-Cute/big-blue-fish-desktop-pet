@@ -1,0 +1,184 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "Facepunch.Steamworks": {
+        "type": "Transitive",
+        "resolved": "2.3.3",
+        "contentHash": "7nUjWX/uy6JbDX7Q3n8ij7vrpWjTM0S8hXO24R3ZwQ0QgY0sXVlxzh3unmYoLvKGi31rzDHqGX68I169hnHNxQ=="
+      },
+      "LinePutScript": {
+        "type": "Transitive",
+        "resolved": "1.11.9",
+        "contentHash": "in2WEh3jV5+aNHMP8zpvSqDvmgf4sOCS1JhQZSjqG9MOYpfvfLsjbuFidJF3+sp7JjwVGLmhn/AYmZgPENbBWw=="
+      },
+      "LinePutScript.Localization.WPF": {
+        "type": "Transitive",
+        "resolved": "1.0.7",
+        "contentHash": "n9Hh57jE8pNwzFypx2RUu6hYFMotZ+RDQYvpHwtHojLrFnZ35zJRgTXK3WKtYZHn7Ldm17+Q7NKQnXG1hkSrnQ==",
+        "dependencies": {
+          "LinePutScript": "1.8.3"
+        }
+      },
+      "NAudio": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "viewQ/yBZKOckMabTWnO+xb7ACw7k9BgjDqwYxOHRyFGQX7tEu67Vcn4rbcPWErp+DkkYQye6pKmdrB1xQNJGw==",
+        "dependencies": {
+          "NAudio.Asio": "3.0.1",
+          "NAudio.Core": "3.0.1",
+          "NAudio.Dmo": "3.0.1",
+          "NAudio.Midi": "3.0.1",
+          "NAudio.Wasapi": "3.0.1",
+          "NAudio.WinForms": "3.0.1",
+          "NAudio.WinMM": "3.0.1"
+        }
+      },
+      "NAudio.Asio": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "Ccqs+wtIgkrsw4KMdIpW+ZZDLd5Br/RXDNvTqzrLgjDdTnp0w7RQSq407H5uR3ThPuMJrzQM+A9nHL2esnzVFg==",
+        "dependencies": {
+          "NAudio.Core": "3.0.1"
+        }
+      },
+      "NAudio.Core": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "3fJ6UnkoiNBeeczKd9OozvcE85FvtyYCykmfzEbFW0uB0uT2+keKdconUGkz9qYlhaq1RJDTFptXOooQBYLijA==",
+        "dependencies": {
+          "System.Numerics.Tensors": "9.0.0"
+        }
+      },
+      "NAudio.Dmo": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "YWX+07lP0bObT4IOknjhK66QInHZ8TuEyIFIXv4pPAOnfiRRzL/SN/Gj6qKLGmizicr+wKZEbHiw5VMnVn/OfA==",
+        "dependencies": {
+          "NAudio.Core": "3.0.1"
+        }
+      },
+      "NAudio.Midi": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "/YiJWtG6EAIt//BYgd6SMudDT/A4cPgX8qpTbV9sxfJenSli8ujDEkPNF/Fa73YCeimK2bA0K3BmsgQ4olN+Nw==",
+        "dependencies": {
+          "NAudio.Core": "3.0.1"
+        }
+      },
+      "NAudio.Wasapi": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "1j8+HaeAJXFaDaIeVpnaahwAa3ZvMog2bswgmY1JSDysAbeehRx+PIeC0AbNyXZr5gvhu9PfOPD7xwuAEKJcbw==",
+        "dependencies": {
+          "NAudio.Core": "3.0.1"
+        }
+      },
+      "NAudio.WinForms": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "2CFII/mxJCJX/xurB4rx/fAcEbwhr0pH/WWxiYvHZJiOi+9qYxJWmabP+qG220aALP2vhj+fNddceZ7L/uO+eA==",
+        "dependencies": {
+          "NAudio.WinMM": "3.0.1"
+        }
+      },
+      "NAudio.WinMM": {
+        "type": "Transitive",
+        "resolved": "3.0.1",
+        "contentHash": "qeedyr0TtKWjEirwVG2ZkL1ecYVUfyh+s0YLsau6XC2FqyqT42LfR96kVEuDdv6U9LUp+aNGDiHO5MK/td0BAA==",
+        "dependencies": {
+          "NAudio.Core": "3.0.1",
+          "NAudio.Midi": "3.0.1"
+        }
+      },
+      "Panuon.WPF": {
+        "type": "Transitive",
+        "resolved": "1.1.3",
+        "contentHash": "YaOjrqWktWKq2vioGibTYku3DxOKGuOlAIch2VCFz5U+PKolf+EZn1Q9RkLOaJk8bB+iUZj8p/c2UXCo4NlbYw=="
+      },
+      "Panuon.WPF.UI": {
+        "type": "Transitive",
+        "resolved": "1.2.4.10",
+        "contentHash": "KYII6a5zJGQCyn4NNaoCMvwy5QFaACub7Xl4VnCQojxJ84xt3aIDfcruHKCj1SsTlskF5VQljh5kJlbC97xlKg==",
+        "dependencies": {
+          "Panuon.WPF": "1.1.3"
+        }
+      },
+      "SkiaSharp": {
+        "type": "Transitive",
+        "resolved": "3.116.1",
+        "contentHash": "DNDwbRjP+aMo27dV2h/uHCVTcWubWWxHnPLiePNyl24f4Pv43mQ8AQQeseOrKR+J3AOCEs6t0sUjo0aa3j3RWQ==",
+        "dependencies": {
+          "SkiaSharp.NativeAssets.Win32": "3.116.1",
+          "SkiaSharp.NativeAssets.macOS": "3.116.1"
+        }
+      },
+      "SkiaSharp.NativeAssets.macOS": {
+        "type": "Transitive",
+        "resolved": "3.116.1",
+        "contentHash": "3KPvpKysDmEMt0NnAZPX5U6KFk0LmG/72/IjAIJemIksIZ0Tjs9pGpr3L+zboVCv1MLVoJLKl3nJDXUG6Jda6A=="
+      },
+      "SkiaSharp.NativeAssets.Win32": {
+        "type": "Transitive",
+        "resolved": "3.116.1",
+        "contentHash": "dRQ75MCI8oz6zAs2Y1w6pq6ARs4MhdNG+gf3doOxOxdnueDXffQLGQIxON54GDoxc0WjKOoHMKBR4DhaduwwQw=="
+      },
+      "System.Numerics.Tensors": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "hyJB4UlpAi19Xr9AXzu2NuagKC4lPfHObNMEAA0HmqFz2rX7wKgzeYzO/jM/eBHDhnUGFFEjk5cOoJaxqg5J4A=="
+      },
+      "WpfAnimatedGif": {
+        "type": "Transitive",
+        "resolved": "2.0.2",
+        "contentHash": "B0j9SqtThyHVTiOPvu6yR+39Te0g3o+7Jjb+qEm7+Iz1HRqbE5/4QV+ntHWOYYBPOUFr9x1mdzGl/EzWP+nKiA=="
+      },
+      "vpet-simulator.core": {
+        "type": "Project",
+        "dependencies": {
+          "LinePutScript": "[1.11.9, )",
+          "LinePutScript.Localization.WPF": "[1.0.7, )",
+          "Panuon.WPF": "[1.1.3, )",
+          "Panuon.WPF.UI": "[1.2.4.10, )",
+          "SkiaSharp": "[3.116.1, )"
+        }
+      },
+      "vpet-simulator.windows": {
+        "type": "Project",
+        "dependencies": {
+          "Facepunch.Steamworks": "[2.3.3, )",
+          "LinePutScript": "[1.11.9, )",
+          "LinePutScript.Localization.WPF": "[1.0.7, )",
+          "NAudio": "[3.0.1, )",
+          "Panuon.WPF": "[1.1.3, )",
+          "Panuon.WPF.UI": "[1.2.4.10, )",
+          "VPet-Simulator.Core": "[1.0.0, )",
+          "VPet-Simulator.Windows.Interface": "[1.0.0, )",
+          "WpfAnimatedGif": "[2.0.2, )"
+        }
+      },
+      "vpet-simulator.windows.interface": {
+        "type": "Project",
+        "dependencies": {
+          "LinePutScript": "[1.11.9, )",
+          "LinePutScript.Localization.WPF": "[1.0.7, )",
+          "Panuon.WPF": "[1.1.3, )",
+          "Panuon.WPF.UI": "[1.2.4.10, )",
+          "VPet-Simulator.Core": "[1.0.0, )"
+        }
+      }
+    },
+    "net10.0-windows7.0/win-x64": {
+      "SkiaSharp.NativeAssets.macOS": {
+        "type": "Transitive",
+        "resolved": "3.116.1",
+        "contentHash": "3KPvpKysDmEMt0NnAZPX5U6KFk0LmG/72/IjAIJemIksIZ0Tjs9pGpr3L+zboVCv1MLVoJLKl3nJDXUG6Jda6A=="
+      },
+      "SkiaSharp.NativeAssets.Win32": {
+        "type": "Transitive",
+        "resolved": "3.116.1",
+        "contentHash": "dRQ75MCI8oz6zAs2Y1w6pq6ARs4MhdNG+gf3doOxOxdnueDXffQLGQIxON54GDoxc0WjKOoHMKBR4DhaduwwQw=="
+      }
+    }
+  }
+}

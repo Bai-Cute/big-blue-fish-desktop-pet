@@ -48,7 +48,7 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 
 ```powershell
 ./test.ps1 -InstalledDirectory "参考安装目录"
-../tools/Build-Installer.ps1 -Version 0.1.0 -RuntimeDirectory "已核对的运行时目录"
+../tools/Build-Installer.ps1 -Version 0.1.1 -RuntimeDirectory "已核对的运行时目录"
 ```
 
 实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时，并比较原有提示词与文本清理行为。包含 24 组四角 / 缩放 / 长短文本布局、三级选择、菜单、天气缓存与失败恢复、两种电池策略和实际生成。

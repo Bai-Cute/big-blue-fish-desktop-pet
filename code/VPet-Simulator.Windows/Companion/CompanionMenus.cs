@@ -8,6 +8,8 @@ namespace VPet_Simulator.Windows;
 
 public partial class MainWindow
 {
+    private const string BatteryPauseNotice = "主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。";
+
     private void BuildCompanionContextMenu()
     {
         companionContextMenu = new ContextMenu { PlacementTarget = this, Placement = PlacementMode.MousePoint };
@@ -33,7 +35,7 @@ public partial class MainWindow
         }
         if (!brain.CanRunOnCurrentPower)
         {
-            ShowCompanionNotice("主人，现在已按设置暂停模型。插上电，或关闭拔电暂停选项后，就能播报天气啦～");
+            ShowCompanionNotice(BatteryPauseNotice, true);
             return;
         }
         weatherRequestPending = true;
@@ -68,9 +70,14 @@ public partial class MainWindow
     {
         if (speechTestPending || companionClosed) return;
         if (hiddenByUser) RestoreCompanion();
-        if (!preferences.ModelEnabled || !brain.CanRunOnCurrentPower)
+        if (!preferences.ModelEnabled)
         {
             ShowCompanionNotice("主人，当前设置暂停了模型，请启用模型并确认供电设置后再测试～");
+            return;
+        }
+        if (!brain.CanRunOnCurrentPower)
+        {
+            ShowCompanionNotice(BatteryPauseNotice, true);
             return;
         }
         speechTestPending = true;
