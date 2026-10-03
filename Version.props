@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <Version>0.1.1</Version>
+    <AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(Version)', '-.*$', '')).0</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <ApplicationVersion>$(AssemblyVersion)</ApplicationVersion>
+  </PropertyGroup>
+</Project>

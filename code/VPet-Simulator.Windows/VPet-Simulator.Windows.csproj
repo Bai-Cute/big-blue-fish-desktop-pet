@@ -19,7 +19,6 @@
 		<UpdateRequired>false</UpdateRequired>
 		<MapFileExtensions>true</MapFileExtensions>
 		<ApplicationRevision>0</ApplicationRevision>
-		<ApplicationVersion>1.0.0.%2a</ApplicationVersion>
 		<IsWebBootstrapper>false</IsWebBootstrapper>
 		<UseApplicationTrust>false</UseApplicationTrust>
 		<BootstrapperEnabled>true</BootstrapperEnabled>
@@ -33,8 +32,6 @@
 		<AssemblyTitle>虚拟桌宠模拟器</AssemblyTitle>
 		<Description>VPET的独立窗口实现</Description>
 		<Company>LB Game</Company>
-		<AssemblyVersion>1.0.0.0</AssemblyVersion>
-		<FileVersion>1.0.0.0</FileVersion>
 		<Product>VPet-Simulator.Windows</Product>
 		<Copyright>Copyright © exLB.org 2022</Copyright>
 		<StartupObject>VPet_Simulator.Windows.App</StartupObject>

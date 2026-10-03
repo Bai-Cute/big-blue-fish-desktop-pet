@@ -1,76 +1,86 @@
 {
+  "version": "0.1.1",
   "date": "2026-10-04",
-  "version": "0.2.2",
-  "configuration": "Release x64",
+  "configuration": "Release x64 self-contained",
   "buildErrors": 0,
-  "checks": 205,
-  "realWindowCornerCases": 24,
-  "provinceCount": 34,
-  "cityCount": 392,
-  "districtCount": 3209,
-  "settingsCascadeAndPersistence": true,
-  "contextMenuClicks": true,
-  "weatherCacheAndFailureRecovery": true,
-  "batteryPolicyBothModes": true,
-  "powerSimulation": "Windows power override in test mode; not physical unplug",
-  "modelProcessExited": true,
-  "selfContainedEntryTest": {
-    "version": "0.2.2",
-    "modelTest": {
-      "text": "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦～",
-      "samples": [
-        "凌晨的电脑光下，主人正在专注什么呢？ 小女仆悄悄守着，随时准备给主人的世界加点甜～",
-        "主人熬夜",
-        "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦",
-        "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦～"
-      ],
-      "runner": 40428
-    },
-    "weather": {
-      "text": "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽然此刻风很轻，但预报显示最高降水概率高达百分之百哦，主人记得带伞吧。",
-      "samples": [
-        "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦～",
-        "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖",
-        "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽",
-        "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽然此刻风很轻，但预报显示最高降水概率高达百分之百哦，主人记",
-        "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽然此刻风很轻，但预报显示最高降水概率高达百分之百哦，主人记得带伞吧。"
-      ],
-      "runner": 40428
-    },
-    "gpuArguments": true,
-    "vulkanLoaded": true,
-    "userPreferencesPreserved": true
+  "targetedChecks": 20,
+  "oldNoticeDisappearanceReproduced": true,
+  "exactBatteryNotice": "主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。",
+  "weatherAndTestNoticePassed": true,
+  "noticeTypesProgressively": true,
+  "fiveSecondAndUnlimitedDwellPassed": true,
+  "repeatedPowerEventsPreserveNotice": true,
+  "blockedRequestDoesNotStartModel": true,
+  "realCpuInferencePassed": true,
+  "powerPauseClearsModelReplyAndUnloadsRunner": true,
+  "powerSimulation": "TestPowerOverride",
+  "releasePayloadCrcPassed": true,
+  "releasePayloadEntries": 1600,
+  "actualSelfContainedEntryPassed": true,
+  "releaseEntryModelText": "哎呀，凌晨四点还在敲代码呢，主人辛苦啦～ 小尾巴悄悄给主人披件小外套哦，别冻着呀！",
+  "userPreferencesHashUnchanged": true,
+  "versionAlignment": {
+    "versionSource": "Version.props",
+    "productVersion": "0.1.1",
+    "fileAndAssemblyVersion": "0.1.1.0",
+    "applicationDllsVerified": 3,
+    "applicationExeVerified": true,
+    "installerExeVerified": true,
+    "repackedPayloadCrcPassed": true,
+    "repackedEntryStartupAndNoticePassed": true
   },
-  "fullUpstreamGameTested": false,
-  "typingRegression": {
-    "oldVersionReproduced": true,
-    "characters": 73,
-    "seconds": 2.6972246,
-    "fullLayoutReservedImmediately": true,
-    "dwellStartsAfterCompletion": true,
-    "modelTestUsesRealGeneration": true,
-    "vulkanLoaded": true,
-    "gpuArguments": true
-  },
-  "publicRelease0_1_1": {
+  "historicalVerification": {
     "date": "2026-10-04",
-    "configuration": "Release x64 self-contained",
+    "configuration": "Release x64",
     "buildErrors": 0,
-    "targetedChecks": 20,
-    "oldNoticeDisappearanceReproduced": true,
-    "exactBatteryNotice": "主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。",
-    "weatherAndTestNoticePassed": true,
-    "noticeTypesProgressively": true,
-    "fiveSecondAndUnlimitedDwellPassed": true,
-    "repeatedPowerEventsPreserveNotice": true,
-    "blockedRequestDoesNotStartModel": true,
-    "realCpuInferencePassed": true,
-    "powerPauseClearsModelReplyAndUnloadsRunner": true,
-    "powerSimulation": "TestPowerOverride",
-    "releasePayloadCrcPassed": true,
-    "releasePayloadEntries": 1600,
-    "actualSelfContainedEntryPassed": true,
-    "releaseEntryModelText": "哎呀，凌晨四点还在敲代码呢，主人辛苦啦～ 小尾巴悄悄给主人披件小外套哦，别冻着呀！",
-    "userPreferencesHashUnchanged": true
+    "checks": 205,
+    "realWindowCornerCases": 24,
+    "provinceCount": 34,
+    "cityCount": 392,
+    "districtCount": 3209,
+    "settingsCascadeAndPersistence": true,
+    "contextMenuClicks": true,
+    "weatherCacheAndFailureRecovery": true,
+    "batteryPolicyBothModes": true,
+    "powerSimulation": "Windows power override in test mode; not physical unplug",
+    "modelProcessExited": true,
+    "selfContainedEntryTest": {
+      "modelTest": {
+        "text": "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦～",
+        "samples": [
+          "凌晨的电脑光下，主人正在专注什么呢？ 小女仆悄悄守着，随时准备给主人的世界加点甜～",
+          "主人熬夜",
+          "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦",
+          "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦～"
+        ],
+        "runner": 40428
+      },
+      "weather": {
+        "text": "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽然此刻风很轻，但预报显示最高降水概率高达百分之百哦，主人记得带伞吧。",
+        "samples": [
+          "主人熬夜啦，小女仆悄悄给屏幕擦个灰～ 明天天气若凉快，记得多穿点哦～",
+          "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖",
+          "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽",
+          "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽然此刻风很轻，但预报显示最高降水概率高达百分之百哦，主人记",
+          "主人，云霄县此刻大部晴朗，气温 24.3 度，体感暖烘烘的。今天最高能到 31.6 度，最低 23.2 度，虽然此刻风很轻，但预报显示最高降水概率高达百分之百哦，主人记得带伞吧。"
+        ],
+        "runner": 40428
+      },
+      "gpuArguments": true,
+      "vulkanLoaded": true,
+      "userPreferencesPreserved": true
+    },
+    "fullUpstreamGameTested": false,
+    "typingRegression": {
+      "oldVersionReproduced": true,
+      "characters": 73,
+      "seconds": 2.6972246,
+      "fullLayoutReservedImmediately": true,
+      "dwellStartsAfterCompletion": true,
+      "modelTestUsesRealGeneration": true,
+      "vulkanLoaded": true,
+      "gpuArguments": true
+    },
+    "sourceSnapshot": "b128cb00dcfac73de6e73de4cecb4253b5b7e226"
   }
 }

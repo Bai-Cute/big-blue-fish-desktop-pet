@@ -1,13 +1,13 @@
-param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version='0.2.2')
+param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-if($Version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$'){throw '版本号格式应为 0.2.0 或 0.2.0-test1。'}
+$Version=& "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
 $name="BigBlueFish-v$Version-win-x64"
 $destination=Join-Path $root "release/$name"
 if((Test-Path -LiteralPath $destination) -and (Get-ChildItem -LiteralPath $destination -Force | Select-Object -First 1)){throw "发布目录已存在：$destination。请使用新的版本号或先自行移走该目录。"}
 $sdk=& "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
-& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:RestoreLockedMode=true -o $destination --nologo
+& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" -o $destination --nologo
 if($LASTEXITCODE -ne 0){throw '发布编译失败。未完成的发布目录保留供检查。'}
 $runtimeDestination=Join-Path $destination 'runtime'
 if($RuntimeDirectory){

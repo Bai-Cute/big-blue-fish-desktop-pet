@@ -1,14 +1,16 @@
 param(
     [string]$SdkPath,
     [string]$RuntimeDirectory,
-    [string]$Version = '0.1.1',
-    [string]$OutputDirectory
+    [string]$Version,
+    [string]$OutputDirectory,
+    [string]$WorkDirectory
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$') { throw '版本号格式应为 0.1.0。' }
+$Version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
 $sdk = & "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
-$work = Join-Path $root '.work'
+if (!$WorkDirectory) { $WorkDirectory = Join-Path $root '.work' }
+$work = [IO.Path]::GetFullPath($WorkDirectory)
 $payload = Join-Path $work "BigBlueFish-v$Version-payload"
 $stub = Join-Path $work "BigBlueFish-v$Version-setup-stub"
 $payloadZip = Join-Path $work "BigBlueFish-v$Version-payload.zip"

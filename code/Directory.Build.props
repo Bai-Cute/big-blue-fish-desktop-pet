@@ -1,4 +1,5 @@
 <Project>
+  <Import Project="../Version.props" />
   <PropertyGroup>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>

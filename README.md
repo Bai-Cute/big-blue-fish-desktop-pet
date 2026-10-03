@@ -50,10 +50,12 @@ https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e486
 构建一键安装器需要一个已经核对过的 llama.cpp 运行时目录：
 
 ```powershell
-./tools/Build-Installer.ps1 -Version 0.1.1 -RuntimeDirectory "运行时目录"
+./tools/Build-Installer.ps1 -RuntimeDirectory "运行时目录"
 ```
 
 安装器自身携带桌宠程序和运行时；模型由安装器在安装过程中从固定来源下载，不会被写入 Git 仓库。
+
+项目版本统一记录在根目录的 `Version.props`，当前为 **0.1.1**。直接编译和构建安装器都会读取它，程序与安装器使用同一个版本号。
 
 ## 天气、科技新闻和桌宠行为
 
