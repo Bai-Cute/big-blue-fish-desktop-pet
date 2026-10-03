@@ -6,11 +6,12 @@
 
 蓝色大肥鱼内置 4B 本地模型，可以联网读取天气、科技新闻和用户当前的工作内容，再以女仆人设在电脑里弹出聊天气泡，温柔可爱地表达对用户的关心。模型只进行单次输出，没有对话记忆，也不能与用户连续聊天。用户在电脑上的行为不会被上传到云端，也不会被保存到本地。
 
-桌宠内置多种可爱的动作和表情，会轮流播放等待、开心、害羞、睡觉、伸展、游泳、挥手等动作。笔记本电脑离开电源时，桌宠可以自动停止模型推理并将模型移出内存，以改善续航；这个行为也可以在设置中调整。
+桌宠内置多种可爱的动作和表情，会轮流播放等待、开心、害羞、睡觉、伸展、挥手等动作。笔记本电脑离开电源时，桌宠可以自动停止模型推理并将模型移出内存，以改善续航；这个行为也可以在设置中调整。
 
-![休息状态](docs/images/bigbluefish-rest-transparent.png)
-
-![说话状态](docs/images/bigbluefish-speaking-transparent.png)
+<p align="center">
+  <img src="docs/images/bigbluefish-rest-transparent.png" width="48%" alt="休息状态" />
+  <img src="docs/images/bigbluefish-speaking-transparent.png" width="48%" alt="说话状态" />
+</p>
 
 ## 一键安装
 
