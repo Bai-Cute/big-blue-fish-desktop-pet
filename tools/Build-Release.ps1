@@ -2,7 +2,7 @@ param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Ve
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 if($Version -notmatch '^\d+\.\d+\.\d+(?:-[a-zA-Z0-9.-]+)?$'){throw '版本号格式应为 0.2.0 或 0.2.0-test1。'}
-$name="BlueWhale-v$Version-win-x64"
+$name="BigBlueFish-v$Version-win-x64"
 $destination=Join-Path $root "release/$name"
 if((Test-Path -LiteralPath $destination) -and (Get-ChildItem -LiteralPath $destination -Force | Select-Object -First 1)){throw "发布目录已存在：$destination。请使用新的版本号或先自行移走该目录。"}
 $sdk=& "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
