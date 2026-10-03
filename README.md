@@ -4,6 +4,8 @@
 
 这是复原工程的独立改进副本。原安装版和原复原工程不作为修改目标。
 
+接手维护的 agent 请先阅读 [AGENTS.md](AGENTS.md)、[完整功能 spec](docs/AGENT_FUNCTIONAL_SPEC.md) 和 [本地 Git 访问与交接](docs/LOCAL_GIT_HANDOFF.md)。详细规格独立于本 README。
+
 ## 功能
 
 - 可拖动、缩放和贴边；独立文本气泡保持在屏幕内，可以手动关闭。
@@ -17,6 +19,7 @@
 
 ```text
 code/       C# / XAML、动画、地区数据、依赖锁文件和测试
+docs/       面向接手 agent 的完整功能规格和本地仓库访问说明
 release/    本地发布包与发布说明；ZIP 作为 GitHub Release 附件
 tools/      发布打包与模型配置脚本
 README.md   项目说明（后续继续完善）
