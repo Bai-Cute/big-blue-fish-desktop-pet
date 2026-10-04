@@ -98,21 +98,6 @@ internal static class Program
         try { Context("710101", false); } catch (IOException) { missing = true; }
         Check(missing, "Missing district coordinates silently replaced with another city");
     }
-
-    static void VerifyScreenContext(Assembly rebuilt)
-    {
-        var type = rebuilt.GetType("VPet_Simulator.Windows.CompanionScreenContext")!;
-        var summarize = type.GetMethod("Summarize", Access)!;
-        string Context(string process, string title, string windowClass = "", string accessible = "", string controlType = "") =>
-            (string)summarize.Invoke(null, new object[] { process, title, windowClass, accessible, controlType })!;
-
-        Check(Context("explorer", "", "Progman") == "主人正在使用 Windows 桌面", "Desktop was classified as Explorer");
-        Check(Context("explorer", "文档") == "主人在查看文件", "Explorer window was not classified as file viewing");
-        Check(Context("Code", "蓝色大肥鱼-Git版 - Visual Studio Code") == "主人在改蓝色大肥鱼的代码", "Fish coding context was too vague");
-        Check(Context("Code", "蓝色大肥鱼 0.2.0 新任务 - Visual Studio Code") == "主人在改蓝色大肥鱼的代码", "Coding context leaked a detailed title");
-        Check(Context("chrome", "GitHub - Big Blue Fish") == "主人正在浏览网页", "Browser context leaked page title");
-        Check(Context("unknown", "", controlType: "ControlType.Document") == "主人正在查看或编辑文档", "Accessibility document context was ignored");
-    }
     static void Pump()
     {
         if (Dispatcher.CurrentDispatcher.HasShutdownStarted)
@@ -178,7 +163,6 @@ internal static class Program
         // The test uses separate preferences and never writes installation settings.
         File.WriteAllText("preferences.json", "{\"ModelEnabled\":false,\"PublicInfo\":false,\"ForegroundEnabled\":false,\"Scale\":0.65,\"Left\":400,\"Top\":300}");
         var rebuilt = typeof(App).Assembly;
-        VerifyScreenContext(rebuilt);
         VerifyWeather(rebuilt);
         var gateType = rebuilt.GetType("VPet_Simulator.Windows.CompanionNewsGate")!;
         var start = new DateTime(2026, 10, 3, 8, 0, 0);
@@ -404,7 +388,7 @@ internal static class Program
         Wait(() => !Property<bool>(speech, "IsTyping"), 8, "Weather typing timed out");
         string weatherUtterance = text.Text;
         Check(weatherUtterance.Length > 10 && !weatherUtterance.Contains("暂时无法") && !weatherUtterance.Contains("正在查看")
-            && System.Text.RegularExpressions.Regex.IsMatch(weatherUtterance, "[0-9零一二三四五六七八九十百千万]"), "Weather menu did not produce natural-language weather: " + weatherUtterance);
+            && System.Text.RegularExpressions.Regex.IsMatch(weatherUtterance, "[0-9]"), "Weather menu did not produce natural-language weather: " + weatherUtterance);
         Check(Property<int?>(brain, "RunnerPid") == pid, "Weather did not reuse resident model");
         Console.WriteLine("Weather broadcast: " + weatherUtterance);
         Check(Property<bool>(brain, "UseGpu"), "GPU setting disabled during model test");
@@ -449,11 +433,17 @@ internal static class Program
         var original = context.LoadFromAssemblyPath(Path.Combine(installed, "VPet-Simulator.Windows.dll"));
         var oldBrain = original.GetType("VPet_Simulator.Windows.CompanionBrain")!;
         var newBrain = rebuilt.GetType(oldBrain.FullName!)!;
-        Check(((string)newBrain.GetField("Persona", Access)!.GetRawConstantValue()!).Contains("粗粒度活动场景"), "Current Persona does not describe coarse activity scenes");
-        Check(Equals(oldBrain.GetField("NewsPersona", Access)!.GetRawConstantValue(), newBrain.GetField("NewsPersona", Access)!.GetRawConstantValue()), "NewsPersona differs from installed program");
-        Check(((string)newBrain.GetMethod("SpeechRequest", Access)!.Invoke(null, new object[] { "主人在编辑代码" })!).Contains("活动场景"), "SpeechRequest does not use activity scenes");
+        foreach (var field in new[]
+        {
+            "Persona",
+            "NewsPersona"
+        }
+
+        )
+            Check(Equals(oldBrain.GetField(field, Access)!.GetRawConstantValue(), newBrain.GetField(field, Access)!.GetRawConstantValue()), field + " differs from installed program");
         foreach (var name in new[]
         {
+            "SpeechRequest",
             "NewsRequest",
             "Clean"
         }

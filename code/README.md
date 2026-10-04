@@ -25,7 +25,6 @@
 | `VPet-Simulator.Windows/Companion/CompanionRegions.cs` | 省市区层级与定位 |
 | `VPet-Simulator.Windows/Companion/CompanionWeather.cs` | 天气请求、天气代码中文映射和按地点缓存 |
 | `VPet-Simulator.Windows/Companion/CompanionBrain.cs` | 模型启动、推理、电池策略和提示词 |
-| `VPet-Simulator.Windows/Companion/CompanionNative.cs` | 前台窗口、供电、闲置、无障碍信息和粗粒度活动场景 |
 | `VPet-Simulator.Windows/Companion/CompanionSpeech.cs` | 所有模型回复的逐字显示、Unicode 字符边界、替换和取消 |
 | `VPet-Simulator.Windows/Companion/CompanionEdgeLayout.cs` | 贴边、独立气泡窗口和 DPI 换算 |
 | `VPet-Simulator.Windows/Companion/CompanionNewsGate.cs` | 新闻概率、静默期和每日上限 |
@@ -53,8 +52,6 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 ```
 
 实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时，并比较原有提示词与文本清理行为。包含 24 组四角 / 缩放 / 长短文本布局、三级选择、菜单、天气缓存与失败恢复、两种电池策略和实际生成。
-
-0.2.0 增加了活动场景回归测试：桌面、文件窗口、代码编辑器、浏览器和无障碍文档控件会分别归纳为有限的场景短句；蓝色大肥鱼的请求只接收归纳结果，不把原始窗口标题作为模型上下文。
 
 发布脚本生成 `BigBlueFish-Setup-x64.exe` 一键安装器。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型不放进安装器，而是在安装过程中从固定来源下载并校验。
 
