@@ -10,6 +10,7 @@
 **/cache/
 **/models/
 **/runtime/
+**/media/*.exe
 **/preferences.json*
 **/news-last-day.txt*
 **/companion.lock
@@ -18,6 +19,7 @@
 **/test-status.json
 **/test-command.txt
 **/test-render.png
+**/test-settings.png
 **/ocr-status.json
 **/vision-status.json
 **/vision-input.jpg

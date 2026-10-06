@@ -12,5 +12,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../../installer/Program.cs" Link="Installer.cs" />
+    <EmbeddedResource Include="../../../Version.props" Link="Version.props" />
   </ItemGroup>
 </Project>

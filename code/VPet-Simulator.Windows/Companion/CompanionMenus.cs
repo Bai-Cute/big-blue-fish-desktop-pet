@@ -26,7 +26,7 @@ public partial class MainWindow
 
     private async Task SpeakCompanionWeather()
     {
-        if (weatherRequestPending || companionClosed) return;
+        if (weatherRequestPending || companionClosed || exitAnimation) return;
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
@@ -64,7 +64,7 @@ public partial class MainWindow
             if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled
                 && brain.CanRunOnCurrentPower && regionCode == preferences.WeatherRegionCode)
             {
-                if (text.Length > 0) { FinishCompanionPartial(text); PlayCompanion("wave"); }
+                if (text.Length > 0) { FinishCompanionPartial(text); }
                 else ShowCompanionNotice("主人，" + brain.Status + "。");
             }
         }
@@ -77,7 +77,7 @@ public partial class MainWindow
 
     private Task SpeakCompanionTest()
     {
-        if (companionClosed) return Task.CompletedTask;
+        if (companionClosed || exitAnimation) return Task.CompletedTask;
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {

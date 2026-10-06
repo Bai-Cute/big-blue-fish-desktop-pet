@@ -1,6 +1,7 @@
 param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
+& "$PSScriptRoot/Setup-Media.ps1"
 $Version=& "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
 $modeName=if($InputMode -eq 'Ocr'){'OCR'}else{'Vision'}
 $name="BigBlueFish-v$Version-$modeName-win-x64"

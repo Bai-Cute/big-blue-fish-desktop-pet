@@ -8,6 +8,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+& "$PSScriptRoot/Setup-Media.ps1"
 $Version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
 $sdk = & "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
 if (!$WorkDirectory) { $WorkDirectory = Join-Path $root '.work' }

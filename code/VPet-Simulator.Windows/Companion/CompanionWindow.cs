@@ -37,7 +37,6 @@ public partial class MainWindow
     private DateTime nextSpeech, nextAction, bubbleUntil;
     private bool companionReady, companionClosed, dragged, dragging, hiddenByUser, fullscreenHidden;
     private Point dragStart, windowStart, anchor;
-    private Point? destination;
     private readonly Random companionRandom = new();
     private DateTime lastFrame = DateTime.UtcNow;
     private DateTime nextWarmup = DateTime.MinValue;
@@ -47,7 +46,6 @@ public partial class MainWindow
     private IntPtr lastExternalForeground;
     private IntPtr? speechForegroundOverride;
     private string currentAction = "idle";
-    private DateTime actionUntil;
     private System.Threading.Mutex? singleInstance;
     private FileStream? instanceLock;
     private double SpriteSize => 280 * preferences.Scale;
@@ -200,6 +198,7 @@ public partial class MainWindow
         PreviewMouseRightButtonDown += (_, e) =>
         {
             e.Handled = true;
+            if (exitAnimation) return;
             lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
             companionContextMenu.IsOpen = true;
         };
@@ -208,8 +207,9 @@ public partial class MainWindow
         PreviewMouseLeftButtonUp += CompanionUp;
         LostMouseCapture += (_, _) =>
         {
-            dragging = false;
+            if (dragging) { dragging = false; FinishDragAnimation(); }
         };
+        Closing += CompanionClosing;
         BuildCompanionTray();
         SystemEvents.PowerModeChanged += CompanionPowerChanged;
         SystemEvents.DisplaySettingsChanged += CompanionDisplayChanged;
@@ -223,44 +223,15 @@ public partial class MainWindow
         companionTimer.Start();
     }
 
-    private async Task LoadCompanionAnimations()
+    private Task LoadCompanionAnimations()
     {
-        try
-        {
-            Core.Save = GameSavesData.GameSave;
-            Core.Controller = new MWController(this);
-            Core.Graph = new GraphCore(220, Dispatcher, new GraphCore.Config(new LpsDocument("touchhead:|px#100:|py#0:|sw#300:|sh#240:|\ntouchbody:|px#140:|py#200:|sw#240:|sh#260:|")));
-            PNGAnimation.BlueWhaleTint = true;
-            foreach (var folder in Directory.GetDirectories("assets/pet"))
-            {
-                var name = Path.GetFileName(folder).Replace("_0", "");
-                var frames = new DirectoryInfo(folder).GetFiles("*.png").OrderBy(x => int.Parse(x.Name.Split('_')[0])).ToArray();
-                var type = name == "idle" ? GraphType.Default : GraphType.Common;
-                Core.Graph.AddGraph(new PNGAnimation(Core.Graph, Path.GetFullPath(folder), frames, new GraphInfo(name, type, AnimatType.Single, IGameSave.ModeType.Happy), false));
-            }
-
-            Main = new Main(Core)
-            {
-                Width = SpriteSize,
-                Height = SpriteSize,
-                VerticalAlignment = VerticalAlignment.Bottom,
-                HorizontalAlignment = HorizontalAlignment.Center
-            };
-            Main.IsHitTestVisible = true;
-            companionLayout.Children.Insert(0, Main);
-            await Main.Load_2_WaitGraph();
-            if (Main.ErrorMessage.Count > 0)
-                throw new IOException("动画加载失败：" + Main.ErrorMessage[0]);
-            Main.Load_4_Start();
-            companionReady = true;
-            File.WriteAllText("ready.status", "ready");
-        }
+        try { StartVideoAnimations(); }
         catch (Exception e)
         {
             File.WriteAllText("companion-errors.log", e.ToString());
-            bubbleText.Text = "动画未能加载，请检查文件是否完整。";
-            bubble.Visibility = Visibility.Visible;
+            ShowCompanionNotice("动画未能加载，请检查文件是否完整。");
         }
+        return Task.CompletedTask;
     }
 
     private void InstallCompanionHook()
@@ -283,6 +254,7 @@ public partial class MainWindow
             return new IntPtr(3);
         } // MA_NOACTIVATE, still deliver clicks.
 
+        if (msg == 0x11) exitReady = true; // System session end need not wait for an animation.
         if (msg == 0x218)
             ApplyCompanionPowerPolicy();
         return IntPtr.Zero;
@@ -320,14 +292,10 @@ public partial class MainWindow
     });
     private void ApplyCompanionScale(bool save = true)
     {
-        Width = Math.Max(320, SpriteSize + 20);
-        Height = SpriteSize + 115;
+        Width = SpriteSize * 640 / 360 + 20;
+        Height = SpriteSize + 35;
         Set.ZoomLevel = SpriteSize / 500;
-        if (Main != null)
-        {
-            Main.Width = SpriteSize;
-            Main.Height = SpriteSize;
-        }
+        if (videoImage != null) { videoImage.Width = SpriteSize * 640 / 360; videoImage.Height = SpriteSize; }
         PositionLoadingIndicator();
 
         if (save)
@@ -345,8 +313,8 @@ public partial class MainWindow
         // The idle sprite's visible head is around the upper middle of the
         // transparent sprite. Keep the indicator just above its right side.
         loadingIndicator.Margin = new Thickness(
-            Math.Max(0, (Width - SpriteSize) / 2 + SpriteSize * .68),
-            Math.Max(0, Height - SpriteSize + SpriteSize * .03),
+            Math.Max(0, (Width - SpriteSize * 640 / 360) / 2 + SpriteSize * 412 / 360),
+            Math.Max(0, Height - SpriteSize + SpriteSize * 50 / 360),
             0,
             0);
     }
@@ -369,12 +337,12 @@ public partial class MainWindow
 
     private void CompanionDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton != MouseButton.Left || bubble.IsMouseOver)
+        if (exitAnimation || e.ChangedButton != MouseButton.Left || bubble.IsMouseOver)
             return;
         e.Handled = true;
         dragging = true;
         dragged = false;
-        destination = null;
+        CancelMovement();
         CompanionNative.GetCursorPos(out var p);
         dragStart = new Point(p.X, p.Y);
         windowStart = new Point(Left, Top);
@@ -410,17 +378,17 @@ public partial class MainWindow
         ClampCompanion();
         anchor = new Point(Left, Top);
         SaveCompanion();
-        PlayCompanion(dragged ? "happy" : "blush");
-        nextAction = DateTime.UtcNow.AddSeconds(20);
+        if (dragged) FinishDragAnimation(); else ClickAnimation();
     }
 
     private void PlayCompanion(string name)
     {
-        if (!companionReady)
-            return;
-        currentAction = name;
-        actionUntil = DateTime.UtcNow.AddSeconds(name == "sleep" ? 18 : 8);
-        Main.Display(name, AnimatType.Single, () => Main.DisplayNomal());
+        if (!companionReady || exitAnimation) return;
+        if (name == "drag") { CancelMovement(); PlayAnimation(animationPolicy.Find("被鼠标拖拽悬空反馈"), "Drag"); return; }
+        var id = name switch { "idle" => "待机呼吸休闲", "wave" => "点击回应-元气挥手", "angry" => "点击回应-傲娇生气", "sleep" => "原地小憩沉眠", _ => name };
+        CancelMovement();
+        var rule = animationPolicy.Rules.FirstOrDefault(r => r.Id == id);
+        if (rule != null) PlayAnimation(rule, "Preview");
     }
 
     private void ResetBubbleDeadline()
@@ -443,7 +411,7 @@ public partial class MainWindow
             Dispatcher.Invoke(() => ShowCompanionPartial(text));
             return;
         }
-        if (companionClosed || text.Length == 0)
+        if (companionClosed || exitAnimation || text.Length == 0)
             return;
         bubbleIsModelReply = true;
         bubbleUntil = DateTime.MaxValue;
@@ -497,13 +465,13 @@ public partial class MainWindow
             lastExternalForeground = foreground;
         var dt = Math.Min(.15, (now - lastFrame).TotalSeconds);
         lastFrame = now;
-        if (companionClosed)
+        if (companionClosed || exitAnimation)
             return;
         if (App.Args.Contains("--test-mode") && now > diagnosticAt)
         {
             diagnosticAt = now.AddSeconds(1);
             var hwnd = new WindowInteropHelper(this).Handle;
-            File.WriteAllText("test-status.json", System.Text.Json.JsonSerializer.Serialize(new { ready = companionReady, visible = IsVisible, hiddenByUser, fullscreenHidden, fullscreen = CompanionNative.IsFullscreen(), onAC = CompanionNative.OnAC, runner = brain.RunnerPid, busy = brain.Busy, status = brain.Status, hwnd = hwnd.ToInt64(), foreground = CompanionNative.GetForegroundWindow().ToInt64(), startupForeground = startupForeground.ToInt64(), style = CompanionNative.GetStyle(hwnd, -20).ToInt64(), Left, Top, Width, Height, bubble = bubbleText.Text, bubbleVisible = bubble.Visibility == Visibility.Visible, loadingVisible = loadingIndicator.Visibility == Visibility.Visible, bubbleDurationIndex = preferences.BubbleDurationIndex, bubbleRemainingSeconds = bubbleUntil == DateTime.MaxValue ? -1 : Math.Max(0, (bubbleUntil - now).TotalSeconds), action = currentAction }));
+            File.WriteAllText("test-status.json", System.Text.Json.JsonSerializer.Serialize(new { ready = companionReady, visible = IsVisible, hiddenByUser, fullscreenHidden, fullscreen = CompanionNative.IsFullscreen(), onAC = CompanionNative.OnAC, runner = brain.RunnerPid, busy = brain.Busy, status = brain.Status, hwnd = hwnd.ToInt64(), foreground = CompanionNative.GetForegroundWindow().ToInt64(), startupForeground = startupForeground.ToInt64(), style = CompanionNative.GetStyle(hwnd, -20).ToInt64(), Left, Top, Width, Height, bubble = bubbleText.Text, bubbleVisible = bubble.Visibility == Visibility.Visible, loadingVisible = loadingIndicator.Visibility == Visibility.Visible, bubbleDurationIndex = preferences.BubbleDurationIndex, bubbleRemainingSeconds = bubbleUntil == DateTime.MaxValue ? -1 : Math.Max(0, (bubbleUntil - now).TotalSeconds), action = currentAction, animationPhase, animationFrames = videoPlayer?.Frames, animationSeconds = videoPlayer?.PositionSeconds, animationInterval = preferences.AnimationIntervalSeconds, workRecognitionEnabled = false }));
             if (File.Exists("test-command.txt"))
             {
                 var command = File.ReadAllText("test-command.txt").Trim();
@@ -575,8 +543,21 @@ public partial class MainWindow
                         using (var stream = File.Create("test-render.png"))
                             encoder.Save(stream);
                         break;
+                    case "render-settings":
+                        if (companionSettings != null)
+                        {
+                            var settingsBitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)companionSettings.ActualWidth, (int)companionSettings.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+                            settingsBitmap.Render((Visual)companionSettings.Content);
+                            var settingsEncoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
+                            settingsEncoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(settingsBitmap));
+                            using var settingsStream = File.Create("test-settings.png");
+                            settingsEncoder.Save(settingsStream);
+                        }
+                        break;
                     default:
-                        if (command.StartsWith("action:"))
+                        if (command.StartsWith("event:"))
+                            StartAnimationEvent(animationPolicy.Find(command[6..]));
+                        else if (command.StartsWith("action:"))
                             PlayCompanion(command[7..]);
                         break;
                 }
@@ -612,57 +593,11 @@ public partial class MainWindow
             }
         }
 
-        if (hiddenByUser || fullscreenHidden || !companionReady || dragging)
+        if (videoPlayer != null) videoPlayer.Paused = !exitAnimation && (hiddenByUser || fullscreenHidden);
+        if (exitAnimation || hiddenByUser || fullscreenHidden || !companionReady || dragging)
             return;
         if (bubble.Visibility == Visibility.Visible && now > bubbleUntil)
             bubble.Visibility = Visibility.Collapsed;
-        if (destination is Point target)
-        {
-            var delta = target.X - Left;
-            var step = Math.Sign(delta) * Math.Min(Math.Abs(delta), dt * 16);
-            Core.Controller!.MoveWindows(step / Set.ZoomLevel, 0);
-            if (Math.Abs(delta) < 1)
-            {
-                destination = null;
-                Main.PetGrid.RenderTransform = Transform.Identity;
-            }
-        }
-
-        if (now > nextAction && companionSettings == null)
-        {
-            nextAction = now.AddSeconds(companionRandom.Next(18, 38));
-            var names = CompanionNative.OnAC ? new[]
-            {
-                "wave",
-                "stretch",
-                "happy",
-                "sit",
-                "sit_stretch",
-                "eat",
-                "music",
-                "swim",
-                "idle"
-            }
-
-            : new[]
-            {
-                "idle",
-                "sit",
-                "sleep",
-                "stretch"
-            };
-            var action = names[companionRandom.Next(names.Length)];
-            PlayCompanion(action);
-            if (action == "swim" || (!CompanionNative.OnAC && companionRandom.Next(5) == 0))
-            {
-                var original = Left;
-                Left = anchor.X + companionRandom.Next(-45, 46);
-                ClampCompanion();
-                destination = new Point(Left, Top);
-                Left = original;
-            }
-        }
-
         if (now < nextSpeech || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
             return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600)
@@ -705,7 +640,6 @@ public partial class MainWindow
                 FinishCompanionPartial(text);
             else
                 ShowCompanionBubble(text);
-            PlayCompanion("wave");
         }
         else if (streamed)
         {
@@ -775,215 +709,6 @@ public partial class MainWindow
             k.DeleteValue(StartupName, false);
     }
 
-    private void OpenCompanionSettings()
-    {
-        if (companionSettings != null)
-        {
-            companionSettings.Activate();
-            return;
-        }
-
-        destination = null;
-        var w = new Window
-        {
-            Title = "大肥鱼设置",
-            Width = 460,
-            SizeToContent = SizeToContent.Height,
-            MaxHeight = Math.Max(400, SystemParameters.WorkArea.Height - 60),
-            ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            Background = new SolidColorBrush(Color.FromRgb(245, 249, 255)),
-            FontFamily = new FontFamily("Microsoft YaHei UI"),
-            FontSize = 14,
-            ShowInTaskbar = true
-        };
-        var p = new StackPanel
-        {
-            Margin = new Thickness(22)
-        };
-        w.Content = new ScrollViewer { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        p.Children.Add(new TextBlock { Text = "蓝色大肥鱼", FontSize = 23, FontWeight = FontWeights.Bold, Foreground = Brushes.SteelBlue, Margin = new Thickness(0, 0, 0, 12) });
-        void Toggle(string label, bool value, Action<bool> change)
-        {
-            var c = new CheckBox
-            {
-                Content = label,
-                IsChecked = value,
-                Margin = new Thickness(0, 7, 0, 7)
-            };
-            c.Click += (_, _) =>
-            {
-                change(c.IsChecked == true);
-                SaveCompanion();
-            };
-            p.Children.Add(c);
-        }
-
-        Toggle("启用本地大模型", preferences.ModelEnabled, v =>
-        {
-            preferences.ModelEnabled = v;
-            if (!v)
-                brain.Stop();
-            else
-            {
-                nextWarmup = DateTime.MinValue;
-                nextSpeech = DateTime.UtcNow.AddSeconds(20);
-            }
-        });
-        Toggle("拔电时暂停并卸载模型", preferences.StopModelOnBattery, v =>
-        {
-            preferences.StopModelOnBattery = v;
-            ApplyCompanionPowerPolicy();
-        });
-        Toggle("使用显卡加速（关闭则使用 CPU）", preferences.GpuEnabled, v =>
-        {
-            preferences.GpuEnabled = v;
-            brain.Stop();
-            brain.UseGpu = v;
-            nextWarmup = DateTime.MinValue;
-        });
-        Toggle("开机自动启动", StartupEnabled(), SetCompanionStartup);
-        Toggle("自动获取天气和科技新闻", preferences.PublicInfo, v => preferences.PublicInfo = v);
-        Toggle("感知当前应用（仅在本机处理）", preferences.ForegroundEnabled, v => preferences.ForegroundEnabled = v);
-        AddCompanionRegionSelectors(p);
-        var label = new TextBlock
-        {
-            Text = $"缩放：{preferences.Scale:P0}",
-            Margin = new Thickness(0, 10, 0, 4)
-        };
-        p.Children.Add(label);
-        var scale = new Slider
-        {
-            Minimum = .65,
-            Maximum = 1.6,
-            Value = preferences.Scale,
-            TickFrequency = .05,
-            IsSnapToTickEnabled = true
-        };
-        scale.ValueChanged += (_, _) =>
-        {
-            preferences.Scale = scale.Value;
-            label.Text = $"缩放：{scale.Value:P0}";
-            ApplyCompanionScale();
-        };
-        p.Children.Add(scale);
-        var freq = new ComboBox
-        {
-            Margin = new Thickness(0, 8, 0, 8)
-        };
-        foreach (var n in new[]
-        {
-            3,
-            8,
-            15,
-            30
-        }
-
-        )
-            freq.Items.Add($"说话间隔：{n}–{n + 7} 分钟");
-        freq.SelectedIndex = preferences.SpeechMinMinutes switch
-        {
-            3 => 0,
-            15 => 2,
-            30 => 3,
-            _ => 1
-        };
-        freq.SelectionChanged += (_, _) =>
-        {
-            preferences.SpeechMinMinutes = new[]
-            {
-                3,
-                8,
-                15,
-                30
-            }[freq.SelectedIndex];
-            nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
-            SaveCompanion();
-        };
-        p.Children.Add(freq);
-        var dwellLabel = new TextBlock
-        {
-            Text = "气泡驻留时间：" + CompanionPreferences.BubbleDurationLabels[preferences.BubbleDurationIndex],
-            Margin = new Thickness(0, 8, 0, 4)
-        };
-        p.Children.Add(dwellLabel);
-        var dwell = new Slider
-        {
-            Minimum = 0,
-            Maximum = 7,
-            Value = preferences.BubbleDurationIndex,
-            TickFrequency = 1,
-            IsSnapToTickEnabled = true,
-            SmallChange = 1,
-            LargeChange = 1,
-            TickPlacement = System.Windows.Controls.Primitives.TickPlacement.BottomRight,
-            ToolTip = dwellLabel.Text
-        };
-        System.Windows.Automation.AutomationProperties.SetName(dwell, "气泡驻留时间");
-        dwell.ValueChanged += (_, _) =>
-        {
-            preferences.BubbleDurationIndex = (int)Math.Round(dwell.Value);
-            dwellLabel.Text = "气泡驻留时间：" + CompanionPreferences.BubbleDurationLabels[preferences.BubbleDurationIndex];
-            dwell.ToolTip = dwellLabel.Text;
-            if (bubble.Visibility == Visibility.Visible)
-                ResetBubbleDeadline();
-            SaveCompanion();
-        };
-        p.Children.Add(dwell);
-        var status = new TextBlock
-        {
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = Brushes.SlateGray,
-            Margin = new Thickness(0, 8, 0, 8)
-        };
-        p.Children.Add(status);
-        var timer = new DispatcherTimer
-        {
-            Interval = TimeSpan.FromSeconds(1)
-        };
-        void UpdateStatus() => status.Text = (CompanionNative.OnAC ? "已插电" :
-            preferences.StopModelOnBattery ? "电池供电 · 已按设置暂停模型" : "电池供电 · 允许模型运行") + "\n" + brain.Status;
-        timer.Tick += (_, _) => UpdateStatus();
-        UpdateStatus();
-        timer.Start();
-        void Button(string text, Action action)
-        {
-            var b = new Button
-            {
-                Content = text,
-                Padding = new Thickness(8),
-                Margin = new Thickness(0, 4, 0, 4)
-            };
-            b.Click += (_, _) => action();
-            p.Children.Add(b);
-        }
-
-        Button("隐藏到任务栏通知区", HideCompanion);
-        Button("回到右下角", () =>
-        {
-            var a = SystemParameters.WorkArea;
-            Left = a.Right - Width - 8;
-            Top = a.Bottom - Height + 12;
-            ClampCompanion();
-            anchor = new Point(Left, Top);
-            SaveCompanion();
-        });
-        Button("关闭桌宠", () =>
-        {
-            w.Close();
-            base.Close();
-        });
-        p.Children.Add(new TextBlock { Text = "右键可打开设置或播报天气；无聊天记录。\n基于 VPet · 素材采用社区鲸鱼娘动画", FontSize = 11, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 10, 0, 0) });
-        companionSettings = w;
-        w.Closed += (_, _) =>
-        {
-            timer.Stop();
-            companionSettings = null;
-            SaveCompanion();
-        };
-        w.Show();
-    }
-
     private void ShutdownCompanion()
     {
         if (companionClosed)
@@ -991,6 +716,8 @@ public partial class MainWindow
         companionClosed = true;
         companionContextMenu.IsOpen = false;
         companionTimer?.Stop();
+        videoPlayer?.Dispose();
+        loadingTimer?.Stop();
         speech?.Dispose();
         brain?.Dispose();
         SaveCompanion();

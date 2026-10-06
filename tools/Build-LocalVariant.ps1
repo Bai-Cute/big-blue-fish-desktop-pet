@@ -4,6 +4,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+& "$PSScriptRoot/Setup-Media.ps1"
 $version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -InputMode $InputMode
 $destination = Join-Path $root ".work/BigBlueFish-v$version-$($InputMode.ToLowerInvariant())"
 & $SdkPath publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release `

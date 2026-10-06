@@ -269,7 +269,12 @@
 	  <ProjectReference Include="..\VPet-Simulator.Windows.Interface\VPet-Simulator.Windows.Interface.csproj" />
 	</ItemGroup>
   <ItemGroup>
-    <Content Include="assets\pet\**\*.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="assets\fish\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="media\ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="media\FFmpeg-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="assets\regions\china-regions.json" />
   </ItemGroup>
+  <Target Name="EnsureAnimationDecoder" BeforeTargets="PrepareForBuild" Condition="!Exists('$(MSBuildProjectDirectory)\media\ffmpeg.exe')">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)\..\..\tools\Setup-Media.ps1&quot;" />
+  </Target>
 </Project>

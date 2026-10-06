@@ -1,0 +1,736 @@
+[
+  {
+    "Id": "三球抛接",
+    "File": "三球抛接.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "下五子棋",
+    "File": "下五子棋.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "东张西望",
+    "File": "东张西望.webm",
+    "Pool": "Event",
+    "Weight": 1000
+  },
+  {
+    "Id": "中秋赏月吃月饼",
+    "File": "中秋赏月吃月饼.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "MidAutumn",
+    "RadiusDays": 7,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "优雅女仆舞",
+    "File": "优雅女仆舞.webm",
+    "Pool": "Event",
+    "Weight": 300
+  },
+  {
+    "Id": "余额-分文不剩",
+    "File": "余额-分文不剩.webm",
+    "Pool": "Disabled",
+    "Weight": 0
+  },
+  {
+    "Id": "余额-数金皱眉",
+    "File": "余额-数金皱眉.webm",
+    "Pool": "Disabled",
+    "Weight": 0
+  },
+  {
+    "Id": "余额-袋空如洗",
+    "File": "余额-袋空如洗.webm",
+    "Pool": "Disabled",
+    "Weight": 0
+  },
+  {
+    "Id": "余额-金袋叮当",
+    "File": "余额-金袋叮当.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "余额-钱袋如常",
+    "File": "余额-钱袋如常.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "余额-钱袋满溢",
+    "File": "余额-钱袋满溢.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "偷吃零食被抓住",
+    "File": "偷吃零食被抓住.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "写代码",
+    "File": "写代码.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "WorkKind": "Coding",
+    "WorkWeight": 1000
+  },
+  {
+    "Id": "写福字",
+    "File": "写福字.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "SpringFestival",
+    "RadiusDays": 14,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "凭空生花",
+    "File": "凭空生花.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Festival": "ValentineOrMay20",
+    "RadiusDays": 7,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "动物环绕",
+    "File": "动物环绕.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "原地专心玩魔方",
+    "File": "原地专心玩魔方.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "原地小憩沉眠",
+    "File": "原地小憩沉眠.webm",
+    "Pool": "Idle",
+    "Weight": 40,
+    "NightOnly": true
+  },
+  {
+    "Id": "原地左转奔跑",
+    "File": "原地左转奔跑.webm",
+    "Pool": "Event",
+    "Weight": 200,
+    "MoveKind": "Run",
+    "HourParity": 1
+  },
+  {
+    "Id": "原地敲击桌面互动",
+    "File": "原地敲击桌面互动.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "原地漂浮踏步",
+    "File": "原地漂浮踏步.webm",
+    "Pool": "Event",
+    "Weight": 1000
+  },
+  {
+    "Id": "原地跳跃抓碎头顶物品",
+    "File": "原地跳跃抓碎头顶物品.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "原地蹲下玩玩具汽车",
+    "File": "原地蹲下玩玩具汽车.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "变鸽子",
+    "File": "变鸽子.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "可爱宅舞",
+    "File": "可爱宅舞.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "吃Token",
+    "File": "吃Token.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃冰淇淋融化",
+    "File": "吃冰淇淋融化.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "SeasonOnly": "Summer",
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃午餐",
+    "File": "吃午餐.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Dinner",
+    "MealBoost": 900
+  },
+  {
+    "Id": "吃大闸蟹",
+    "File": "吃大闸蟹.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃年糕",
+    "File": "吃年糕.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃早餐",
+    "File": "吃早餐.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Breakfast",
+    "MealBoost": 900
+  },
+  {
+    "Id": "吃晚餐",
+    "File": "吃晚餐.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Lunch",
+    "MealBoost": 900
+  },
+  {
+    "Id": "吃汤圆",
+    "File": "吃汤圆.webm",
+    "Pool": "Event",
+    "Weight": 30,
+    "Festival": "Lantern",
+    "RadiusDays": 7,
+    "FestivalMode": "Window",
+    "FestivalWeight": 100,
+    "Meal": "Any",
+    "MealBoost": 2400
+  },
+  {
+    "Id": "吃白饭",
+    "File": "吃白饭.webm",
+    "Pool": "Event",
+    "Weight": 1000
+  },
+  {
+    "Id": "吃粽子",
+    "File": "吃粽子.webm",
+    "Pool": "Event",
+    "Weight": 30,
+    "Festival": "DragonBoat",
+    "RadiusDays": 7,
+    "FestivalMode": "Window",
+    "FestivalWeight": 100,
+    "Meal": "Any",
+    "MealBoost": 2400
+  },
+  {
+    "Id": "吃糖葫芦",
+    "File": "吃糖葫芦.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "吃腊八粥",
+    "File": "吃腊八粥.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Festival": "Laba",
+    "RadiusDays": 7,
+    "FestivalMode": "Window",
+    "FestivalWeight": 100,
+    "Meal": "Any",
+    "MealBoost": 2400
+  },
+  {
+    "Id": "吃西瓜",
+    "File": "吃西瓜.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "SummerWeight": 300
+  },
+  {
+    "Id": "吃重阳糕",
+    "File": "吃重阳糕.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃长寿面",
+    "File": "吃长寿面.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃青团",
+    "File": "吃青团.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吃饺子",
+    "File": "吃饺子.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "吹气球",
+    "File": "吹气球.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "吹笛子",
+    "File": "吹笛子.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "哈欠连天",
+    "File": "哈欠连天.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "MorningWeight": 500
+  },
+  {
+    "Id": "堆雪人",
+    "File": "堆雪人.webm",
+    "Pool": "Event",
+    "Weight": 300,
+    "SeasonOnly": "Winter"
+  },
+  {
+    "Id": "大口吃零食",
+    "File": "大口吃零食.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "女仆屈膝礼仪",
+    "File": "女仆屈膝礼仪.webm",
+    "Pool": "Greeting",
+    "Weight": 100
+  },
+  {
+    "Id": "小幅度原地360度旋转展示",
+    "File": "小幅度原地360度旋转展示.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "小提琴演奏",
+    "File": "小提琴演奏.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "工作状态-原地踱步张望",
+    "File": "工作状态-原地踱步张望.webm",
+    "Pool": "Event",
+    "Weight": 1000
+  },
+  {
+    "Id": "工作状态-垂头叹气冒汗",
+    "File": "工作状态-垂头叹气冒汗.webm",
+    "Pool": "Disabled",
+    "Weight": 0
+  },
+  {
+    "Id": "工作状态-忙碌点按",
+    "File": "工作状态-忙碌点按.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "WorkKind": "Working",
+    "WorkWeight": 1000
+  },
+  {
+    "Id": "工作状态-思考冒泡",
+    "File": "工作状态-思考冒泡.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "WorkKind": "Working",
+    "WorkWeight": 1000
+  },
+  {
+    "Id": "工作状态-清点归档",
+    "File": "工作状态-清点归档.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "WorkKind": "Working",
+    "WorkWeight": 1000
+  },
+  {
+    "Id": "工作状态-雀跃庆祝",
+    "File": "工作状态-雀跃庆祝.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "待机呼吸休闲",
+    "File": "待机呼吸休闲.webm",
+    "Pool": "Idle",
+    "Weight": 100
+  },
+  {
+    "Id": "扑克魔术",
+    "File": "扑克魔术.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "抽陀螺",
+    "File": "抽陀螺.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "打瞌睡被惊醒",
+    "File": "打瞌睡被惊醒.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "拆礼物",
+    "File": "拆礼物.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "插茱萸赏菊",
+    "File": "插茱萸赏菊.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "摇扇纳凉",
+    "File": "摇扇纳凉.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "WinterWeight": 0,
+    "SummerWeight": 300
+  },
+  {
+    "Id": "撸猫",
+    "File": "撸猫.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "收红包",
+    "File": "收红包.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "SpringFestival",
+    "RadiusDays": 14,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "放孔明灯",
+    "File": "放孔明灯.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "放河灯",
+    "File": "放河灯.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "放烟花",
+    "File": "放烟花.webm",
+    "Pool": "Event",
+    "Weight": 30,
+    "Festival": "SpringFestival",
+    "RadiusDays": 14,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "放风筝",
+    "File": "放风筝.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "整体换装试色",
+    "File": "整体换装试色.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "是啊，吃什么",
+    "File": "是啊，吃什么.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "晨间刷牙",
+    "File": "晨间刷牙.webm",
+    "Pool": "Daily",
+    "Weight": 100
+  },
+  {
+    "Id": "涮火锅",
+    "File": "涮火锅.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "Meal": "Any",
+    "MealBoost": 400
+  },
+  {
+    "Id": "深度思考碎碎念",
+    "File": "深度思考碎碎念.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "点击回应-傲娇生气",
+    "File": "点击回应-傲娇生气.webm",
+    "Pool": "Click",
+    "Weight": 20
+  },
+  {
+    "Id": "点击回应-元气挥手",
+    "File": "点击回应-元气挥手.webm",
+    "Pool": "Click",
+    "Weight": 100
+  },
+  {
+    "Id": "点击回应-害羞惊讶",
+    "File": "点击回应-害羞惊讶.webm",
+    "Pool": "Click",
+    "Weight": 100
+  },
+  {
+    "Id": "点击回应-开心跃动",
+    "File": "点击回应-开心跃动.webm",
+    "Pool": "Click",
+    "Weight": 20
+  },
+  {
+    "Id": "点击回应-挠痒咯咯笑",
+    "File": "点击回应-挠痒咯咯笑.webm",
+    "Pool": "Click",
+    "Weight": 20
+  },
+  {
+    "Id": "照镜子",
+    "File": "照镜子.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "玩水枪",
+    "File": "玩水枪.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "玩游戏气急败坏",
+    "File": "玩游戏气急败坏.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "用鲸鱼尾巴拍打地面",
+    "File": "用鲸鱼尾巴拍打地面.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "碎碎念-发呆碎碎念",
+    "File": "碎碎念-发呆碎碎念.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "碎碎念-对屏碎碎念",
+    "File": "碎碎念-对屏碎碎念.webm",
+    "Pool": "Event",
+    "Weight": 500
+  },
+  {
+    "Id": "碎碎念-擦桌碎碎念",
+    "File": "碎碎念-擦桌碎碎念.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "穿针乞巧",
+    "File": "穿针乞巧.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "Qixi",
+    "RadiusDays": 7,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "舞狮头",
+    "File": "舞狮头.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "SpringFestival",
+    "RadiusDays": 7,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "荡秋千",
+    "File": "荡秋千.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "萌化小幽灵",
+    "File": "萌化小幽灵.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "蓝鲸现世",
+    "File": "蓝鲸现世.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "蝴蝶蜜蜂环绕头顶开花",
+    "File": "蝴蝶蜜蜂环绕头顶开花.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "螃蟹走路",
+    "File": "螃蟹走路.webm",
+    "Pool": "Event",
+    "Weight": 200,
+    "MoveKind": "Crab",
+    "HourParity": 0
+  },
+  {
+    "Id": "被吓一跳",
+    "File": "被吓一跳.webm",
+    "Pool": "Event",
+    "Weight": 30
+  },
+  {
+    "Id": "被落叶淹没",
+    "File": "被落叶淹没.webm",
+    "Pool": "Event",
+    "Weight": 100,
+    "SeasonOnly": "Autumn"
+  },
+  {
+    "Id": "被鼠标拖拽悬空反馈",
+    "File": "被鼠标拖拽悬空反馈.webm",
+    "Pool": "Drag",
+    "Weight": 100
+  },
+  {
+    "Id": "装点圣诞树",
+    "File": "装点圣诞树.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "Christmas",
+    "RadiusDays": 14,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "讨糖南瓜灯",
+    "File": "讨糖南瓜灯.webm",
+    "Pool": "Event",
+    "Weight": 0,
+    "Festival": "Halloween",
+    "RadiusDays": 14,
+    "FestivalMode": "Triangle",
+    "FestivalWeight": 1000
+  },
+  {
+    "Id": "超大伸懒腰",
+    "File": "超大伸懒腰.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "踢毽子",
+    "File": "踢毽子.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "轻快记录",
+    "File": "轻快记录.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "轻快摇摆舞",
+    "File": "轻快摇摆舞.webm",
+    "Pool": "Event",
+    "Weight": 1000
+  },
+  {
+    "Id": "骑木马",
+    "File": "骑木马.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "鲸鱼吐泡泡特效",
+    "File": "鲸鱼吐泡泡特效.webm",
+    "Pool": "Event",
+    "Weight": 200
+  },
+  {
+    "Id": "原地重力下蹲压缩",
+    "File": "原地重力下蹲压缩.webm",
+    "Pool": "Event",
+    "Weight": 100
+  },
+  {
+    "Id": "悠闲哼歌",
+    "File": "悠闲哼歌.webm",
+    "Pool": "Idle",
+    "Weight": 20
+  }
+]

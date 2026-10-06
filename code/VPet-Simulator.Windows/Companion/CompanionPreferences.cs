@@ -14,6 +14,11 @@ internal sealed class CompanionPreferences
     public double Scale { get; set; } = 1;
     public int SpeechMinMinutes { get; set; } = 8;
     public int BubbleDurationIndex { get; set; } = 3;
+    public int AnimationIntervalSeconds { get; set; } = 40;
+    public int BreakfastHour { get; set; } = 8;
+    public int LunchHour { get; set; } = 12;
+    public int DinnerHour { get; set; } = 18;
+    public string? LastBrushDate { get; set; }
 
     internal static readonly int[] BubbleDurations =
     {
@@ -55,6 +60,10 @@ internal sealed class CompanionPreferences
                 if (s != null)
                 {
                     s.Scale = Math.Clamp(s.Scale, .65, 1.6);
+                    s.AnimationIntervalSeconds = Math.Clamp(s.AnimationIntervalSeconds, 30, 300);
+                    s.BreakfastHour = Math.Clamp(s.BreakfastHour, 0, 23);
+                    s.LunchHour = Math.Clamp(s.LunchHour, 0, 23);
+                    s.DinnerHour = Math.Clamp(s.DinnerHour, 0, 23);
                     s.SpeechMinMinutes = Math.Clamp(s.SpeechMinMinutes, 3, 60);
                     s.BubbleDurationIndex = Math.Clamp(s.BubbleDurationIndex, 0, BubbleDurations.Length - 1);
                     s.WeatherRegionCode = CompanionRegions.District(s.WeatherRegionCode).Code;

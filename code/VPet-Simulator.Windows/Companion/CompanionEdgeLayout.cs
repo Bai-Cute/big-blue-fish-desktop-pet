@@ -206,8 +206,7 @@ public static class CompanionEdgeLayout
 
     public static Rect PetBounds(Window w)
     {
-        double spriteSize = SpriteSize(w);
-        return new Rect((w.Width - spriteSize) / 2.0 + spriteSize * 37.0 / 220.0, w.Height - spriteSize + spriteSize * 15.0 / 220.0, spriteSize * 146.0 / 220.0, spriteSize * 173.0 / 220.0);
+        return ((VPet_Simulator.Windows.MainWindow)w).CompanionVisibleBounds;
     }
 
     public static Rect WorkArea(Window w)

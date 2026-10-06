@@ -2,6 +2,7 @@ param([string]$SdkPath,[switch]$Locked,[ValidateSet('Ocr','Vision')][string]$Inp
 $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
+    & "$PSScriptRoot/../tools/Setup-Media.ps1"
     $sdk=& "$PSScriptRoot/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
     $project=Join-Path $PSScriptRoot 'VPet-Simulator.Windows/VPet-Simulator.Windows.csproj'
     $argsBuild=@('build',$project,'-c','Release','-p:Platform=x64',"-p:CompanionInputMode=$InputMode",'--nologo')
