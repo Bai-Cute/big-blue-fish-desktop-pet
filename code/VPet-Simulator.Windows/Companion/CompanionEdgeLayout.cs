@@ -158,6 +158,7 @@ public static class CompanionEdgeLayout
                 }
 
                 Rect area = WorkArea(pet);
+                var styledBubble = bubble as VPet_Simulator.Windows.CompanionBubble;
                 Rect petBounds = PetBounds(pet);
                 double maximumWidth = Math.Max(1.0, Math.Min(300.0, area.Width - 16.0));
                 bubble.MaxWidth = maximumWidth;
@@ -175,12 +176,15 @@ public static class CompanionEdgeLayout
                 double bubbleHeight = Math.Min(Math.Max(1.0, area.Height - 16.0), Math.Max(22, measuringText.DesiredSize.Height) + vertical);
                 double left = Limit(pet.Left + petBounds.Left + petBounds.Width / 2.0 - bubbleWidth / 2.0, area.Left + 8.0, area.Right - bubbleWidth - 8.0);
                 double top = pet.Top + petBounds.Top - bubbleHeight - 10.0;
+                bool belowPet = false;
                 if (top < area.Top + 8.0)
                 {
+                    belowPet = true;
                     top = pet.Top + petBounds.Bottom + 10.0;
                 }
 
                 top = Limit(top, area.Top + 8.0, area.Bottom - bubbleHeight - 8.0);
+                styledBubble?.PointAt(pet.Left + petBounds.Left + petBounds.Width / 2.0 - left, belowPet);
                 popup.Width = Math.Max(1.0, bubbleWidth);
                 popup.Height = Math.Max(1.0, bubbleHeight);
                 popup.Left = left;

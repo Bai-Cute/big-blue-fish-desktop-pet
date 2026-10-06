@@ -92,9 +92,10 @@ public partial class MainWindow
         bubbleText = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
-            FontSize = 15,
-            Foreground = new SolidColorBrush(Color.FromRgb(49, 64, 94)),
-            FontFamily = new FontFamily("Microsoft YaHei UI"),
+            FontSize = 17,
+            Foreground = new SolidColorBrush(global::VPet_Simulator.Windows.CompanionBubble.HairBlue),
+            FontFamily = new FontFamily(new Uri("pack://application:,,,/VPet-Simulator.Windows;component/"),
+                "./Res/Font/#乐米小奶泡体"),
             Focusable = false
         };
         var bubbleContent = new Grid();
@@ -118,7 +119,7 @@ public partial class MainWindow
                 Text = "\uE711",
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
                 FontSize = 10,
-                Foreground = new SolidColorBrush(Color.FromRgb(91, 116, 151)),
+                Foreground = new SolidColorBrush(global::VPet_Simulator.Windows.CompanionBubble.HairBlue),
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             }
@@ -131,13 +132,8 @@ public partial class MainWindow
             bubble.Visibility = Visibility.Collapsed;
         };
         bubbleContent.Children.Add(dismiss);
-        bubble = new Border
+        bubble = new CompanionBubble
         {
-            Background = new SolidColorBrush(Color.FromRgb(244, 249, 255)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(160, 188, 225)),
-            BorderThickness = new Thickness(1.5),
-            CornerRadius = new CornerRadius(18),
-            Padding = new Thickness(15, 10, 10, 10),
             VerticalAlignment = VerticalAlignment.Top,
             HorizontalAlignment = HorizontalAlignment.Center,
             MaxWidth = 300,
@@ -149,7 +145,7 @@ public partial class MainWindow
         {
             Width = 18,
             Height = 18,
-            Stroke = new SolidColorBrush(Color.FromRgb(91, 116, 151)),
+            Stroke = new SolidColorBrush(global::VPet_Simulator.Windows.CompanionBubble.HairBlue),
             StrokeThickness = 2.5,
             StrokeDashArray = new DoubleCollection { 2.2, 3.8 },
             RenderTransformOrigin = new Point(.5, .5),
@@ -160,7 +156,7 @@ public partial class MainWindow
             Width = 28,
             Height = 28,
             Padding = new Thickness(5),
-            Background = new SolidColorBrush(Color.FromArgb(235, 244, 249, 255)),
+            Background = new SolidColorBrush(Color.FromArgb(235, 255, 251, 244)),
             CornerRadius = new CornerRadius(14),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,

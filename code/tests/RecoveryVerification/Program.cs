@@ -105,11 +105,11 @@ internal static class Program
         var build = native.GetMethod("BuildForegroundContext", Access)!;
         var context = (string)build.Invoke(null, new object[]
         {
-            "Code", "蓝色大肥鱼 0.2.0 新任务 - Visual Studio Code", "Chrome_WidgetWin_1",
+            "Code", "蓝色大肥鱼 0.3.0 新任务 - Visual Studio Code", "Chrome_WidgetWin_1",
             "蓝色大肥鱼-Git版", "ControlType.Document",
             new[] { "ControlType.TabItem：README.md", "ControlType.Document：正在编辑" }
         })!;
-        Check(context.Contains("前台应用：Code") && context.Contains("窗口标题：蓝色大肥鱼 0.2.0 新任务 - Visual Studio Code"), "Foreground metadata was lost");
+        Check(context.Contains("前台应用：Code") && context.Contains("窗口标题：蓝色大肥鱼 0.3.0 新任务 - Visual Studio Code"), "Foreground metadata was lost");
         Check(context.Contains("ControlType.TabItem：README.md") && context.Contains("ControlType.Document：正在编辑"), "Accessibility clues were lost");
         Check(context.Length < 1600, "Foreground context was not bounded");
         var brain = rebuilt.GetType("VPet_Simulator.Windows.CompanionBrain")!;

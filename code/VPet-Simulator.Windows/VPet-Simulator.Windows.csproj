@@ -152,6 +152,7 @@
 	<ItemGroup>
 		<Resource Include="Res\Font\OPPOSans B.ttf" />
 		<Resource Include="Res\Font\OPPOSans R.ttf" />
+        <Resource Include="Res\Font\LemiXiaoNaiPaoTi.ttf" />
 		<Resource Include="Res\Gallery.png" />
 		<Resource Include="Res\hash0.png" />
 		<Resource Include="Res\hash1.png" />

@@ -10,7 +10,7 @@ This is a customized companion build, not an official VPet or DeepSeek release.
 * GGUF: https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf , revision b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1. Upstream filename Qwen3.5-4B-heretic-f16_Q4_K_M.gguf. Expected local filename Qwen3.5-4B-heretic-Q4_K_M.gguf; model is not included in Git or the release ZIP. Size 2708804480 bytes. SHA256 8485535a36c9f333574d08b650ad698ac02ec30752bd9cd87e493a3b7531bee1. Apache-2.0 text is included as VPet-Apache-2.0.txt and also applies to the model.
 * Vision projector GGUF: https://huggingface.co/mradermacher/Qwen3.5-4B-heretic-GGUF , revision 0d92f575bfcb057411f3d4088c5eabed979a9b3f, upstream filename and expected local filename Qwen3.5-4B-heretic.mmproj-f16.gguf. It is the matching multimodal projector for the Qwen3.5-4B-heretic model and is downloaded by the installer; it is not included in Git or the release ZIP. Size 672423552 bytes. SHA256 E638DC8DE3B75309A190092BA006307759343B62AE0D21ED8359DF76B9B76C3B. Apache-2.0.
 * .NET 10 runtime: Microsoft and .NET contributors, MIT. Additional runtime notices are included where distributed with the SDK.
-* Windows OCR: Microsoft Windows.Media.Ocr, provided by the installed Windows text recognition language component. The 0.2.0 OCR build uses Microsoft.Windows.SDK.NET.Ref 10.0.26100.1 and its runtime projections; Microsoft Windows SDK license: https://aka.ms/WinSDKLicenseURL .
+* Windows OCR: Microsoft Windows.Media.Ocr, provided by the installed Windows text recognition language component. The 0.3.0 OCR build uses Microsoft.Windows.SDK.NET.Ref 10.0.26100.1 and its runtime projections; Microsoft Windows SDK license: https://aka.ms/WinSDKLicenseURL .
 * Weather: https://open-meteo.com/ , CC BY 4.0 attribution. User-selected district center coordinates; current and daily forecast are queried at runtime. No weather dataset is bundled.
 * News: IT之家, https://www.ithome.com/rss/ . Headlines are retrieved at runtime; no news archive is bundled.
 
@@ -18,3 +18,5 @@ VPet dependencies include LinePutScript, Panuon WPF, SkiaSharp, NAudio, WpfAnima
 
 * Administrative region data: https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov , commit c6c6e35bea3066d674efe2cded189dc57a86e7d8, release 2025.251231.260403. MIT; see licenses/AreaCity-MIT.txt. Only hierarchy and approximate center coordinates are embedded. Mainland GCJ-02 centers are approximately converted to WGS84; polygons are not redistributed.
 
+
+* Lemi Xiao Nai Pao Ti (乐米小奶泡体), version 1.000: font by 乐米字库 / 乐米品牌. It is embedded for companion speech bubbles according to the free commercial use terms published on the font source page: https://www.maoken.com/freefonts/27620.html . The supplied license note is retained in licenses/Lemi-Xiao-Nai-PaoTi.txt.
