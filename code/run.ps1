@@ -1,7 +1,8 @@
-param([string]$SdkPath,[string]$RuntimeDirectory,[string]$ModelsDirectory)
+param([string]$SdkPath,[string]$RuntimeDirectory,[string]$ModelsDirectory,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
-& "$PSScriptRoot/build.ps1" -SdkPath $SdkPath -Locked
-$directory=Join-Path $PSScriptRoot 'VPet-Simulator.Windows/bin/x64/Release/net10.0-windows7.0'
+& "$PSScriptRoot/build.ps1" -SdkPath $SdkPath -Locked -InputMode $InputMode
+$tfm=if($InputMode -eq 'Ocr'){'net10.0-windows10.0.26100.0'}else{'net10.0-windows7.0'}
+$directory=Join-Path $PSScriptRoot "VPet-Simulator.Windows/bin/x64/Release/$tfm"
 if(!$RuntimeDirectory){$RuntimeDirectory=$env:BLUE_WHALE_RUNTIME}
 if(!$ModelsDirectory){$ModelsDirectory=$env:BLUE_WHALE_MODELS}
 if(!$RuntimeDirectory){$RuntimeDirectory='D:\Program Files\蓝色大肥鱼\runtime'}

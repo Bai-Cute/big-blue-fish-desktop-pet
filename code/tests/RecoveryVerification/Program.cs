@@ -98,6 +98,24 @@ internal static class Program
         try { Context("710101", false); } catch (IOException) { missing = true; }
         Check(missing, "Missing district coordinates silently replaced with another city");
     }
+
+    static void VerifyScreenContext(Assembly rebuilt)
+    {
+        var native = rebuilt.GetType("VPet_Simulator.Windows.CompanionNative")!;
+        var build = native.GetMethod("BuildForegroundContext", Access)!;
+        var context = (string)build.Invoke(null, new object[]
+        {
+            "Code", "蓝色大肥鱼 0.2.0 新任务 - Visual Studio Code", "Chrome_WidgetWin_1",
+            "蓝色大肥鱼-Git版", "ControlType.Document",
+            new[] { "ControlType.TabItem：README.md", "ControlType.Document：正在编辑" }
+        })!;
+        Check(context.Contains("前台应用：Code") && context.Contains("窗口标题：蓝色大肥鱼 0.2.0 新任务 - Visual Studio Code"), "Foreground metadata was lost");
+        Check(context.Contains("ControlType.TabItem：README.md") && context.Contains("ControlType.Document：正在编辑"), "Accessibility clues were lost");
+        Check(context.Length < 1600, "Foreground context was not bounded");
+        var brain = rebuilt.GetType("VPet_Simulator.Windows.CompanionBrain")!;
+        var request = (string)brain.GetMethod("SpeechRequest", Access)!.Invoke(null, new object[] { context })!;
+        Check(request.Contains("前台窗口资料") && request.Contains("针对性"), "Speech request did not preserve targeted context");
+    }
     static void Pump()
     {
         if (Dispatcher.CurrentDispatcher.HasShutdownStarted)
@@ -163,6 +181,7 @@ internal static class Program
         // The test uses separate preferences and never writes installation settings.
         File.WriteAllText("preferences.json", "{\"ModelEnabled\":false,\"PublicInfo\":false,\"ForegroundEnabled\":false,\"Scale\":0.65,\"Left\":400,\"Top\":300}");
         var rebuilt = typeof(App).Assembly;
+        VerifyScreenContext(rebuilt);
         VerifyWeather(rebuilt);
         var gateType = rebuilt.GetType("VPet_Simulator.Windows.CompanionNewsGate")!;
         var start = new DateTime(2026, 10, 3, 8, 0, 0);
@@ -388,7 +407,7 @@ internal static class Program
         Wait(() => !Property<bool>(speech, "IsTyping"), 8, "Weather typing timed out");
         string weatherUtterance = text.Text;
         Check(weatherUtterance.Length > 10 && !weatherUtterance.Contains("暂时无法") && !weatherUtterance.Contains("正在查看")
-            && System.Text.RegularExpressions.Regex.IsMatch(weatherUtterance, "[0-9]"), "Weather menu did not produce natural-language weather: " + weatherUtterance);
+            && System.Text.RegularExpressions.Regex.IsMatch(weatherUtterance, "[0-9一二三四五六七八九十百零两]"), "Weather menu did not produce natural-language weather: " + weatherUtterance);
         Check(Property<int?>(brain, "RunnerPid") == pid, "Weather did not reuse resident model");
         Console.WriteLine("Weather broadcast: " + weatherUtterance);
         Check(Property<bool>(brain, "UseGpu"), "GPU setting disabled during model test");
@@ -433,17 +452,10 @@ internal static class Program
         var original = context.LoadFromAssemblyPath(Path.Combine(installed, "VPet-Simulator.Windows.dll"));
         var oldBrain = original.GetType("VPet_Simulator.Windows.CompanionBrain")!;
         var newBrain = rebuilt.GetType(oldBrain.FullName!)!;
-        foreach (var field in new[]
-        {
-            "Persona",
-            "NewsPersona"
-        }
-
-        )
-            Check(Equals(oldBrain.GetField(field, Access)!.GetRawConstantValue(), newBrain.GetField(field, Access)!.GetRawConstantValue()), field + " differs from installed program");
+        Check(((string)newBrain.GetField("Persona", Access)!.GetRawConstantValue()!).Contains("窗口标题和无障碍名称是活动主线"), "Persona does not use structured foreground context");
+        Check(Equals(oldBrain.GetField("NewsPersona", Access)!.GetRawConstantValue(), newBrain.GetField("NewsPersona", Access)!.GetRawConstantValue()), "NewsPersona differs from installed program");
         foreach (var name in new[]
         {
-            "SpeechRequest",
             "NewsRequest",
             "Clean"
         }
@@ -460,6 +472,9 @@ internal static class Program
 
             )
                 Check(Equals(oldBrain.GetMethod(name, Access)!.Invoke(null, new[] { value }), newBrain.GetMethod(name, Access)!.Invoke(null, new[] { value })), name + " behavioral parity failed");
+
+        var speechRequest = (string)newBrain.GetMethod("SpeechRequest", Access)!.Invoke(null, new[] { "前台应用：Code\n窗口标题：蓝色大肥鱼-Git版 - Visual Studio Code" })!;
+        Check(speechRequest.Contains("窗口标题和应用名称为主线") && speechRequest.Contains("针对性"), "SpeechRequest lost structured foreground guidance");
         File.WriteAllText(Path.Combine(sandbox, "result.json"), System.Text.Json.JsonSerializer.Serialize(new { passed = true, checks, corners,
             provinceCount = 34, modelGeneration = utterance, weatherGeneration = weatherUtterance,
             batteryPolicyBothModes = true, modelProcessExited = true, typingSeconds = revealSeconds,

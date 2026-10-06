@@ -1,6 +1,7 @@
 <Project>
   <PropertyGroup>
-    <Version>0.1.1</Version>
+    <CompanionInputMode Condition="'$(CompanionInputMode)' == ''">Ocr</CompanionInputMode>
+    <Version>0.2.0</Version>
     <AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Replace('$(Version)', '-.*$', '')).0</AssemblyVersion>
     <FileVersion>$(AssemblyVersion)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>

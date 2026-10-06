@@ -3,6 +3,8 @@ using System.IO.Compression;
 using System.Security.Cryptography;
 using System.Text;
 using System.Drawing;
+using System.Reflection;
+using System.Text.Json;
 
 namespace BigBlueFish.Setup;
 
@@ -18,9 +20,25 @@ internal static class Program
 
 internal sealed class InstallerForm : Form
 {
+#if COMPANION_OCR
+    internal const bool RequiresVision = false;
+    internal const string InputMode = "OCR";
+    private const string ModeLabel = "OCR 版";
+#else
+    internal const bool RequiresVision = true;
+    internal const string InputMode = "Vision";
+    private const string ModeLabel = "视觉版";
+#endif
+    internal static string ProductVersion => typeof(InstallerForm).Assembly
+        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+    private const string ManifestName = "installation-manifest.json";
+    private sealed record InstalledManifest(string Version, string InputMode, string[] Files);
     private const string ModelName = "Qwen3.5-4B-heretic-Q4_K_M.gguf";
     private const string ModelUrl = "https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1/Qwen3.5-4B-heretic-f16_Q4_K_M.gguf?download=true";
     private const string ModelSha256 = "8485535a36c9f333574d08b650ad698ac02ec30752bd9cd87e493a3b7531bee1";
+    private const string MmprojName = "Qwen3.5-4B-heretic.mmproj-f16.gguf";
+    private const string MmprojUrl = "https://huggingface.co/mradermacher/Qwen3.5-4B-heretic-GGUF/resolve/0d92f575bfcb057411f3d4088c5eabed979a9b3f/Qwen3.5-4B-heretic.mmproj-f16.gguf?download=true";
+    private const string MmprojSha256 = "E638DC8DE3B75309A190092BA006307759343B62AE0D21ED8359DF76B9B76C3B";
     private static readonly byte[] PayloadMarker = Encoding.ASCII.GetBytes("BIGBLUEFISH_PAYLOAD_V1");
 
     private readonly TextBox destination = new();
@@ -31,7 +49,7 @@ internal sealed class InstallerForm : Form
 
     public InstallerForm()
     {
-        Text = "蓝色大肥鱼 · 安装程序";
+        Text = $"蓝色大肥鱼 · {ProductVersion} {ModeLabel}安装程序";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
@@ -60,7 +78,7 @@ internal sealed class InstallerForm : Form
 
         var title = new Label
         {
-            Text = "安装蓝色大肥鱼",
+            Text = $"安装蓝色大肥鱼 · {ModeLabel}",
             Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
             AutoSize = true,
             Margin = new Padding(0, 0, 0, 12)
@@ -69,7 +87,9 @@ internal sealed class InstallerForm : Form
 
         var intro = new Label
         {
-            Text = "这只可爱的桌宠会把程序和本地 4B 模型安装到电脑中。安装过程中需要联网下载模型。",
+            Text = RequiresVision
+                ? "这只可爱的桌宠会把程序、本地 4B 模型和视觉投影组件安装到电脑中。安装过程中需要从 Hugging Face 联网下载模型与视觉组件。"
+                : "这只可爱的桌宠会把程序和本地 4B 模型安装到电脑中，使用 Windows 的本地文字识别组件读取当前窗口。安装过程中需要从 Hugging Face 联网下载模型。",
             AutoSize = true,
             MaximumSize = new Size(596, 0),
             Margin = new Padding(0, 0, 0, 22)
@@ -107,13 +127,16 @@ internal sealed class InstallerForm : Form
 
         var model = new Label
         {
-            Text = "模型约 2.7 GB。下载完成后会自动校验文件，校验通过才会继续安装。",
+            Text = RequiresVision
+                ? "模型约 2.7 GB，视觉投影组件约 640 MB。已有文件校验通过后可以继续使用；下载完成后会自动校验文件并继续安装。"
+                : "模型约 2.7 GB。已有模型校验通过后可以继续使用；下载完成后会自动校验文件并继续安装。",
             AutoSize = true,
             MaximumSize = new Size(596, 0),
             Margin = new Padding(0, 0, 0, 10)
         };
         layout.Controls.Add(model, 0, 4);
-        source.Text = "模型下载源：Hugging Face（点击打开）";
+        source.Text = RequiresVision ? "模型与视觉组件下载源：Hugging Face（点击打开）"
+            : "模型下载源：Hugging Face（点击打开）";
         source.AutoSize = true;
         source.LinkColor = Color.FromArgb(55, 105, 170);
         source.MaximumSize = new Size(596, 0);
@@ -194,37 +217,14 @@ internal sealed class InstallerForm : Form
         using (var payload = OpenPayload())
         using (var archive = new ZipArchive(payload, ZipArchiveMode.Read, leaveOpen: false))
         {
-            foreach (var entry in archive.Entries)
-            {
-                var path = Path.GetFullPath(Path.Combine(target, entry.FullName));
-                if (!path.StartsWith(Path.GetFullPath(target) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-                    throw new InvalidDataException("安装包包含无效路径。");
-                if (string.IsNullOrEmpty(entry.Name))
-                {
-                    Directory.CreateDirectory(path);
-                    continue;
-                }
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                entry.ExtractToFile(path, overwrite: true);
-            }
+            ExtractApplication(archive, target);
         }
 
         var modelFolder = Path.Combine(target, "models");
         Directory.CreateDirectory(modelFolder);
-        var modelPath = Path.Combine(modelFolder, ModelName);
-        if (File.Exists(modelPath) && await MatchesHashAsync(modelPath))
-        {
-            status.Text = "模型已经存在，跳过下载。";
-        }
-        else
-        {
-            var partial = modelPath + ".partial";
-            if (File.Exists(partial)) File.Delete(partial);
-            await DownloadModelAsync(partial);
-            if (!await MatchesHashAsync(partial))
-                throw new InvalidDataException("模型 SHA-256 校验失败，未使用该文件。\n\n" + ModelSha256);
-            File.Move(partial, modelPath, overwrite: true);
-        }
+        await EnsureArtifactAsync(modelFolder, ModelName, ModelUrl, ModelSha256, "本地 4B 模型");
+        if (RequiresVision)
+            await EnsureArtifactAsync(modelFolder, MmprojName, MmprojUrl, MmprojSha256, "视觉投影组件");
 
         CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "蓝色大肥鱼.lnk"), target);
         var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "蓝色大肥鱼.lnk");
@@ -233,11 +233,80 @@ internal sealed class InstallerForm : Form
         progress.Value = 100;
     }
 
-    private async Task DownloadModelAsync(string partial)
+    // The manifest owns application files only. Settings, models and caches survive
+    // both upgrades and mode changes; files exclusive to an old payload are removed.
+    internal static void ExtractApplication(ZipArchive archive, string target)
     {
-        status.Text = "正在从 Hugging Face 下载本地 4B 模型…";
+        target = Path.GetFullPath(target);
+        Directory.CreateDirectory(target);
+        string Resolve(string relative)
+        {
+            var path = Path.GetFullPath(Path.Combine(target, relative));
+            if (!path.StartsWith(target.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("安装包包含无效路径。");
+            return path;
+        }
+        static bool Preserved(string relative)
+        {
+            relative = relative.Replace('\\', '/');
+            return relative.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
+                || relative.StartsWith("cache/", StringComparison.OrdinalIgnoreCase)
+                || relative.StartsWith("preferences.json", StringComparison.OrdinalIgnoreCase)
+                || relative is "news-last-day.txt" or "companion.lock" or "ready.status"
+                    or "companion-errors.log" or "test-command.txt" or "test-status.json"
+                    or "ocr-status.json" or "vision-status.json" or "vision-input.jpg";
+        }
+        var manifestPath = Path.Combine(target, ManifestName);
+        var previous = File.Exists(manifestPath)
+            ? JsonSerializer.Deserialize<InstalledManifest>(File.ReadAllText(manifestPath))?.Files ?? [] : [];
+        var entries = archive.Entries.Where(e => !string.IsNullOrEmpty(e.Name)).ToArray();
+        var current = new HashSet<string>(entries.Select(e => e.FullName.Replace('\\', '/')),
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in entries)
+        {
+            if (Preserved(entry.FullName)) continue;
+            var path = Resolve(entry.FullName);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            entry.ExtractToFile(path, overwrite: true);
+        }
+        // Older installers had no manifest. These are the known OCR-only runtime
+        // projections and the old generated installation instructions.
+        foreach (var relative in previous.Concat(new[] {
+            "Microsoft.Windows.SDK.NET.dll", "WinRT.Runtime.dll", "INSTALL-README.txt", "Setup-Model.ps1" }))
+        {
+            if (current.Contains(relative) || Preserved(relative)) continue;
+            var path = Resolve(relative);
+            if (File.Exists(path)) File.Delete(path);
+        }
+        var manifest = new InstalledManifest(ProductVersion, InputMode,
+            current.Where(p => !Preserved(p)).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray());
+        File.WriteAllText(manifestPath + ".partial", JsonSerializer.Serialize(manifest));
+        File.Move(manifestPath + ".partial", manifestPath, overwrite: true);
+    }
+
+    private async Task EnsureArtifactAsync(string folder, string name, string url, string sha256, string label)
+    {
+        var path = Path.Combine(folder, name);
+        if (File.Exists(path) && await MatchesHashAsync(path, sha256))
+        {
+            status.Text = $"{label}已经存在，跳过下载。";
+            return;
+        }
+
+        var partial = path + ".partial";
+        if (File.Exists(partial)) File.Delete(partial);
+        await DownloadArtifactAsync(partial, url, label);
+        if (!await MatchesHashAsync(partial, sha256))
+            throw new InvalidDataException($"{label} SHA-256 校验失败，未使用该文件。\n\n{sha256}");
+        File.Move(partial, path, overwrite: true);
+    }
+
+    private async Task DownloadArtifactAsync(string partial, string url, string label)
+    {
+        status.Text = $"正在从 Hugging Face 下载{label}…";
         using var client = new HttpClient { Timeout = TimeSpan.FromHours(2) };
-        using var response = await client.GetAsync(ModelUrl, HttpCompletionOption.ResponseHeadersRead);
+        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
         response.EnsureSuccessStatusCode();
         var total = response.Content.Headers.ContentLength ?? 0;
         await using var input = await response.Content.ReadAsStreamAsync();
@@ -253,16 +322,16 @@ internal sealed class InstallerForm : Form
         }
     }
 
-    private static async Task<bool> MatchesHashAsync(string path)
+    private static async Task<bool> MatchesHashAsync(string path, string expected)
     {
         await using var stream = File.OpenRead(path);
         var hash = await SHA256.HashDataAsync(stream);
-        return Convert.ToHexString(hash).Equals(ModelSha256, StringComparison.OrdinalIgnoreCase);
+        return Convert.ToHexString(hash).Equals(expected, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static Stream OpenPayload()
+    internal static Stream OpenPayload(string? installerPath = null)
     {
-        var self = Environment.ProcessPath ?? throw new InvalidOperationException("无法定位安装程序。");
+        var self = installerPath ?? Environment.ProcessPath ?? throw new InvalidOperationException("无法定位安装程序。");
         var stream = new FileStream(self, FileMode.Open, FileAccess.Read, FileShare.Read);
         if (stream.Length < 8 + PayloadMarker.Length) throw new InvalidDataException("安装程序不完整。");
         stream.Seek(-8, SeekOrigin.End);

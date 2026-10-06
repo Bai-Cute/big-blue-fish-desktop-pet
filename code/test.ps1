@@ -1,4 +1,4 @@
-param([string]$SdkPath,[string]$InstalledDirectory='D:\Program Files\蓝色大肥鱼')
+param([string]$SdkPath,[string]$InstalledDirectory='D:\Program Files\蓝色大肥鱼',[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
@@ -11,6 +11,6 @@ try {
         $link=Join-Path $sandbox $name
         if(!(Test-Path -LiteralPath $link)){New-Item -ItemType Junction -Path $link -Target $target | Out-Null}
     }
-    & $sdk run --project "$PSScriptRoot/tests/RecoveryVerification/RecoveryVerification.csproj" -c Release -p:Platform=x64 -- $PSScriptRoot $InstalledDirectory
+    & $sdk run --project "$PSScriptRoot/tests/RecoveryVerification/RecoveryVerification.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -- $PSScriptRoot $InstalledDirectory
     if($LASTEXITCODE -ne 0){throw '验证失败，见上方诊断'}
 } finally {Pop-Location}

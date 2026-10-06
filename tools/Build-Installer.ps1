@@ -3,7 +3,8 @@ param(
     [string]$RuntimeDirectory,
     [string]$Version,
     [string]$OutputDirectory,
-    [string]$WorkDirectory
+    [string]$WorkDirectory,
+    [ValidateSet('Ocr','Vision')][string]$InputMode = 'Ocr'
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -11,13 +12,15 @@ $Version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
 $sdk = & "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
 if (!$WorkDirectory) { $WorkDirectory = Join-Path $root '.work' }
 $work = [IO.Path]::GetFullPath($WorkDirectory)
-$payload = Join-Path $work "BigBlueFish-v$Version-payload"
-$stub = Join-Path $work "BigBlueFish-v$Version-setup-stub"
-$payloadZip = Join-Path $work "BigBlueFish-v$Version-payload.zip"
+$modeName = if ($InputMode -eq 'Ocr') { 'OCR' } else { 'Vision' }
+$baseName = "BigBlueFish-v$Version-$modeName-Setup"
+$payload = Join-Path $work "BigBlueFish-v$Version-$modeName-payload"
+$stub = Join-Path $work "BigBlueFish-v$Version-$modeName-setup-stub"
+$payloadZip = Join-Path $work "BigBlueFish-v$Version-$modeName-payload.zip"
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root 'release' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
-$output = Join-Path $OutputDirectory 'BigBlueFish-Setup-x64.exe'
-$shaFile = Join-Path $OutputDirectory 'BigBlueFish-Setup-x64.sha256'
+$output = Join-Path $OutputDirectory "$baseName.exe"
+$shaFile = Join-Path $OutputDirectory "$baseName.sha256"
 foreach ($p in @($payload,$stub,$payloadZip)) {
     if (Test-Path -LiteralPath $p) { throw "中间产物已存在，请先检查后移走：$p" }
 }
@@ -25,7 +28,7 @@ if (Test-Path -LiteralPath $output) { throw "发布文件已存在，请使用�
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $payload | Out-Null
-& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" "-p:InformationalVersion=$Version" -o $payload --nologo
+& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" "-p:InformationalVersion=$Version" -o $payload --nologo
 if ($LASTEXITCODE -ne 0) { throw '桌宠发布失败。' }
 $runtimeTarget = Join-Path $payload 'runtime'
 New-Item -ItemType Directory -Force -Path $runtimeTarget | Out-Null
@@ -37,19 +40,11 @@ if ($RuntimeDirectory) {
 }
 Copy-Item -LiteralPath "$root/code/licenses" -Destination $payload -Recurse
 Copy-Item -LiteralPath "$root/code/LICENSE", "$root/code/THIRD-PARTY.md" -Destination $payload
-Copy-Item -LiteralPath "$root/tools/Setup-Model.ps1" -Destination $payload
-Set-Content -LiteralPath (Join-Path $payload 'INSTALL-README.txt') -Encoding utf8 -Value @"
-蓝色大肥鱼安装目录
-
-本目录由 BigBlueFish-Setup-x64.exe 安装。
-本地 4B 模型由安装程序从固定版本的 Hugging Face 来源下载并校验。
-模型文件不属于 Git 仓库内容。
-"@
+Copy-Item -LiteralPath "$root/release/README.md" -Destination (Join-Path $payload 'INSTALL-README.md')
 New-Item -ItemType Directory -Force -Path (Join-Path $payload 'models') | Out-Null
-Set-Content -LiteralPath (Join-Path $payload 'models/README.txt') -Encoding utf8 -Value '模型由 BigBlueFish 安装程序下载到此目录。'
 Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $payloadZip -CompressionLevel Optimal
 New-Item -ItemType Directory -Force -Path $stub | Out-Null
-& $sdk publish "$root/installer/BigBlueFish.Setup.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:RestoreLockedMode=true "-p:Version=$Version" -o $stub --nologo
+& $sdk publish "$root/installer/BigBlueFish.Setup.csproj" -c Release "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:RestoreLockedMode=true "-p:Version=$Version" -o $stub --nologo
 if ($LASTEXITCODE -ne 0) { throw '安装器编译失败。' }
 $stubExe = Join-Path $stub 'BigBlueFish.Setup.exe'
 if (!(Test-Path -LiteralPath $stubExe)) { throw '未找到安装器可执行文件。' }
@@ -66,6 +61,6 @@ try {
     $fs.Write($lengthBytes, 0, $lengthBytes.Length)
 } finally { $fs.Dispose() }
 $hash = (Get-FileHash -LiteralPath $output -Algorithm SHA256).Hash.ToLowerInvariant()
-Set-Content -LiteralPath $shaFile -Encoding ascii -Value "$hash  BigBlueFish-Setup-x64.exe"
+Set-Content -LiteralPath $shaFile -Encoding ascii -Value "$hash  $baseName.exe"
 Write-Host "安装器已生成：$output"
 Write-Host "SHA256：$hash"

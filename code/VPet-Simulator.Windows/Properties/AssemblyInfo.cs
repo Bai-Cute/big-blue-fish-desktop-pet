@@ -18,3 +18,5 @@
                                               //(未在页面中找到资源时使用，
                                               //、应用程序或任何主题专用资源字典中找到时使用)
 )]
+
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("OcrVerification")]

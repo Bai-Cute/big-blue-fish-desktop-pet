@@ -1,19 +1,9 @@
-# 蓝色大肥鱼 · Windows 一键安装版
+# 蓝色大肥鱼 · 0.2.0 Windows 一键安装版
 
-请在 GitHub Releases 下载 `BigBlueFish-Setup-x64.exe`，双击后按安装器提示完成部署。安装器会安装桌宠程序、动画资源、.NET 运行时和本地推理运行时；安装完成后会创建快捷方式并启动蓝色大肥鱼。
+蓝色大肥鱼提供视觉版与 OCR 版两种安装器。视觉版直接读取当前窗口截图，结合画面和文字理解内容；OCR 版使用本地文字识别，把界面文字按位置整理后交给模型。两版都使用同一个 4B 本地模型，拥有相同的角色动作、天气、科技新闻和设置功能，可以选择自己更喜欢的一版。
 
-安装过程中需要联网下载约 2.7 GB 的本地 4B 模型。下载源为固定版本的 Hugging Face：
+下载 `BigBlueFish-v0.2.0-Vision-Setup.exe` 安装视觉版，或下载 `BigBlueFish-v0.2.0-OCR-Setup.exe` 安装 OCR 版。双击后按提示安装，安装器会自动配置桌宠程序与运行环境，从 Hugging Face 下载并校验约 2.7 GB 的本地模型；视觉版还会下载约 640 MB 的视觉投影组件。下载来源会在安装器中显示，安装完成后启动桌宠。
 
-```text
-https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1/Qwen3.5-4B-heretic-f16_Q4_K_M.gguf?download=true
-```
+更新前先退出正在运行的桌宠，再运行安装器并选择原安装目录。安装器会保留已有设置，并校验已有模型；校验通过的模型可以继续使用。切换视觉版与 OCR 版时，也可以使用同一安装目录。
 
-安装器会在完成下载后校验模型。模型文件名为 `Qwen3.5-4B-heretic-Q4_K_M.gguf`，SHA-256 为：
-
-```text
-8485535a36c9f333574d08b650ad698ac02ec30752bd9cd87e493a3b7531bee1
-```
-
-模型不存储在 Git 仓库中，也不作为普通仓库文件上传；它由安装器在安装过程中从上面的固定来源获取。安装完成后，可以从桌面快捷方式、开始菜单或安装目录启动程序。
-
-发布包和模型使用的许可见 `THIRD-PARTY.md`、`LICENSE` 和 `licenses/`。版本变化见仓库根目录的 `CHANGELOG.md`。
+对应的 `.sha256` 文件提供安装器的 SHA-256 校验值。完整更新记录见 [CHANGELOG.md](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/blob/v0.2.0/CHANGELOG.md)。

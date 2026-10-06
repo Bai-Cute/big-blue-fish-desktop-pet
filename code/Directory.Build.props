@@ -4,6 +4,7 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath Condition="'$(CompanionInputMode)' == 'Vision'">packages.vision.lock.json</NuGetLockFilePath>
     <Deterministic>true</Deterministic>
     <DebugType>portable</DebugType>
     <EmbedAllSources>true</EmbedAllSources>

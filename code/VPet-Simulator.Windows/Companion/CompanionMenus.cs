@@ -26,7 +26,7 @@ public partial class MainWindow
 
     private async Task SpeakCompanionWeather()
     {
-        if (weatherRequestPending || speechTestPending || companionClosed) return;
+        if (weatherRequestPending || companionClosed) return;
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
@@ -51,11 +51,20 @@ public partial class MainWindow
             if (version != speechRequestVersion || companionClosed || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || regionCode != preferences.WeatherRegionCode)
                 return;
             if (brain.Busy) { ShowCompanionNotice("主人，模型暂时还在忙，请稍后再试一下～"); return; }
-            var text = await brain.GenerateWeather();
+            BeginModelSpeech();
+            string text;
+            try
+            {
+                text = await brain.GenerateWeather(partial => ShowCompanionPartial(partial));
+            }
+            finally
+            {
+                EndModelSpeech();
+            }
             if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled
                 && brain.CanRunOnCurrentPower && regionCode == preferences.WeatherRegionCode)
             {
-                if (text.Length > 0) { ShowCompanionBubble(text); PlayCompanion("wave"); }
+                if (text.Length > 0) { FinishCompanionPartial(text); PlayCompanion("wave"); }
                 else ShowCompanionNotice("主人，" + brain.Status + "。");
             }
         }
@@ -66,44 +75,24 @@ public partial class MainWindow
         }
     }
 
-    private async Task SpeakCompanionTest()
+    private Task SpeakCompanionTest()
     {
-        if (speechTestPending || companionClosed) return;
+        if (companionClosed) return Task.CompletedTask;
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
             ShowCompanionNotice("主人，当前设置暂停了模型，请启用模型并确认供电设置后再测试～");
-            return;
+            return Task.CompletedTask;
         }
         if (!brain.CanRunOnCurrentPower)
         {
             ShowCompanionNotice(BatteryPauseNotice, true);
-            return;
+            return Task.CompletedTask;
         }
-        speechTestPending = true;
-        long version = ++speechRequestVersion;
-        try
-        {
-            ShowCompanionNotice("主人，正在等待本地模型生成测试短句（" + (brain.UseGpu ? "显卡加速" : "CPU") + "）～");
-            var deadline = DateTime.UtcNow.AddSeconds(100);
-            while (brain.Busy && DateTime.UtcNow < deadline && !companionClosed && brain.CanRunOnCurrentPower)
-                await Task.Delay(100);
-            if (companionClosed || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
-            if (brain.Busy) { ShowCompanionNotice("主人，模型暂时还在忙，请稍后再试一下～"); return; }
-            // A real ordinary model generation, using the same GPU/CPU configuration as normal speech.
-            var text = await brain.Generate(false, false);
-            if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden
-                && preferences.ModelEnabled && brain.CanRunOnCurrentPower)
-            {
-                if (text.Length > 0) { ShowCompanionBubble(text); PlayCompanion("wave"); }
-                else ShowCompanionNotice("主人，吐字测试未能生成文字：" + brain.Status + "。");
-            }
-        }
-        finally
-        {
-            speechTestPending = false;
-            nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
-        }
+        // A test directly enters the same single handler used when the ordinary
+        // speech countdown reaches zero.
+        speechForegroundOverride = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+        return SpeechCountdownZeroAsync();
     }
 
     private void AddCompanionRegionSelectors(Panel panel)

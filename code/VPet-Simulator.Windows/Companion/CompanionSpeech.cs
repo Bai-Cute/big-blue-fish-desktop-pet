@@ -33,6 +33,18 @@ internal sealed class CompanionSpeech(TextBlock text, Border bubble, Action refr
         else completed();
     }
 
+    internal void ShowPartial(string message)
+    {
+        Cancel();
+        if (!subscribed) { timer.Tick += Tick; subscribed = true; }
+        FullText = message;
+        boundaries = StringInfo.ParseCombiningCharacters(message);
+        shown = boundaries.Length;
+        text.Text = message;
+        bubble.Visibility = Visibility.Visible;
+        refresh();
+    }
+
     private string Prefix(int count) => count >= boundaries.Length ? FullText : FullText[..boundaries[count]];
 
     private void Tick(object? sender, EventArgs e)

@@ -2,6 +2,7 @@
 **/obj/
 **/.verification/
 .work/
+/work/
 .vs/
 *.user
 *.suo
@@ -17,6 +18,9 @@
 **/test-status.json
 **/test-command.txt
 **/test-render.png
+**/ocr-status.json
+**/vision-status.json
+**/vision-input.jpg
 /release/*
 !/release/README.md
 /AGENTS.md

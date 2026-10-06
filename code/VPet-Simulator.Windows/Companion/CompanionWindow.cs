@@ -13,6 +13,7 @@ using System.Windows.Threading;
 using VPet_Simulator.Core;
 using static VPet_Simulator.Core.GraphInfo;
 using Forms = System.Windows.Forms;
+using Ellipse = System.Windows.Shapes.Ellipse;
 
 namespace VPet_Simulator.Windows;
 public partial class MainWindow
@@ -22,10 +23,13 @@ public partial class MainWindow
     private DispatcherTimer companionTimer = null !;
     private Border bubble = null !;
     private TextBlock bubbleText = null !;
+    private Border loadingIndicator = null !;
+    private Ellipse loadingSpinner = null !;
+    private DispatcherTimer loadingTimer = null !;
+    private double loadingAngle;
     private CompanionSpeech speech = null!;
     private bool bubbleIsModelReply;
     private long speechRequestVersion;
-    private bool speechTestPending;
     private Grid companionLayout = null !;
     private Window? companionSettings;
     private ContextMenu companionContextMenu = null!;
@@ -40,6 +44,8 @@ public partial class MainWindow
     private bool hookInstalled;
     private DateTime diagnosticAt;
     private readonly IntPtr startupForeground = CompanionNative.GetForegroundWindow();
+    private IntPtr lastExternalForeground;
+    private IntPtr? speechForegroundOverride;
     private string currentAction = "idle";
     private DateTime actionUntil;
     private System.Threading.Mutex? singleInstance;
@@ -61,6 +67,8 @@ public partial class MainWindow
 
         instanceLock = File.Open("companion.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
         preferences = CompanionPreferences.Read();
+        if (CompanionNative.IsExternalForegroundCandidate(startupForeground))
+            lastExternalForeground = startupForeground;
         brain = new CompanionBrain
         {
             UseGpu = preferences.GpuEnabled,
@@ -139,6 +147,41 @@ public partial class MainWindow
             Child = bubbleContent
         };
         companionLayout.Children.Add(bubble);
+        loadingSpinner = new Ellipse
+        {
+            Width = 18,
+            Height = 18,
+            Stroke = new SolidColorBrush(Color.FromRgb(91, 116, 151)),
+            StrokeThickness = 2.5,
+            StrokeDashArray = new DoubleCollection { 2.2, 3.8 },
+            RenderTransformOrigin = new Point(.5, .5),
+            RenderTransform = new RotateTransform()
+        };
+        loadingIndicator = new Border
+        {
+            Width = 28,
+            Height = 28,
+            Padding = new Thickness(5),
+            Background = new SolidColorBrush(Color.FromArgb(235, 244, 249, 255)),
+            CornerRadius = new CornerRadius(14),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(0),
+            Visibility = Visibility.Collapsed,
+            IsHitTestVisible = false,
+            Child = loadingSpinner
+        };
+        Panel.SetZIndex(loadingIndicator, 20);
+        companionLayout.Children.Add(loadingIndicator);
+        loadingTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(60)
+        };
+        loadingTimer.Tick += (_, _) =>
+        {
+            loadingAngle = (loadingAngle + 28) % 360;
+            ((RotateTransform)loadingSpinner.RenderTransform).Angle = loadingAngle;
+        };
         speech = new CompanionSpeech(bubbleText, bubble, () => CompanionEdgeLayout.Refresh(this), ResetBubbleDeadline);
         Content = companionLayout;
         ApplyCompanionScale(false);
@@ -157,6 +200,7 @@ public partial class MainWindow
         PreviewMouseRightButtonDown += (_, e) =>
         {
             e.Handled = true;
+            lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
             companionContextMenu.IsOpen = true;
         };
         PreviewMouseLeftButtonDown += CompanionDown;
@@ -284,6 +328,7 @@ public partial class MainWindow
             Main.Width = SpriteSize;
             Main.Height = SpriteSize;
         }
+        PositionLoadingIndicator();
 
         if (save)
         {
@@ -291,6 +336,19 @@ public partial class MainWindow
             anchor = new Point(Left, Top);
             SaveCompanion();
         }
+    }
+
+    private void PositionLoadingIndicator()
+    {
+        if (loadingIndicator == null || preferences == null)
+            return;
+        // The idle sprite's visible head is around the upper middle of the
+        // transparent sprite. Keep the indicator just above its right side.
+        loadingIndicator.Margin = new Thickness(
+            Math.Max(0, (Width - SpriteSize) / 2 + SpriteSize * .68),
+            Math.Max(0, Height - SpriteSize + SpriteSize * .03),
+            0,
+            0);
     }
 
     private void ClampCompanion() => CompanionEdgeLayout.Clamp(this);
@@ -378,6 +436,45 @@ public partial class MainWindow
         speech.Show(text, true);
     }
 
+    private void ShowCompanionPartial(string text)
+    {
+        if (!Dispatcher.CheckAccess())
+        {
+            Dispatcher.Invoke(() => ShowCompanionPartial(text));
+            return;
+        }
+        if (companionClosed || text.Length == 0)
+            return;
+        bubbleIsModelReply = true;
+        bubbleUntil = DateTime.MaxValue;
+        speech.ShowPartial(text);
+    }
+
+    private void FinishCompanionPartial(string text)
+    {
+        ShowCompanionPartial(text);
+        ResetBubbleDeadline();
+    }
+
+    private void BeginModelSpeech()
+    {
+        if (loadingIndicator == null || loadingTimer == null)
+            return;
+        ClearCompanionModelReply();
+        loadingIndicator.Visibility = Visibility.Visible;
+        loadingTimer.Start();
+        CompanionEdgeLayout.Refresh(this);
+    }
+
+    private void EndModelSpeech()
+    {
+        if (loadingIndicator == null || loadingTimer == null)
+            return;
+        loadingTimer.Stop();
+        loadingIndicator.Visibility = Visibility.Collapsed;
+        CompanionEdgeLayout.Refresh(this);
+    }
+
     private void ShowCompanionNotice(string text, bool animate = false)
     {
         bubbleIsModelReply = false;
@@ -395,6 +492,9 @@ public partial class MainWindow
     private async void CompanionTick(object? sender, EventArgs e)
     {
         var now = DateTime.UtcNow;
+        var foreground = CompanionNative.GetForegroundWindow();
+        if (CompanionNative.IsExternalForegroundCandidate(foreground))
+            lastExternalForeground = foreground;
         var dt = Math.Min(.15, (now - lastFrame).TotalSeconds);
         lastFrame = now;
         if (companionClosed)
@@ -403,7 +503,7 @@ public partial class MainWindow
         {
             diagnosticAt = now.AddSeconds(1);
             var hwnd = new WindowInteropHelper(this).Handle;
-            File.WriteAllText("test-status.json", System.Text.Json.JsonSerializer.Serialize(new { ready = companionReady, visible = IsVisible, hiddenByUser, fullscreenHidden, fullscreen = CompanionNative.IsFullscreen(), onAC = CompanionNative.OnAC, runner = brain.RunnerPid, busy = brain.Busy, status = brain.Status, hwnd = hwnd.ToInt64(), foreground = CompanionNative.GetForegroundWindow().ToInt64(), startupForeground = startupForeground.ToInt64(), style = CompanionNative.GetStyle(hwnd, -20).ToInt64(), Left, Top, Width, Height, bubble = bubbleText.Text, bubbleVisible = bubble.Visibility == Visibility.Visible, bubbleDurationIndex = preferences.BubbleDurationIndex, bubbleRemainingSeconds = bubbleUntil == DateTime.MaxValue ? -1 : Math.Max(0, (bubbleUntil - now).TotalSeconds), action = currentAction }));
+            File.WriteAllText("test-status.json", System.Text.Json.JsonSerializer.Serialize(new { ready = companionReady, visible = IsVisible, hiddenByUser, fullscreenHidden, fullscreen = CompanionNative.IsFullscreen(), onAC = CompanionNative.OnAC, runner = brain.RunnerPid, busy = brain.Busy, status = brain.Status, hwnd = hwnd.ToInt64(), foreground = CompanionNative.GetForegroundWindow().ToInt64(), startupForeground = startupForeground.ToInt64(), style = CompanionNative.GetStyle(hwnd, -20).ToInt64(), Left, Top, Width, Height, bubble = bubbleText.Text, bubbleVisible = bubble.Visibility == Visibility.Visible, loadingVisible = loadingIndicator.Visibility == Visibility.Visible, bubbleDurationIndex = preferences.BubbleDurationIndex, bubbleRemainingSeconds = bubbleUntil == DateTime.MaxValue ? -1 : Math.Max(0, (bubbleUntil - now).TotalSeconds), action = currentAction }));
             if (File.Exists("test-command.txt"))
             {
                 var command = File.ReadAllText("test-command.txt").Trim();
@@ -563,7 +663,7 @@ public partial class MainWindow
             }
         }
 
-        if (now < nextSpeech || brain.Busy || weatherRequestPending || speechTestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
+        if (now < nextSpeech || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
             return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600)
         {
@@ -571,19 +671,58 @@ public partial class MainWindow
             return;
         }
 
-        nextSpeech = now.AddMinutes(preferences.SpeechMinMinutes + companionRandom.Next(0, 8));
+        await SpeechCountdownZeroAsync();
+    }
+
+    private async Task SpeechCountdownZeroAsync()
+    {
+        var foregroundHandle = speechForegroundOverride
+            ?? CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+        speechForegroundOverride = null;
+        if (brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
+            return;
+
+        nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes + companionRandom.Next(0, 8));
         long version = speechRequestVersion;
-        var text = await brain.Generate(preferences.PublicInfo, preferences.ForegroundEnabled);
-        if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower && text.Length > 0 && CompanionNative.IdleSeconds >= 5)
+        BeginModelSpeech();
+        bool streamed = false;
+        string text;
+        try
         {
-            ShowCompanionBubble(text);
+            text = await brain.Generate(preferences.PublicInfo, preferences.ForegroundEnabled, foregroundHandle, partial =>
+            {
+                streamed = true;
+                ShowCompanionPartial(partial);
+            });
+        }
+        finally
+        {
+            EndModelSpeech();
+        }
+        if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower && text.Length > 0)
+        {
+            if (streamed)
+                FinishCompanionPartial(text);
+            else
+                ShowCompanionBubble(text);
             PlayCompanion("wave");
         }
+        else if (streamed)
+        {
+            ClearCompanionModelReply();
+        }
+#if COMPANION_OCR
+        else if (!companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower)
+        {
+            ShowCompanionNotice("主人，" + brain.Status + "。");
+        }
+#endif
     }
 
     private void BuildCompanionTray()
     {
         var menu = new Forms.ContextMenuStrip();
+        menu.Opening += (_, _) => lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
         menu.Items.Add("显示桌宠", null, (_, _) => Dispatcher.Invoke(RestoreCompanion));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenCompanionSettings));
         menu.Items.Add("天气", null, async (_, _) => await Dispatcher.InvokeAsync(SpeakCompanionWeather).Task.Unwrap());

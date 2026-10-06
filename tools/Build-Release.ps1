@@ -1,13 +1,14 @@
-param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version)
+param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 $Version=& "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
-$name="BigBlueFish-v$Version-win-x64"
+$modeName=if($InputMode -eq 'Ocr'){'OCR'}else{'Vision'}
+$name="BigBlueFish-v$Version-$modeName-win-x64"
 $destination=Join-Path $root "release/$name"
 if((Test-Path -LiteralPath $destination) -and (Get-ChildItem -LiteralPath $destination -Force | Select-Object -First 1)){throw "发布目录已存在：$destination。请使用新的版本号或先自行移走该目录。"}
 $sdk=& "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
-& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" -o $destination --nologo
+& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" -o $destination --nologo
 if($LASTEXITCODE -ne 0){throw '发布编译失败。未完成的发布目录保留供检查。'}
 $runtimeDestination=Join-Path $destination 'runtime'
 if($RuntimeDirectory){
@@ -32,12 +33,12 @@ Copy-Item -LiteralPath "$root/code/LICENSE","$root/code/THIRD-PARTY.md" -Destina
 Copy-Item -LiteralPath "$root/tools/Setup-Model.ps1" -Destination $destination
 Copy-Item -LiteralPath "$root/release/README.md" -Destination (Join-Path $destination 'README.md')
 New-Item -ItemType Directory -Path (Join-Path $destination 'models') | Out-Null
-Set-Content -LiteralPath (Join-Path $destination 'models/README.txt') -Value '运行 Setup-Model.ps1 配置模型。模型文件不随 Git 仓库或此发布包分发。' -Encoding utf8
+Set-Content -LiteralPath (Join-Path $destination 'models/README.txt') -Value '运行 Setup-Model.ps1 配置 4B 模型和视觉投影组件。模型文件不随 Git 仓库或此发布包分发。' -Encoding utf8
 $files=Get-ChildItem -LiteralPath $destination -Recurse -File
 $manifest=foreach($file in $files){
     [ordered]@{path=[IO.Path]::GetRelativePath($destination,$file.FullName).Replace('\','/');size=$file.Length;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}
 }
-[ordered]@{version=$Version;platform='win-x64';selfContained=$true;modelIncluded=$false;files=$manifest} |
+[ordered]@{version=$Version;platform='win-x64';inputMode=$InputMode;selfContained=$true;modelIncluded=$false;files=$manifest} |
     ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $destination 'manifest.json') -Encoding utf8
 $archive=Join-Path $root "release/$name.zip"
 Compress-Archive -LiteralPath $destination -DestinationPath $archive

@@ -1,4 +1,4 @@
-param([string]$Version)
+param([string]$Version, [ValidateSet('Ocr','Vision')][string]$InputMode = 'Ocr')
 $ErrorActionPreference = 'Stop'
 if (!$Version) {
     [xml]$projectVersion = Get-Content -LiteralPath (Join-Path $PSScriptRoot '../Version.props') -Raw
