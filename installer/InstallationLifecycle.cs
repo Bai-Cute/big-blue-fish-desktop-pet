@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using System.IO.Compression;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
@@ -68,16 +68,17 @@ internal static class InstallationLifecycle
     internal static string RegistrationName(string directory) => "BigBlueFish-" +
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(ValidateDirectory(directory).ToUpperInvariant())))[..16];
 
-    internal static void Register(string directory, string installer, params string[] shortcuts)
+    internal static void Register(string directory, params string[] shortcuts)
     {
         var target = ValidateDirectory(directory);
-        CopyUninstaller(installer, Path.Combine(target, UninstallerName));
+        if (!File.Exists(Path.Combine(target, UninstallerName)))
+            throw new IOException("安装文件中缺少卸载程序。");
         var info = new InstallInfo(target, shortcuts, WindowsIdentity.GetCurrent().User!.Value);
         File.WriteAllText(Path.Combine(target, InfoName), JsonSerializer.Serialize(info));
         using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
         using var key = machine.CreateSubKey(UninstallRoot + "\\" + RegistrationName(target));
         key.SetValue("DisplayName", "蓝色大肥鱼");
-        key.SetValue("DisplayVersion", InstallerForm.ProductVersion);
+        key.SetValue("DisplayVersion", typeof(InstallationLifecycle).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
         key.SetValue("Publisher", "Bai-Cute");
         key.SetValue("InstallLocation", target);
         key.SetValue("DisplayIcon", Path.Combine(target, "vpeticon.ico"));
@@ -91,42 +92,25 @@ internal static class InstallationLifecycle
         application.SetValue("Path", target);
     }
 
-    private static void CopyUninstaller(string installer, string destination)
+    internal static string ValidateInstallation(string directory)
     {
-        using var input = File.OpenRead(installer);
-        var marker = Encoding.ASCII.GetBytes("BIGBLUEFISH_PAYLOAD_V1");
-        input.Seek(-8, SeekOrigin.End);
-        var length = new byte[8];
-        input.ReadExactly(length);
-        long markerOffset = input.Length - 8 - marker.Length;
-        input.Position = markerOffset;
-        var actual = new byte[marker.Length];
-        input.ReadExactly(actual);
-        long remaining = markerOffset - BitConverter.ToInt64(length);
-        if (!actual.SequenceEqual(marker) || remaining <= 0) throw new InvalidDataException("安装程序不完整。");
-        input.Position = 0;
-        using var output = File.Create(destination + ".partial");
-        var buffer = new byte[1024 * 1024];
-        while (remaining > 0)
-        {
-            int count = input.Read(buffer, 0, (int)Math.Min(buffer.Length, remaining));
-            if (count == 0) throw new EndOfStreamException();
-            output.Write(buffer, 0, count);
-            remaining -= count;
-        }
-        output.Dispose();
-        File.Move(destination + ".partial", destination, overwrite: true);
+        var target = ValidateDirectory(directory);
+        using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "installation-manifest.json")));
+        if (!manifest.RootElement.GetProperty("Files").EnumerateArray()
+            .Any(x => string.Equals(x.GetString(), "VPet-Simulator.Windows.exe", StringComparison.OrdinalIgnoreCase)))
+            throw new InvalidDataException("未找到蓝色大肥鱼的安装记录。");
+        var info = JsonSerializer.Deserialize<InstallInfo>(File.ReadAllText(Path.Combine(target, InfoName)))!;
+        if (!target.Equals(info.Directory, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("安装目录与记录不一致。");
+        return target;
     }
 
     internal static void Uninstall(string directory, bool removeData)
     {
-        var target = ValidateDirectory(directory);
+        var target = ValidateInstallation(directory);
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "installation-manifest.json")));
         var files = manifest.RootElement.GetProperty("Files").EnumerateArray().Select(x => x.GetString()!).ToArray();
-        if (!files.Contains("VPet-Simulator.Windows.exe", StringComparer.OrdinalIgnoreCase))
-            throw new InvalidDataException("未找到蓝色大肥鱼的安装记录。");
         var info = JsonSerializer.Deserialize<InstallInfo>(File.ReadAllText(Path.Combine(target, InfoName)))!;
-        if (!target.Equals(info.Directory, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("安装目录与记录不一致。");
         foreach (var process in Process.GetProcesses())
         {
             using (process)
@@ -197,71 +181,4 @@ internal static class InstallationLifecycle
         Marshal.FinalReleaseComObject(shell);
     }
 
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    private static extern bool MoveFileEx(string existing, string? destination, int flags);
-
-    internal static Form CreateUninstallForm(string target)
-    {
-            var form = new Form { Text = "卸载蓝色大肥鱼", ClientSize = new Size(480, 210),
-                StartPosition = FormStartPosition.CenterScreen, FormBorderStyle = FormBorderStyle.FixedDialog,
-                MaximizeBox = false, MinimizeBox = false, Font = new Font("Microsoft YaHei UI", 10),
-                AutoScaleDimensions = new SizeF(96, 96), AutoScaleMode = AutoScaleMode.Dpi,
-                AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink };
-            var layout = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink, ColumnCount = 1, RowCount = 3, Padding = new Padding(24) };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-            for (int i = 0; i < 3; i++) layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-            var label = new Label { Text = "准备卸载蓝色大肥鱼。勾选下方选项，可以保留模型和设置，方便以后重新安装。",
-                AutoSize = true, MaximumSize = new Size(420, 0), Margin = new Padding(0, 0, 0, 18) };
-            var data = new CheckBox { Text = "保留模型和设置", Checked = false, AutoSize = true, Margin = new Padding(0, 0, 0, 22) };
-            var button = new Button { Text = "卸载", AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                MinimumSize = new Size(110, 38), Padding = new Padding(12, 4, 12, 4), Anchor = AnchorStyles.Right, Margin = Padding.Empty };
-            button.Click += (_, _) =>
-            {
-                try
-                {
-                var temporary = Path.Combine(Path.GetTempPath(), "BigBlueFish-Uninstall-" + Guid.NewGuid().ToString("N") + ".exe");
-                File.Copy(Environment.ProcessPath!, temporary);
-                var start = new ProcessStartInfo(temporary) { UseShellExecute = true, WorkingDirectory = Path.GetTempPath() };
-                start.ArgumentList.Add("--uninstall-worker");
-                start.ArgumentList.Add(target);
-                if (!data.Checked) start.ArgumentList.Add("--remove-data");
-                Process.Start(start);
-                form.Close();
-                }
-                catch (Exception error)
-                {
-                    MessageBox.Show(form, error.Message, "蓝色大肥鱼卸载未完成", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            };
-            layout.Controls.Add(label, 0, 0);
-            layout.Controls.Add(data, 0, 1);
-            layout.Controls.Add(button, 0, 2);
-            form.Controls.Add(layout);
-            return form;
-    }
-
-    internal static int RunUninstall(string[] args)
-    {
-        try
-        {
-            if (args.Length < 2) throw new ArgumentException("未提供安装目录。");
-            var target = ValidateDirectory(args[1]);
-            if (args[0] == "--uninstall-worker")
-            {
-                Uninstall(target, args.Contains("--remove-data"));
-                MoveFileEx(Environment.ProcessPath!, null, 4);
-                MessageBox.Show("蓝色大肥鱼已卸载。", "蓝色大肥鱼", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                return 0;
-            }
-            using var form = CreateUninstallForm(target);
-            Application.Run(form);
-            return 0;
-        }
-        catch (Exception error)
-        {
-            MessageBox.Show(error.Message, "蓝色大肥鱼卸载未完成", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            return 1;
-        }
-    }
 }

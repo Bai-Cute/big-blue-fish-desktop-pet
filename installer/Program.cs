@@ -14,8 +14,6 @@ internal static class Program
     private static int Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
-        if (args.Length > 0 && args[0] is "--uninstall" or "--uninstall-worker")
-            return InstallationLifecycle.RunUninstall(args);
         Application.Run(new InstallerForm());
         return 0;
     }
@@ -242,7 +240,7 @@ internal sealed class InstallerForm : Form
         var uninstallMenu = Path.Combine(group, "卸载蓝色大肥鱼.lnk");
         Directory.CreateDirectory(group);
         var legacyStartMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "蓝色大肥鱼.lnk");
-        InstallationLifecycle.Register(target, installerPath, desktop, startMenu, uninstallMenu, legacyStartMenu);
+        InstallationLifecycle.Register(target, desktop, startMenu, uninstallMenu, legacyStartMenu);
         CreateShortcut(desktop, target);
         CreateShortcut(startMenu, target);
         CreateShortcut(uninstallMenu, target, InstallationLifecycle.UninstallerName, $"--uninstall \"{target}\"");

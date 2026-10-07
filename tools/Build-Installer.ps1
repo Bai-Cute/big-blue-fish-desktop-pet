@@ -18,12 +18,13 @@ $modeName = if ($InputMode -eq 'Ocr') { 'OCR' } else { 'Vision' }
 $baseName = "BigBlueFish-v$Version-$modeName-Setup"
 $payload = Join-Path $work "BigBlueFish-v$Version-$modeName-payload"
 $stub = Join-Path $work "BigBlueFish-v$Version-$modeName-setup-stub"
+$uninstaller = Join-Path $work "BigBlueFish-v$Version-$modeName-uninstaller"
 $payloadZip = Join-Path $work "BigBlueFish-v$Version-$modeName-payload.zip"
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root 'release' }
 $OutputDirectory = [IO.Path]::GetFullPath($OutputDirectory)
 $output = Join-Path $OutputDirectory "$baseName.exe"
 $shaFile = Join-Path $OutputDirectory "$baseName.sha256"
-foreach ($p in @($payload,$stub,$payloadZip)) {
+foreach ($p in @($payload,$stub,$payloadZip,$uninstaller)) {
     if (Test-Path -LiteralPath $p) { throw "中间产物已存在，请先检查后移走：$p" }
 }
 if (Test-Path -LiteralPath $output) { throw "发布文件已存在，请使用新的工作区或先移走：$output" }
@@ -45,6 +46,9 @@ Copy-Item -LiteralPath "$root/code/licenses" -Destination $payload -Recurse
 Copy-Item -LiteralPath "$root/code/LICENSE", "$root/code/THIRD-PARTY.md" -Destination $payload
 Copy-Item -LiteralPath "$root/release/README.md" -Destination (Join-Path $payload 'INSTALL-README.md')
 New-Item -ItemType Directory -Force -Path (Join-Path $payload 'models') | Out-Null
+& $sdk publish "$root/uninstaller/BigBlueFish.Uninstall.csproj" -c Release -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" -o $uninstaller --nologo
+if ($LASTEXITCODE -ne 0) { throw '卸载器编译失败。' }
+Copy-Item -LiteralPath (Join-Path $uninstaller 'Uninstall.exe') -Destination $payload
 Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $payloadZip -CompressionLevel Optimal
 New-Item -ItemType Directory -Force -Path $stub | Out-Null
 & $sdk publish "$root/installer/BigBlueFish.Setup.csproj" -c Release "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:RestoreLockedMode=true "-p:Version=$Version" -o $stub --nologo

@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Diagnostics;
+using System.Windows.Automation;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -7,6 +9,7 @@ using System.Security.Principal;
 using Microsoft.Win32;
 using System.Reflection;
 using BigBlueFish.Setup;
+using BigBlueFish.Uninstaller;
 
 namespace BigBlueFish.InstallerVerification;
 
@@ -20,11 +23,92 @@ internal static class Checks
         Console.WriteLine("PASS " + message);
     }
 
+    static void VerifyInstallerEntry(string executable)
+    {
+        var start = new ProcessStartInfo(Path.GetFullPath(executable)) { WorkingDirectory = Path.GetTempPath(), UseShellExecute = false };
+        start.Environment["DOTNET_ROOT"] = Path.Combine(Path.GetTempPath(), "BigBlueFish-No-System-Dotnet");
+        start.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
+        using var process = Process.Start(start)!;
+        try
+        {
+            var limit = DateTime.UtcNow.AddSeconds(20);
+            do { Thread.Sleep(100); process.Refresh(); }
+            while (!process.HasExited && process.MainWindowHandle == IntPtr.Zero && DateTime.UtcNow < limit);
+            Check(!process.HasExited && process.MainWindowTitle.Contains("安装程序"), "actual setup starts installation window independently");
+            Check(process.CloseMainWindow() && process.WaitForExit(5000), "cancelling actual installer leaves installation unchanged");
+        }
+        finally { if (!process.HasExited) { process.Kill(); process.WaitForExit(5000); } }
+    }
+
+    static void VerifyUninstallerEntry(string target, bool explicitArguments)
+    {
+        var executable = Path.Combine(target, "Uninstall.exe");
+        var start = new ProcessStartInfo(executable) { WorkingDirectory = Path.GetTempPath(), UseShellExecute = false };
+        start.Environment["DOTNET_ROOT"] = Path.Combine(Path.GetTempPath(), "BigBlueFish-No-System-Dotnet");
+        start.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
+        if (explicitArguments) { start.ArgumentList.Add("--uninstall"); start.ArgumentList.Add(target); }
+        using var process = Process.Start(start)!;
+        try
+        {
+            var limit = DateTime.UtcNow.AddSeconds(20);
+            do { Thread.Sleep(100); process.Refresh(); }
+            while (!process.HasExited && process.MainWindowHandle == IntPtr.Zero && DateTime.UtcNow < limit);
+            Check(!process.HasExited && process.MainWindowTitle == "卸载蓝色大肥鱼",
+                explicitArguments ? "registered command opens actual uninstall window" : "zero-argument Uninstall.exe opens actual uninstall window from unrelated working directory");
+            var window = AutomationElement.FromHandle(process.MainWindowHandle);
+            var box = window.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.CheckBox));
+            Check(box != null && box.Current.Name == "保留模型和设置" && ((TogglePattern)box.GetCurrentPattern(TogglePattern.Pattern)).Current.ToggleState == ToggleState.Off,
+                "actual standalone uninstall window has unchecked retain-data checkbox");
+            Check(window.FindFirst(TreeScope.Descendants, new AndCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+                new PropertyCondition(AutomationElement.NameProperty, "卸载"))) != null, "actual window offers uninstall button");
+            Check(process.CloseMainWindow() && process.WaitForExit(5000), "cancel closes actual uninstaller without executing removal");
+            Check(File.Exists(executable) && File.Exists(Path.Combine(target, "preferences.json")), "cancelling uninstall preserves application and settings");
+        }
+        finally { if (!process.HasExited) { process.Kill(); process.WaitForExit(5000); } }
+    }
+
+    static void VerifyUninstallWorker(string target, bool removeData)
+    {
+        // The production GUI also runs a copy outside the installation, so it can delete itself.
+        var worker = target + "-worker-" + Guid.NewGuid().ToString("N") + ".exe";
+        File.Copy(Path.Combine(target, "Uninstall.exe"), worker);
+        var start = new ProcessStartInfo(worker) { WorkingDirectory = Path.GetTempPath(), UseShellExecute = false };
+        start.ArgumentList.Add("--uninstall-worker"); start.ArgumentList.Add(target);
+        if (removeData) start.ArgumentList.Add("--remove-data");
+        using var process = Process.Start(start)!;
+        try
+        {
+            var limit = DateTime.UtcNow.AddSeconds(30);
+            do { Thread.Sleep(100); process.Refresh(); }
+            while (!process.HasExited && process.MainWindowHandle == IntPtr.Zero && DateTime.UtcNow < limit);
+            Check(!process.HasExited && process.MainWindowHandle != IntPtr.Zero, "actual uninstall worker reaches completion dialog");
+            var dialog = AutomationElement.FromHandle(process.MainWindowHandle);
+            Check(dialog.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "蓝色大肥鱼已卸载。")) != null,
+                "actual standalone worker reports successful removal");
+            var ok = dialog.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
+            ((InvokePattern)ok!.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
+            Check(process.WaitForExit(5000) && process.ExitCode == 0, "actual standalone worker exits successfully");
+        }
+        finally
+        {
+            if (!process.HasExited) { process.Kill(); process.WaitForExit(5000); }
+            File.Delete(worker);
+        }
+    }
+
     [STAThread]
     static int Main(string[] args)
     {
         try
         {
+            if (args.Length == 2 && args[0] == "--entry-only")
+            {
+                VerifyUninstallerEntry(Path.GetFullPath(args[1]), explicitArguments: false);
+                VerifyUninstallerEntry(Path.GetFullPath(args[1]), explicitArguments: true);
+                Console.WriteLine($"RESULT {count} actual installed entry checks passed");
+                return 0;
+            }
             if (args.Length >= 2 && args[0] == "--ui-layout")
             {
                 bool systemDpi = args.Contains("--system-dpi");
@@ -32,7 +116,7 @@ internal static class Checks
                 Application.EnableVisualStyles();
                 foreach (float scale in systemDpi ? new[] { 1f } : new[] { 1f, 2f })
                 {
-                    using var form = InstallationLifecycle.CreateUninstallForm(Path.GetTempPath());
+                    using var form = UninstallApplication.CreateUninstallForm(Path.GetTempPath());
                     form.Show();
                     Application.DoEvents();
                     form.Scale(new SizeF(scale, scale));
@@ -82,10 +166,11 @@ internal static class Checks
             using var versionStream = typeof(Checks).Assembly.GetManifestResourceStream(typeof(Checks).Assembly.GetManifestResourceNames().Single(n => n.EndsWith("Version.props")))!;
             string expectedVersion = XDocument.Load(versionStream).Descendants("Version").Single().Value;
             Check(InstallerForm.ProductVersion == expectedVersion, "installer product version matches Version.props");
+            VerifyInstallerEntry(args[0]);
             using var stream = InstallerForm.OpenPayload(args[0]);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             var names = archive.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var required in new[] { "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll",
+            foreach (var required in new[] { "VPet-Simulator.Windows.exe", "Uninstall.exe", "VPet-Simulator.Windows.dll",
                 "VPet-Simulator.Core.dll", "VPet-Simulator.Windows.Interface.dll", "coreclr.dll", "hostfxr.dll",
                 "PresentationFramework.dll", "runtime/llama-server.exe", "runtime/ggml-vulkan.dll", "runtime/mtmd.dll",
                 "media/ffmpeg.exe", "media/FFmpeg-LICENSE.txt", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
@@ -142,7 +227,7 @@ internal static class Checks
                 string startupName = "BigBlueFish-Verification-" + Guid.NewGuid().ToString("N");
                 using (var startup = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
                     startup.SetValue(startupName, $"\"{Path.Combine(target, "VPet-Simulator.Windows.exe")}\"");
-                InstallationLifecycle.Register(target, args[0], ownShortcut, unrelatedShortcut, uninstallShortcut);
+                InstallationLifecycle.Register(target, ownShortcut, unrelatedShortcut, uninstallShortcut);
                 InstallationLifecycle.GrantUserAccess(target);
                 Check(RestrictedUserProbe.Run(target) == 0, "ordinary token creates modifies renames and deletes data after installer ACL grant");
                 Check(folder.Parent.GetAccessControl().GetSecurityDescriptorBinaryForm().SequenceEqual(parentAcl), "installer leaves parent directory ACL unchanged");
@@ -156,7 +241,10 @@ internal static class Checks
                     Check((key?.GetValue("UninstallString") as string)?.Contains("Uninstall.exe\" --uninstall") == true, "Windows uninstall command points to installed uninstaller");
                 }
                 Check(File.Exists(Path.Combine(target, "Uninstall.exe")), "standalone uninstaller installed");
-                InstallationLifecycle.Uninstall(target, removeData: false);
+                Check(FileVersionInfo.GetVersionInfo(Path.Combine(target, "Uninstall.exe")).ProductVersion == expectedVersion, "independent uninstaller version matches project");
+                VerifyUninstallerEntry(target, explicitArguments: false);
+                VerifyUninstallerEntry(target, explicitArguments: true);
+                VerifyUninstallWorker(target, removeData: false);
                 Check(!File.Exists(ownShortcut) && File.Exists(unrelatedShortcut), "uninstall removes own shortcut and preserves unrelated shortcut");
                 Check(!File.Exists(uninstallShortcut), "uninstall removes its own Start menu shortcut");
                 File.Delete(unrelatedShortcut);
@@ -169,8 +257,8 @@ internal static class Checks
                 using (var application = machine.OpenSubKey(InstallationLifecycle.ApplicationPathKey)) Check(application == null, "uninstall removes its own Windows application path");
                 // Reinstall the same mode over retained data, then exercise complete removal.
                 InstallerForm.ExtractApplication(archive, target);
-                InstallationLifecycle.Register(target, args[0]);
-                InstallationLifecycle.Uninstall(target, removeData: true);
+                InstallationLifecycle.Register(target);
+                VerifyUninstallWorker(target, removeData: true);
                 Check(!Directory.Exists(target), "full uninstall removes app directory including model and settings");
                 foreach (var prohibited in new[] { Path.GetPathRoot(target)!, Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), @"D:\Program Files" })
                 {
