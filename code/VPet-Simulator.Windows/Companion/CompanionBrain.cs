@@ -26,6 +26,9 @@ internal sealed class CompanionBrain : IDisposable
         Timeout = TimeSpan.FromSeconds(12)
     };
     private Process? runner;
+    private bool runnerReady;
+    private readonly Func<ProcessStartInfo, Process?> startRunner;
+    private readonly TimeSpan runnerLoadTimeout;
     private readonly CompanionJob job = new();
     private int port;
     private CancellationTokenSource? active;
@@ -51,7 +54,15 @@ internal sealed class CompanionBrain : IDisposable
     // Temporary experiment: show streamed model output as it arrives.
     internal static bool StreamingResponses { get; set; } = true;
 
-    internal CompanionBrain() => weather = new CompanionWeather(publicWeb);
+    internal CompanionBrain() : this(Process.Start, TimeSpan.FromSeconds(60)) { }
+
+    // The verification harness substitutes a real child process, not model output in the app.
+    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null)
+    {
+        this.startRunner = startRunner;
+        this.runnerLoadTimeout = runnerLoadTimeout;
+        weather = new CompanionWeather(weatherClient ?? publicWeb);
+    }
 
     internal const string WeatherPersona = "你是蓝色大肥鱼，一位活泼亲昵的鲸鱼娘女仆，称用户为主人。主人刚主动请求天气。请把本轮给定的天气资料改写成自然中文播报：先说所选地点，再说当前天气和气温，适当提今天高低温或降水概率，并给一句有依据的简短关心。只说天气，不谈新闻或用户活动。最多三个短句、90个中文字，不加标题、列表、思考过程或动作旁白。严格依照资料，不编造实测、未来降雨时间、温度变化或预警。概率不是已经发生的事实。";
     internal static string WeatherRequest(string context) => "主人选择的地点与最新天气资料：\n" + context + "\n请直接用自然语言播报这份天气。";
@@ -85,8 +96,34 @@ internal sealed class CompanionBrain : IDisposable
 
     private async Task EnsureRunner(CancellationToken token)
     {
-        if (runner is { HasExited: false })
-            return;
+        token.ThrowIfCancellationRequested();
+        if (runnerReady && runner is { HasExited: false })
+        {
+            try
+            {
+                using var healthTimeout = CancellationTokenSource.CreateLinkedTokenSource(token);
+                healthTimeout.CancelAfter(TimeSpan.FromSeconds(3));
+                using var health = await local.GetAsync($"http://127.0.0.1:{port}/health", healthTimeout.Token);
+                if (health.IsSuccessStatusCode) return;
+            }
+            catch (HttpRequestException) { }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested) { }
+        }
+        StopRunner();
+        token.ThrowIfCancellationRequested();
+        try
+        {
+            await StartRunner(token);
+        }
+        catch
+        {
+            StopRunner();
+            throw;
+        }
+    }
+
+    private async Task StartRunner(CancellationToken token)
+    {
         var path = Path.GetFullPath("runtime/llama-server.exe");
         var model = Path.GetFullPath("models/Qwen3.5-4B-heretic-Q4_K_M.gguf");
         if (!File.Exists(path) || !File.Exists(model))
@@ -146,10 +183,9 @@ internal sealed class CompanionBrain : IDisposable
         }
         foreach (var arg in arguments)
             psi.ArgumentList.Add(arg);
-        runner = Process.Start(psi) ?? throw new IOException("无法启动本地模型");
+        runner = startRunner(psi) ?? throw new IOException("无法启动本地模型");
         if (!job.Attach(runner))
         {
-            runner.Kill(true);
             throw new IOException("无法建立模型退出保障");
         }
 
@@ -162,27 +198,35 @@ internal sealed class CompanionBrain : IDisposable
         runner.BeginOutputReadLine();
         runner.BeginErrorReadLine();
         Status = "正在加载本地模型";
-        for (int i = 0; i < 120; i++)
+        using var loading = CancellationTokenSource.CreateLinkedTokenSource(token);
+        loading.CancelAfter(runnerLoadTimeout);
+        var loadingToken = loading.Token;
+        try
         {
-            token.ThrowIfCancellationRequested();
-            if (!CanRunOnCurrentPower)
-                throw new OperationCanceledException();
-            if (runner.HasExited)
-                throw new IOException("本地模型启动失败");
-            try
+            while (true)
             {
-                using var r = await local.GetAsync($"http://127.0.0.1:{port}/health", token);
-                if (r.IsSuccessStatusCode)
-                    return;
+                loadingToken.ThrowIfCancellationRequested();
+                if (!CanRunOnCurrentPower)
+                    throw new OperationCanceledException();
+                if (runner.HasExited)
+                    throw new IOException("本地模型启动失败");
+                try
+                {
+                    using var r = await local.GetAsync($"http://127.0.0.1:{port}/health", loadingToken);
+                    if (r.IsSuccessStatusCode)
+                    {
+                        runnerReady = true;
+                        return;
+                    }
+                }
+                catch (HttpRequestException) { }
+                await Task.Delay(500, loadingToken);
             }
-            catch (HttpRequestException)
-            {
-            }
-
-            await Task.Delay(500, token);
         }
-
-        throw new TimeoutException("模型加载超时");
+        catch (OperationCanceledException) when (!token.IsCancellationRequested && CanRunOnCurrentPower)
+        {
+            throw new TimeoutException("模型加载超时");
+        }
     }
 
     private async Task<string> WeatherContext(CancellationToken token)
@@ -224,6 +268,19 @@ internal sealed class CompanionBrain : IDisposable
     }
 
     private async Task<string> Complete(string persona, string request, double temperature, CancellationToken token, CompanionWindowImage? image = null, Action<string>? onPartial = null)
+    {
+        try
+        {
+            return await CompleteRequest(persona, request, temperature, token, image, onPartial);
+        }
+        catch (Exception error) when (error is HttpRequestException or IOException)
+        {
+            StopRunner();
+            throw;
+        }
+    }
+
+    private async Task<string> CompleteRequest(string persona, string request, double temperature, CancellationToken token, CompanionWindowImage? image = null, Action<string>? onPartial = null)
     {
         object content = image == null
             ? request
@@ -494,10 +551,14 @@ internal sealed class CompanionBrain : IDisposable
 
     private void StopRunner()
     {
+        runnerReady = false;
         try
         {
             if (runner is { HasExited: false })
+            {
                 runner.Kill(true);
+                runner.WaitForExit(5000);
+            }
         }
         catch
         {

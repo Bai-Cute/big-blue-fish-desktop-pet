@@ -30,7 +30,8 @@ OCR 版生成目录为 `VPet-Simulator.Windows/bin/x64/Release/net10.0-windows10
 | `VPet-Simulator.Windows/Companion/CompanionNewsGate.cs` | 新闻概率、静默期和每日上限 |
 | `VPet-Simulator.Core/Graph/PNGAnimation.cs` | 动画读取和蓝色渲染 |
 | `VPet-Simulator.Windows/assets/regions/` | 地区数据、来源版本和输入 SHA256 |
-| `tests/RecoveryVerification/` | 实窗布局、设置、天气缓存、模型和电源验证 |
+| `tests/RunnerVerification/` | 当前提示词、真实子进程故障恢复及本地模型验证 |
+| `tests/RecoveryVerification/` | 历史恢复基线验证，通过 `-LegacyRecovery` 运行 |
 
 地区数据由 MIT 许可的 [AreaCity](https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov) `2025.251231.260403` 版本生成，包含 34 个省级项、392 个市级项、3209 个县区级项。上游部分台湾地区没有坐标；保留选择，查询时明确提示。区划为固定版本快照，不保证后续行政调整实时同步。
 
@@ -47,18 +48,18 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 先退出桌宠，再运行：
 
 ```powershell
-./test.ps1 -InstalledDirectory "参考安装目录"
+./test.ps1 -InstalledDirectory "C:\Program Files\蓝色大肥鱼" -InputMode Vision
 ../tools/Build-Installer.ps1 -InputMode Ocr -RuntimeDirectory "已核对的运行时目录"
 ```
 
-实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时，并比较原有提示词与文本清理行为。包含 24 组四角 / 缩放 / 长短文本布局、三级选择、菜单、天气缓存与失败恢复、两种电池策略和实际生成。
+默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。`-LegacyRecovery` 可单独运行历史恢复验证。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout` 检查卸载界面，追加 `--system-dpi` 可使用当前显示器 DPI。
 
-发布脚本生成 `BigBlueFish-v0.3.0-OCR-Setup.exe` 一键安装器，使用 `-InputMode Vision` 生成 `BigBlueFish-v0.3.0-Vision-Setup.exe`。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
+发布脚本生成 `BigBlueFish-v0.3.1-OCR-Setup.exe` 一键安装器，使用 `-InputMode Vision` 生成 `BigBlueFish-v0.3.1-Vision-Setup.exe`。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
 
 恢复基线见 `recovery-baseline.json`，原始 DLL 与动画校验见 `provenance.json`，当前验证见 `verification.json`。源码启用确定性构建并嵌入调试信息。升级依赖时更新锁文件并重跑相关测试。
 
 根目录 `Version.props` 统一管理项目版本。主程序、Core、Interface 和安装器的产品版本由它生成；Windows 文件版本采用对应的四段格式。构建脚本默认读取该文件，也可以用 `-Version` 指定构建版本。
 
-项目提供 Vision 与 Ocr 两种输入路线，均使用 0.3.0。默认构建 Ocr，通过 `-InputMode Vision` 构建视觉版。Vision 直接把前台截图交给多模态模型；Ocr 识别前台窗口文字，按位置组织为文本再交给本地模型。`tools/Build-LocalVariant.ps1 -InputMode Ocr -SdkPath <SDK绝对路径>` 生成自包含应用，改成 Vision 即可构建视觉版；`code/build.ps1` 和 `code/run.ps1` 也接受 `-InputMode`。
+项目提供 Vision 与 Ocr 两种输入路线，均使用 0.3.1。默认构建 Ocr，通过 `-InputMode Vision` 构建视觉版。Vision 直接把前台截图交给多模态模型；Ocr 识别前台窗口文字，按位置组织为文本再交给本地模型。`tools/Build-LocalVariant.ps1 -InputMode Ocr -SdkPath <SDK绝对路径>` 生成自包含应用，改成 Vision 即可构建视觉版；`code/build.ps1` 和 `code/run.ps1` 也接受 `-InputMode`。
 
 没有穷举验证上游完整游戏、多人、Steam 或创意工坊功能；以定制桌宠实际入口为维护范围。

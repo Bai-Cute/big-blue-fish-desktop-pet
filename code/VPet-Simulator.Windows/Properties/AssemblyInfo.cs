@@ -20,3 +20,4 @@
 )]
 
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("OcrVerification")]
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("RunnerVerification")]

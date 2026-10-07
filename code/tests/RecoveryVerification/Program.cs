@@ -114,7 +114,7 @@ internal static class Program
         Check(context.Length < 1600, "Foreground context was not bounded");
         var brain = rebuilt.GetType("VPet_Simulator.Windows.CompanionBrain")!;
         var request = (string)brain.GetMethod("SpeechRequest", Access)!.Invoke(null, new object[] { context })!;
-        Check(request.Contains("前台窗口资料") && request.Contains("针对性"), "Speech request did not preserve targeted context");
+        Check(request.Contains(context) && request.Contains("本轮明确的画面内容"), "Speech request preserves current foreground context");
     }
     static void Pump()
     {
@@ -452,7 +452,8 @@ internal static class Program
         var original = context.LoadFromAssemblyPath(Path.Combine(installed, "VPet-Simulator.Windows.dll"));
         var oldBrain = original.GetType("VPet_Simulator.Windows.CompanionBrain")!;
         var newBrain = rebuilt.GetType(oldBrain.FullName!)!;
-        Check(((string)newBrain.GetField("Persona", Access)!.GetRawConstantValue()!).Contains("窗口标题和无障碍名称是活动主线"), "Persona does not use structured foreground context");
+        var persona = (string)newBrain.GetField("Persona", Access)!.GetRawConstantValue()!;
+        Check(persona.Contains("主体正文、编辑区、聊天记录") && persona.Contains("桌面、新标签页、主页"), "Persona distinguishes visible task content from entry screens");
         Check(Equals(oldBrain.GetField("NewsPersona", Access)!.GetRawConstantValue(), newBrain.GetField("NewsPersona", Access)!.GetRawConstantValue()), "NewsPersona differs from installed program");
         foreach (var name in new[]
         {
@@ -474,7 +475,7 @@ internal static class Program
                 Check(Equals(oldBrain.GetMethod(name, Access)!.Invoke(null, new[] { value }), newBrain.GetMethod(name, Access)!.Invoke(null, new[] { value })), name + " behavioral parity failed");
 
         var speechRequest = (string)newBrain.GetMethod("SpeechRequest", Access)!.Invoke(null, new[] { "前台应用：Code\n窗口标题：蓝色大肥鱼-Git版 - Visual Studio Code" })!;
-        Check(speechRequest.Contains("窗口标题和应用名称为主线") && speechRequest.Contains("针对性"), "SpeechRequest lost structured foreground guidance");
+        Check(speechRequest.Contains("蓝色大肥鱼-Git版 - Visual Studio Code") && speechRequest.Contains("已展开具体内容") && speechRequest.Contains("入口界面"), "SpeechRequest retains current context and scene guidance");
         File.WriteAllText(Path.Combine(sandbox, "result.json"), System.Text.Json.JsonSerializer.Serialize(new { passed = true, checks, corners,
             provinceCount = 34, modelGeneration = utterance, weatherGeneration = weatherUtterance,
             batteryPolicyBothModes = true, modelProcessExited = true, typingSeconds = revealSeconds,

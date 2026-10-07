@@ -1,0 +1,14 @@
+Microsoft Visual C++ Runtime
+Copyright (c) Microsoft Corporation. All rights reserved.
+
+The Windows release includes unmodified x64 CRT redistributable files from the
+Microsoft Visual Studio Community VC/Redist/MSVC directory. They are deployed
+alongside the llama.cpp executable. File versions and SHA-256 values are recorded
+in runtime/visual-cpp-runtime.json in the installed application.
+
+Microsoft's software license terms govern these components:
+https://visualstudio.microsoft.com/license-terms/
+
+Redistribution documentation and redistributable file lists:
+https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files
+https://learn.microsoft.com/en-us/cpp/windows/determining-which-dlls-to-redistribute

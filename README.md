@@ -39,7 +39,7 @@
 
 普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载喜欢的识别版本：
 
-`BigBlueFish-v0.3.0-Vision-Setup.exe` 为视觉版，直接读取当前窗口的画面；`BigBlueFish-v0.3.0-OCR-Setup.exe` 为 OCR 版，识别并整理当前窗口中的文字。
+`BigBlueFish-v0.3.1-Vision-Setup.exe` 为视觉版，直接读取当前窗口的画面；`BigBlueFish-v0.3.1-OCR-Setup.exe` 为 OCR 版，识别并整理当前窗口中的文字。
 
 双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时安装到电脑中，并从 Hugging Face 的固定来源下载约 2.7 GB 的 4B 模型。视觉版还会下载约 640 MB 的视觉投影组件，让模型能够读取窗口图片。下载文件会经过 SHA-256 校验，安装完成后创建快捷方式并启动桌宠。
 
@@ -89,7 +89,7 @@ https://huggingface.co/mradermacher/Qwen3.5-4B-heretic-GGUF/resolve/0d92f575bfcb
 
 安装器自身携带桌宠程序和运行时；模型由安装器在安装过程中从固定来源下载，不会被写入 Git 仓库。
 
-项目版本统一记录在根目录的 `Version.props`，当前为 **0.3.0**。视觉版与 OCR 版使用相同的项目版本，程序、应用组件和安装器均从这份配置生成版本信息。两种识别方式共享同一份桌宠源码，通过构建参数选择输入方式。
+项目版本统一记录在根目录的 `Version.props`，当前为 **0.3.1**。视觉版与 OCR 版使用相同的项目版本，程序、应用组件和安装器均从这份配置生成版本信息。两种识别方式共享同一份桌宠源码，通过构建参数选择输入方式。
 
 ## 天气、科技新闻和桌宠行为
 

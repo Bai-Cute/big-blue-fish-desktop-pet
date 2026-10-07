@@ -11,10 +11,13 @@ namespace BigBlueFish.Setup;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static int Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        if (args.Length > 0 && args[0] is "--uninstall" or "--uninstall-worker")
+            return InstallationLifecycle.RunUninstall(args);
         Application.Run(new InstallerForm());
+        return 0;
     }
 }
 
@@ -211,6 +214,7 @@ internal sealed class InstallerForm : Form
 
     private async Task InstallAsync(string target)
     {
+        target = InstallationLifecycle.ValidateDirectory(target);
         Directory.CreateDirectory(target);
         status.Text = "正在解包程序文件…";
         progress.Value = 0;
@@ -226,11 +230,23 @@ internal sealed class InstallerForm : Form
         if (RequiresVision)
             await EnsureArtifactAsync(modelFolder, MmprojName, MmprojUrl, MmprojSha256, "视觉投影组件");
 
-        CreateShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "蓝色大肥鱼.lnk"), target);
-        var startMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "蓝色大肥鱼.lnk");
-        Directory.CreateDirectory(Path.GetDirectoryName(startMenu)!);
-        CreateShortcut(startMenu, target);
+        FinishInstallation(target, Environment.ProcessPath!);
         progress.Value = 100;
+    }
+
+    internal static void FinishInstallation(string target, string installerPath)
+    {
+        var desktop = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "蓝色大肥鱼.lnk");
+        var group = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "蓝色大肥鱼");
+        var startMenu = Path.Combine(group, "蓝色大肥鱼.lnk");
+        var uninstallMenu = Path.Combine(group, "卸载蓝色大肥鱼.lnk");
+        Directory.CreateDirectory(group);
+        var legacyStartMenu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "蓝色大肥鱼.lnk");
+        InstallationLifecycle.Register(target, installerPath, desktop, startMenu, uninstallMenu, legacyStartMenu);
+        CreateShortcut(desktop, target);
+        CreateShortcut(startMenu, target);
+        CreateShortcut(uninstallMenu, target, InstallationLifecycle.UninstallerName, $"--uninstall \"{target}\"");
+        InstallationLifecycle.GrantUserAccess(target);
     }
 
     // The manifest owns application files only. Settings, models and caches survive
@@ -349,7 +365,7 @@ internal sealed class InstallerForm : Form
         return new LimitedStream(stream, length);
     }
 
-    private static void CreateShortcut(string shortcutPath, string target)
+    private static void CreateShortcut(string shortcutPath, string target, string executableName = "VPet-Simulator.Windows.exe", string arguments = "")
     {
         try
         {
@@ -357,7 +373,8 @@ internal sealed class InstallerForm : Form
             if (shellType is null) return;
             dynamic shell = Activator.CreateInstance(shellType)!;
             dynamic shortcut = shell.CreateShortcut(shortcutPath);
-            shortcut.TargetPath = Path.Combine(target, "VPet-Simulator.Windows.exe");
+            shortcut.TargetPath = Path.Combine(target, executableName);
+            shortcut.Arguments = arguments;
             shortcut.WorkingDirectory = target;
             shortcut.IconLocation = Path.Combine(target, "vpeticon.ico") + ",0";
             shortcut.Description = "蓝色大肥鱼桌宠";

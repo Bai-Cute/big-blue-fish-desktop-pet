@@ -1,6 +1,7 @@
 param(
     [string]$SdkPath,
     [string]$RuntimeDirectory,
+    [string]$VisualCppDirectory,
     [string]$Version,
     [string]$OutputDirectory,
     [string]$WorkDirectory,
@@ -39,6 +40,7 @@ if ($RuntimeDirectory) {
 } else {
     throw '为避免未经核对的运行时进入正式安装器，请显式传入 -RuntimeDirectory。'
 }
+& "$PSScriptRoot/Copy-VisualCppRuntime.ps1" -Destination $runtimeTarget -SourceDirectory $VisualCppDirectory
 Copy-Item -LiteralPath "$root/code/licenses" -Destination $payload -Recurse
 Copy-Item -LiteralPath "$root/code/LICENSE", "$root/code/THIRD-PARTY.md" -Destination $payload
 Copy-Item -LiteralPath "$root/release/README.md" -Destination (Join-Path $payload 'INSTALL-README.md')

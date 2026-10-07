@@ -1,4 +1,4 @@
-param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$Version,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
+param([string]$SdkPath,[string]$RuntimeDirectory,[string]$RuntimeZip,[string]$VisualCppDirectory,[string]$Version,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 & "$PSScriptRoot/Setup-Media.ps1"
@@ -29,6 +29,7 @@ if($RuntimeDirectory){
     Expand-Archive -LiteralPath $RuntimeZip -DestinationPath $runtimeDestination
 }
 if(!(Test-Path -LiteralPath (Join-Path $runtimeDestination 'llama-server.exe'))){throw '发布包缺少 llama-server.exe。'}
+& "$PSScriptRoot/Copy-VisualCppRuntime.ps1" -Destination $runtimeDestination -SourceDirectory $VisualCppDirectory
 Copy-Item -LiteralPath "$root/code/licenses" -Destination $destination -Recurse
 Copy-Item -LiteralPath "$root/code/LICENSE","$root/code/THIRD-PARTY.md" -Destination $destination
 Copy-Item -LiteralPath "$root/tools/Setup-Model.ps1" -Destination $destination
