@@ -57,15 +57,15 @@ internal sealed class CompanionBrain : IDisposable
     internal CompanionBrain() : this(Process.Start, TimeSpan.FromSeconds(60)) { }
 
     // The verification harness substitutes a real child process, not model output in the app.
-    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null)
+    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null)
     {
         this.startRunner = startRunner;
         this.runnerLoadTimeout = runnerLoadTimeout;
-        weather = new CompanionWeather(weatherClient ?? publicWeb);
+        weather = new CompanionWeather(weatherClient ?? publicWeb, weatherCachePath ?? (weatherClient == null ? "cache/weather.json" : null));
     }
 
-    internal const string WeatherPersona = "你是蓝色大肥鱼，一位活泼亲昵的鲸鱼娘女仆，称用户为主人。主人刚主动请求天气。请把本轮给定的天气资料改写成自然中文播报：先说所选地点，再说当前天气和气温，适当提今天高低温或降水概率，并给一句有依据的简短关心。只说天气，不谈新闻或用户活动。最多三个短句、90个中文字，不加标题、列表、思考过程或动作旁白。严格依照资料，不编造实测、未来降雨时间、温度变化或预警。概率不是已经发生的事实。";
-    internal static string WeatherRequest(string context) => "主人选择的地点与最新天气资料：\n" + context + "\n请直接用自然语言播报这份天气。";
+    internal const string WeatherPersona = "你是蓝色大肥鱼，一位活泼亲昵的鲸鱼娘女仆，称用户为主人。主人刚主动请求天气。请把本轮给定的天气资料改写成自然中文播报：先说所选地点，再说资料记录时的天气和气温，适当提资料日期的高低温或降水概率，并给一句有依据的简短关心。只说天气，不谈新闻或用户活动。最多三个短句、90个中文字，不加标题、列表、思考过程或动作旁白。严格依照资料，不编造实测、未来降雨时间、温度变化或预警。概率不是已经发生的事实。";
+    internal static string WeatherRequest(string context) => "主人选择的地点与最近天气资料：\n" + context + "\n请直接用自然语言播报这份天气。";
 
     internal const string SceneGuidance = "\n根据画面依据选择说话的具体程度：主体展开了代码、文档、文章或聊天时，围绕明确的项目、活动或话题表达关心；桌面、新标签页、主页或只有快捷方式和推荐卡片的画面，可以围绕当前界面问候、撒娇或俏皮地碎碎念。图标、最近列表、推荐卡片属于界面背景；正在展开的主体内容体现当前任务。界面状态本身就是足够的话题。示范口吻：桌面→主人面前是桌面啦，小女仆摇摇尾巴，过来刷一下存在感～；新标签页→新标签页还空着呢，小女仆也好奇，主人下一站会发现什么有趣的东西呀～。搜索或输入网址等占位文字表示输入框等待填写。桌面、新标签页、主页尚未展开正文时，本轮主题就是眼前的界面状态，关心和趣味从女仆自己的小尾巴、小心思展开。实际表达结合本轮画面，口吻保持自然多变。";
     internal const string BasePersona = "你是蓝色大肥鱼，一位日式二次元风格的可爱鲸鱼娘女仆。称呼用户为主人，亲昵、活泼、俏皮，有一点小调皮。根据此刻状态主动冒出一句有趣的话：早晚问候、撒娇关心、轻轻吐槽摸鱼、惊叹夸奖或好奇地碎碎念。可以用哦～、呀、呢、诶嘿等语气，偶尔提小尾巴或女仆的小心思，不要每次重复。允许不求回答的自言自语式疑问，不催主人回复，不提供问答服务。每次只输出1到2个短句，共20到65个中文字，最多80字。自然口语，不加标题、引号、动作旁白、表情符号或思考过程。不要每次都说安静陪伴、文字慢慢长大，也不要总劝休息；开头和内容要有变化。只围绕本轮明确提供的一种状态说话，不扩展到未知话题。应用名和标题用来辨认界面，已展开的主体正文、编辑区、聊天记录或播放内容用来判断主人在做什么；图标、推荐卡片、导航和空输入框对应界面入口状态。没读过的文章正文、新闻细节不能编造；可以热情夸主人认真、厉害，不声称任务已完成。没有应用信息就不猜主人在写代码或看论文。没有天气观测就绝不谈天气，包括凉快、降温；只有提供温度变化才能说降温，有依据时可以贴心提醒添衣。以下只示范口吻，绝不是本轮事实：早晨问候→早上好主人，小女仆今天也元气满满地来报到啦～；主体是知乎问题正文→主人正在看知乎上的这个问题呢，小女仆也好奇大家会有什么有趣的想法呀；前台是论文→哇，好厉害的论文呀！主人认真起来的样子真棒～；前台是绘画→主人又在画漂亮的东西啦，偷偷给小女仆留个出镜位置也可以哦～。";
@@ -229,11 +229,9 @@ internal sealed class CompanionBrain : IDisposable
         }
     }
 
-    private async Task<string> WeatherContext(CancellationToken token)
-    {
-        try { return await weather.Context(WeatherRegionCode, false, token); }
-        catch (Exception e) when (e is not OperationCanceledException) { return ""; }
-    }
+    internal void RefreshWeather() => _ = weather.RefreshIfDue(WeatherRegionCode);
+
+    private string WeatherContext() => weather.CachedContext(WeatherRegionCode);
 
     internal async Task<string> GenerateWeather(Action<string>? onPartial = null)
     {
@@ -245,7 +243,7 @@ internal sealed class CompanionBrain : IDisposable
         try
         {
             Status = "正在获取所选地区天气";
-            var context = await weather.Context(WeatherRegionCode, true, token);
+            var context = await weather.Context(WeatherRegionCode, token);
             await EnsureRunner(token);
             Status = "正在生成天气播报";
             var text = await Complete(WeatherPersona, WeatherRequest(context), .4, token, onPartial: onPartial);
@@ -431,11 +429,11 @@ internal sealed class CompanionBrain : IDisposable
 #if COMPANION_OCR
                 {
                     double publicStarted = generationWatch.Elapsed.TotalMilliseconds;
-                    context += "\n" + await WeatherContext(token);
+                    context += "\n" + WeatherContext();
                     publicInfoMs += generationWatch.Elapsed.TotalMilliseconds - publicStarted;
                 }
 #else
-                    context += "\n" + await WeatherContext(token);
+                    context += "\n" + WeatherContext();
 #endif
 #if COMPANION_OCR
                 request = ocr == null ? SpeechRequest(context) : OcrSpeechRequest(context);
@@ -609,6 +607,7 @@ internal sealed class CompanionBrain : IDisposable
         Stop();
         job.Dispose();
         local.Dispose();
+        weather.Dispose();
         publicWeb.Dispose();
     }
 }

@@ -463,6 +463,7 @@ public partial class MainWindow
         lastFrame = now;
         if (companionClosed || exitAnimation)
             return;
+        if (preferences.PublicInfo) brain.RefreshWeather();
         if (App.Args.Contains("--test-mode") && now > diagnosticAt)
         {
             diagnosticAt = now.AddSeconds(1);

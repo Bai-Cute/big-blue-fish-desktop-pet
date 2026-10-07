@@ -15,6 +15,8 @@ try {
         & $sdk run --project "$PSScriptRoot/tests/RecoveryVerification/RecoveryVerification.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -- $PSScriptRoot $InstalledDirectory
         if($LASTEXITCODE -ne 0){throw '历史恢复验证失败，见上方诊断'}
     }else{
+        & $sdk run --project "$PSScriptRoot/tests/RunnerVerification/RunnerVerification.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -- --weather-cache (Join-Path $sandbox "weather-$InputMode")
+        if($LASTEXITCODE -ne 0){throw '天气缓存验证失败'}
         & $sdk run --project "$PSScriptRoot/tests/RunnerVerification/RunnerVerification.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -- (Join-Path $sandbox "runner-$InputMode")
         if($LASTEXITCODE -ne 0){throw 'Runner故障恢复或提示词验证失败'}
         & $sdk run --project "$PSScriptRoot/tests/AnimationVerification/AnimationVerification.csproj" -c Release -- "$PSScriptRoot/VPet-Simulator.Windows/assets/fish"

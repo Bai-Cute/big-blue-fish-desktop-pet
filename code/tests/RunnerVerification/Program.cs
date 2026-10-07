@@ -12,7 +12,16 @@ internal static class Program
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(
-                """{"current":{"time":"2026-10-07T08:00","temperature_2m":21,"apparent_temperature":20,"relative_humidity_2m":65,"weather_code":0,"wind_speed_10m":8},"daily":{"temperature_2m_min":[18],"temperature_2m_max":[25],"precipitation_probability_max":[10]}}""") });
+                """{"current":{"time":"WEATHER_TIME","temperature_2m":21,"apparent_temperature":20,"relative_humidity_2m":65,"weather_code":0,"wind_speed_10m":8},"daily":{"temperature_2m_min":[18],"temperature_2m_max":[25],"precipitation_probability_max":[10]}}""".Replace("WEATHER_TIME", DateTimeOffset.UtcNow.ToOffset(TimeSpan.FromHours(8)).ToString("yyyy-MM-ddTHH:mm"))) });
+    }
+    private sealed class OfflineWeather : HttpMessageHandler
+    {
+        internal static int Calls;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+        {
+            Interlocked.Increment(ref Calls);
+            throw new HttpRequestException("offline weather transport test");
+        }
     }
     private static int checks;
     private static void Check(bool value, string description)
@@ -27,9 +36,23 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2]);
         try
         {
+            if (args[0] == "--weather-cache") return await WeatherCacheVerification.Run(args[1], args.Contains("--live"));
             string root = Path.GetFullPath(args[0]);
             Directory.CreateDirectory(root);
             Environment.CurrentDirectory = root;
+            if (args.Contains("--real-weather-offline"))
+            {
+                using var offlineClient = new HttpClient(new OfflineWeather());
+                using var actual = new CompanionBrain(Process.Start, TimeSpan.FromSeconds(60), offlineClient, args[2])
+                    { StopOnBattery = false, WeatherRegionCode = "350622" };
+                var text = await actual.GenerateWeather();
+                Check(text.Length > 0 && text.Contains("云霄"), "real model broadcasts selected district from persisted weather with offline HTTP transport");
+                Check(OfflineWeather.Calls == 0, "recent persisted weather reaches real model without HTTP fetch");
+                actual.Stop();
+                Check(actual.RunnerPid == null, "real weather verification unloads its own runner");
+                Console.WriteLine("REAL OFFLINE WEATHER " + text);
+                return 0;
+            }
             if (args.Contains("--real-model"))
             {
                 using var actual = new CompanionBrain { StopOnBattery = false };

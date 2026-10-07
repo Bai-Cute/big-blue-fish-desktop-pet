@@ -75,6 +75,9 @@ internal static class Checks
             Directory.CreateDirectory(Path.Combine(target, "models"));
             var retained = Path.Combine(target, "models", "retention-fixture.txt");
             if (!File.Exists(retained)) File.WriteAllText(retained, "retained-model-marker");
+            Directory.CreateDirectory(Path.Combine(target, "cache"));
+            var weatherCache = Path.Combine(target, "cache", "weather.json");
+            File.WriteAllText(weatherCache, "weather-retention-marker");
             var before = File.ReadAllBytes(settings);
             using var versionStream = typeof(Checks).Assembly.GetManifestResourceStream(typeof(Checks).Assembly.GetManifestResourceNames().Single(n => n.EndsWith("Version.props")))!;
             string expectedVersion = XDocument.Load(versionStream).Descendants("Version").Single().Value;
@@ -95,6 +98,7 @@ internal static class Checks
             InstallerForm.ExtractApplication(archive, target);
             Check(File.ReadAllBytes(settings).SequenceEqual(before), "existing settings preserved");
             Check(File.ReadAllText(retained) == "retained-model-marker", "existing model directory preserved");
+            Check(File.ReadAllText(weatherCache) == "weather-retention-marker", "existing weather cache preserved by update");
             foreach (var entry in archive.Entries.Where(e => e.Name.EndsWith(".dll") || e.Name.EndsWith(".exe")))
             {
                 using var input = entry.Open();
@@ -160,6 +164,7 @@ internal static class Checks
                     Check(startup?.GetValue(startupName) == null, "uninstall clears this install's startup entry");
                 Check(!File.Exists(Path.Combine(target, "VPet-Simulator.Windows.exe")) && !File.Exists(Path.Combine(target, "Uninstall.exe")), "uninstall removes application and uninstaller");
                 Check(File.ReadAllBytes(settings).SequenceEqual(before) && File.Exists(retained), "uninstall can preserve model and settings");
+                Check(File.ReadAllText(weatherCache) == "weather-retention-marker", "retain-data uninstall preserves weather cache");
                 using (var key = machine.OpenSubKey(keyPath)) Check(key == null, "uninstall removes Windows registration");
                 using (var application = machine.OpenSubKey(InstallationLifecycle.ApplicationPathKey)) Check(application == null, "uninstall removes its own Windows application path");
                 // Reinstall the same mode over retained data, then exercise complete removal.
