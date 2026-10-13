@@ -17,6 +17,25 @@ public partial class MainWindow
     private double movementEnd, movementStart;
     private bool movementMirrored;
     private bool exitAnimation, exitReady;
+    private bool greetingNoticeActive;
+    private static string WelcomeText(DateTime now)
+    {
+        string period = now.Hour switch { >= 5 and < 11 => "早上", >= 11 and < 14 => "中午", >= 14 and < 18 => "下午", _ => "晚上" };
+        return $"主人{period}好，鱼鱼给主人请安啦~";
+    }
+    private const string FarewellText = "主人再见~鱼鱼喜欢主人哦";
+    private void ShowGreetingNotice(string text)
+    {
+        ShowCompanionNotice(text);
+        greetingNoticeActive = true;
+        bubbleUntil = DateTime.MaxValue;
+    }
+    private void EndGreetingNotice()
+    {
+        if (!greetingNoticeActive) return;
+        greetingNoticeActive = false;
+        if (!bubbleIsModelReply) { speech.Cancel(); bubble.Visibility = Visibility.Collapsed; }
+    }
     private static string AnimationDirectory => Path.Combine(AppContext.BaseDirectory, "assets", "fish");
     internal Rect CompanionVisibleBounds => new(
         (Width - SpriteSize * 640 / 360) / 2 + SpriteSize * 208 / 360,
@@ -41,6 +60,7 @@ public partial class MainWindow
         videoPlayer.FramePresented += MoveWithAnimation;
         companionReady = true;
         PlayAnimation(animationPolicy.Find("女仆屈膝礼仪"), "Startup");
+        ShowGreetingNotice(WelcomeText(DateTime.Now));
         File.WriteAllText("ready.status", "ready");
     }
     private CompanionAnimationContext AnimationContext() => new(DateTime.Now,
@@ -49,8 +69,12 @@ public partial class MainWindow
     private void PlayAnimation(CompanionAnimationRule rule, string phase, bool mirror = false)
     {
         if (!companionReady || companionClosed) return;
+        if (phase is not ("Startup" or "Exit")) EndGreetingNotice();
         currentAction = rule.Id; animationPhase = phase;
-        videoPlayer!.Play(Path.Combine(AnimationDirectory, rule.File), mirror, AnimationFinished);
+        bool suspendedDrag = phase == "Drag";
+        videoPlayer!.Play(Path.Combine(AnimationDirectory, rule.File), mirror, AnimationFinished,
+            startSeconds: suspendedDrag ? 1.5 : 0, endSeconds: suspendedDrag ? 6 : null,
+            playbackRate: rule.Pool == "Greeting" ? 1.5 : 1);
     }
     private void PlayIdle() => PlayAnimation(animationPolicy.Choose("Idle", AnimationContext(), companionRandom), "Idle");
     private void AnimationFinished()
@@ -71,7 +95,11 @@ public partial class MainWindow
             return;
         }
         if (animationPhase == "Return") { Left = movementOrigin.X; movementRule = null; anchor = new(Left, Top); }
-        if (animationPhase == "Startup") nextAction = DateTime.UtcNow.AddSeconds(preferences.AnimationIntervalSeconds);
+        if (animationPhase == "Startup")
+        {
+            EndGreetingNotice();
+            nextAction = DateTime.UtcNow.AddSeconds(preferences.AnimationIntervalSeconds);
+        }
         AnimationBoundary();
     }
     private void AnimationBoundary()
@@ -145,5 +173,6 @@ public partial class MainWindow
         if (!IsVisible) Dispatcher.BeginInvoke(() => { if (!companionClosed && !exitReady) Show(); });
         videoPlayer!.Paused = false;
         PlayAnimation(animationPolicy.Find("女仆屈膝礼仪"), "Exit");
+        ShowGreetingNotice(FarewellText);
     }
 }

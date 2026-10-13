@@ -14,7 +14,8 @@ using Windows.Storage.Streams;
 namespace VPet_Simulator.Windows;
 
 internal sealed record CompanionOcrSnapshot(string Context, string Language, int Width, int Height,
-    int WordCount, double CaptureMilliseconds, double RecognizeMilliseconds, CompanionOcrWord[] Words);
+    int WordCount, double CaptureMilliseconds, double RecognizeMilliseconds, CompanionOcrWord[] Words,
+    long WindowHandle = 0, bool IsDesktop = false);
 
 internal static class CompanionOcr
 {
@@ -28,12 +29,13 @@ internal static class CompanionOcr
                 ?? throw new IOException("未能读取当前窗口画面");
             var identity = CompanionNative.ForegroundIdentity(handle);
             double captureMs = watch.Elapsed.TotalMilliseconds;
-            return await RecognizeAsync(image, identity, captureMs, token).ConfigureAwait(false);
+            var result = await RecognizeAsync(image, identity, captureMs, token, CompanionNative.IsDesktopWindow(handle)).ConfigureAwait(false);
+            return result with { WindowHandle = handle.ToInt64() };
         }, token).ConfigureAwait(false);
     }
 
     internal static async Task<CompanionOcrSnapshot> RecognizeAsync(CompanionWindowImage image,
-        string identity, double captureMs, CancellationToken token)
+        string identity, double captureMs, CancellationToken token, bool desktop = false)
     {
         var watch = new Stopwatch();
         var languages = OcrEngine.AvailableRecognizerLanguages;
@@ -61,9 +63,14 @@ internal static class CompanionOcr
         double recognizeMs = watch.Elapsed.TotalMilliseconds;
         var words = result.Lines.SelectMany(x => x.Words).Select(x => new CompanionOcrWord(
             x.Text, x.BoundingRect.X, x.BoundingRect.Y, x.BoundingRect.Width, x.BoundingRect.Height)).ToArray();
-        var context = identity + "\n" + CompanionOcrLayout.Format(words, image.Width, image.Height);
+        // Desktop shortcut captions are background, not an open document or task.
+        // Small shadowed labels produce unreliable OCR; keep the captured scene identity
+        // rather than presenting those fragments as the owner's current topic.
+        var context = desktop
+            ? identity + "\n画面是壁纸与快捷方式图标，没有展开的应用正文。"
+            : identity + "\n" + CompanionOcrLayout.Format(words, image.Width, image.Height);
         return new CompanionOcrSnapshot(context, language.LanguageTag, image.Width, image.Height,
-            words.Length, captureMs, recognizeMs, words);
+            words.Length, captureMs, recognizeMs, words, IsDesktop: desktop);
     }
 }
 #endif

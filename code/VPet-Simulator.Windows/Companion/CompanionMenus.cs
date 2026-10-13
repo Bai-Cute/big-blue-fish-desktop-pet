@@ -22,6 +22,9 @@ public partial class MainWindow
         var test = new MenuItem { Header = "吐字测试" };
         test.Click += async (_, _) => { companionContextMenu.IsOpen = false; await SpeakCompanionTest(); };
         companionContextMenu.Items.Add(test);
+        var hide = new MenuItem { Header = "隐藏桌宠" };
+        hide.Click += (_, _) => { companionContextMenu.IsOpen = false; HideCompanion(); };
+        companionContextMenu.Items.Add(hide);
     }
 
     private async Task SpeakCompanionWeather()
@@ -71,7 +74,7 @@ public partial class MainWindow
         finally
         {
             weatherRequestPending = false;
-            nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
+            nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
         }
     }
 

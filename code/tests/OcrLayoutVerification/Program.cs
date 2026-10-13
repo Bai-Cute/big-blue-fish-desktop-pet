@@ -27,6 +27,8 @@ class Program
         Check(text.Contains("Visual Studio Code"), "Latin word spaces lost");
         Check(text.IndexOf("明天一起去吃饭") < text.IndexOf("好呀"), "Conversation vertical order lost");
         Check(text.Contains("【画面底部】\n发送"), "Bottom controls missing");
+        var noise = CompanionOcrLayout.Format(new[] { new CompanionOcrWord("，", 400, 250, 12, 22), new CompanionOcrWord("明天吃饭？", 400, 300, 100, 22) }, 1000, 700);
+        Check(!noise.Contains("\n，") && noise.Contains("明天吃饭？"), "Standalone punctuation removed without stripping sentence punctuation");
         Check(CompanionOcrLayout.Format(Array.Empty<CompanionOcrWord>(), 1000, 700).Contains("没有识别到文字"), "Empty screen invented content");
         var longWords = new List<CompanionOcrWord>();
         for (int i = 0; i < 250; i++) longWords.Add(new(i == 0 ? "蓝色大肥鱼项目" : i == 249 ? "正在修复OCR文字拼接" : new string('测', 40), 400, 100 + i * 20, 400, 18));

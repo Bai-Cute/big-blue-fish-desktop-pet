@@ -23,11 +23,13 @@ class Program
             var screenshot = CompanionScreenCapture.Capture(handle, useVision ? 768 : 2560, !useVision)
                 ?? throw new Exception("Desktop capture failed");
             string context = useVision ? CompanionNative.ForegroundContext(handle)
-                : (await CompanionOcr.RecognizeAsync(screenshot, CompanionNative.ForegroundIdentity(handle), 0, CancellationToken.None)).Context;
+                : (await CompanionOcr.RecognizeAsync(screenshot, CompanionNative.ForegroundIdentity(handle), 0, CancellationToken.None, true)).Context;
             await File.WriteAllTextAsync(args[1], JsonSerializer.Serialize(new
             {
                 persona = useVision ? CompanionBrain.Persona : CompanionBrain.OcrPersona,
                 request = useVision ? CompanionBrain.SpeechRequest(context) : CompanionBrain.OcrSpeechRequest(context),
+                messages = CompanionBrain.BuildMessages(useVision ? CompanionBrain.Persona : CompanionBrain.OcrPersona,
+                    useVision ? CompanionBrain.SpeechRequest(context) : CompanionBrain.OcrSpeechRequest(context)),
                 image = useVision ? screenshot.DataUrl : null, width = screenshot.Width, height = screenshot.Height
             }));
             screenshot.SaveJpeg(Path.ChangeExtension(args[1], useVision ? ".jpg" : ".png"));

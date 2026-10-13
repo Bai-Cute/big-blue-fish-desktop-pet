@@ -21,10 +21,10 @@
 **/test-render.png
 **/test-settings.png
 **/ocr-status.json
+**/model-request.json
 **/vision-status.json
 **/vision-input.jpg
 /release/*
 !/release/README.md
 /AGENTS.md
-/docs/AGENT_FUNCTIONAL_SPEC.md
 /docs/LOCAL_GIT_HANDOFF.md

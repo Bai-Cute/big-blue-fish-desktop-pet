@@ -59,11 +59,12 @@ internal static class CompanionOcrLayout
         var output = new StringBuilder("当前前台窗口的屏幕文字（按区域分别从上到下排列）：\n");
         for (int i = 0; i < regions.Length; i++)
         {
-            if (regions[i].Count == 0) continue;
+            var readable = regions[i].Where(s => s.Text.Any(char.IsLetterOrDigit)).ToArray();
+            if (readable.Length == 0) continue;
             output.Append('【').Append(names[i]).AppendLine("】");
             var text = new StringBuilder();
             Segment? previous = null;
-            foreach (var s in regions[i].OrderBy(x => x.Y).ThenBy(x => x.X))
+            foreach (var s in readable.OrderBy(x => x.Y).ThenBy(x => x.X))
             {
                 if (previous != null && s.Y - (previous.Y + previous.Height) > Math.Max(14, s.Height * .9))
                     text.AppendLine();

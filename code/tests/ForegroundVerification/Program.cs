@@ -68,6 +68,7 @@ class Program
             var handle = new IntPtr(long.Parse(Read()));
             using var own = new Fixture(); own.Show();
             var desktop = CompanionNative.GetShellWindow();
+            Check(CompanionNative.IsDesktopWindow(desktop) && !CompanionNative.IsDesktopWindow(handle), "shell desktop distinguished from normal application");
             Check(CompanionNative.IsExternalForegroundCandidate(handle), "visible external window accepted");
             Check(CompanionScreenCapture.Capture(handle) != null, "visible external window captured");
             Check(CompanionNative.ResolveSpeechForeground(handle, desktop) == handle, "current foreground beats old record");

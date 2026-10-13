@@ -127,11 +127,23 @@ internal static class CompanionNative
         GetWindowText(handle, title, title.Capacity);
         var category = new StringBuilder(128);
         GetClassName(handle, category, category.Capacity);
-        if (category.ToString() is "Progman" or "WorkerW")
-            return "前台辅助信息：Windows 桌面";
+        if (IsDesktopWindow(handle))
+            return "当前前台画面：Windows 桌面，壁纸与快捷方式图标。";
         string name = "未知应用";
         try { using var process = Process.GetProcessById((int)id); name = process.ProcessName; } catch { }
         return "前台辅助信息（以屏幕文字为主要依据）：\n进程：" + name + "\n标题：" + title;
+    }
+
+    internal static bool IsDesktopWindow(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero) return false;
+        if (handle == GetShellWindow()) return true;
+        var category = new StringBuilder(128);
+        GetClassName(handle, category, category.Capacity);
+        if (category.ToString() is not ("Progman" or "WorkerW")) return false;
+        GetWindowThreadProcessId(handle, out var id);
+        try { using var process = Process.GetProcessById((int)id); return process.ProcessName.Equals("explorer", StringComparison.OrdinalIgnoreCase); }
+        catch { return false; }
     }
 
     internal static bool IsVisibleCaptureTarget(IntPtr handle)

@@ -34,6 +34,7 @@ public partial class MainWindow
     private Window? companionSettings;
     private ContextMenu companionContextMenu = null!;
     private bool weatherRequestPending;
+    private bool speechRequestPending;
     private DateTime nextSpeech, nextAction, bubbleUntil;
     private bool companionReady, companionClosed, dragged, dragging, hiddenByUser, fullscreenHidden;
     private Point dragStart, windowStart, anchor;
@@ -265,7 +266,7 @@ public partial class MainWindow
             if (e.Mode == PowerModes.Suspend)
                 brain.Stop();
             ApplyCompanionPowerPolicy();
-            nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
+            nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
         });
     }
 
@@ -567,7 +568,7 @@ public partial class MainWindow
                 brain.Stop();
             ClearCompanionModelReply();
         }
-        else if (preferences.ModelEnabled && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
+        else if (preferences.ModelEnabled && !speechRequestPending && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
         {
             nextWarmup = now.AddMinutes(2);
             _ = brain.WarmUp();
@@ -595,7 +596,7 @@ public partial class MainWindow
             return;
         if (bubble.Visibility == Visibility.Visible && now > bubbleUntil)
             bubble.Visibility = Visibility.Collapsed;
-        if (now < nextSpeech || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
+        if (now < nextSpeech || speechRequestPending || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
             return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600)
         {
@@ -611,16 +612,29 @@ public partial class MainWindow
         var foregroundHandle = speechForegroundOverride
             ?? CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
         speechForegroundOverride = null;
-        if (brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
+        if (speechRequestPending || companionClosed || exitAnimation || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower)
             return;
 
-        nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes + companionRandom.Next(0, 8));
+        speechRequestPending = true;
         long version = speechRequestVersion;
         BeginModelSpeech();
         bool streamed = false;
-        string text;
+        string text = "";
         try
         {
+            // Both countdown and test use this gate. A warm-up or weather task
+            // delays the request instead of silently discarding the test click.
+            var deadline = DateTime.UtcNow.AddSeconds(100);
+            while ((brain.Busy || weatherRequestPending) && DateTime.UtcNow < deadline
+                && !companionClosed && !exitAnimation && !hiddenByUser && !fullscreenHidden
+                && preferences.ModelEnabled && brain.CanRunOnCurrentPower)
+                await Task.Delay(100);
+            if (brain.Busy || weatherRequestPending || companionClosed || exitAnimation || hiddenByUser || fullscreenHidden
+                || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower)
+                return;
+            version = speechRequestVersion;
+            nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
+            BeginModelSpeech(); // A preceding weather request may have ended its own loading indicator.
             text = await brain.Generate(preferences.PublicInfo, preferences.ForegroundEnabled, foregroundHandle, partial =>
             {
                 streamed = true;
@@ -629,6 +643,7 @@ public partial class MainWindow
         }
         finally
         {
+            speechRequestPending = false;
             EndModelSpeech();
         }
         if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower && text.Length > 0)
@@ -642,12 +657,7 @@ public partial class MainWindow
         {
             ClearCompanionModelReply();
         }
-#if COMPANION_OCR
-        else if (!companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled && brain.CanRunOnCurrentPower)
-        {
-            ShowCompanionNotice("主人，" + brain.Status + "。");
-        }
-#endif
+        // Empty/failed generation is silent for automatic speech and tests alike.
     }
 
     private void BuildCompanionTray()
@@ -674,7 +684,7 @@ public partial class MainWindow
         hiddenByUser = false;
         Show();
         ClampCompanion();
-        nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
+        nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
     }
 
     private void HideCompanion()

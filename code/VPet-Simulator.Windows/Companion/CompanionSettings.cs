@@ -128,8 +128,8 @@ public partial class MainWindow
         p.Children.Add(label);
         var scale = new Slider
         {
-            Minimum = .65,
-            Maximum = 1.6,
+            Minimum = .5,
+            Maximum = 2.0,
             Value = preferences.Scale,
             TickFrequency = .05,
             IsSnapToTickEnabled = true
@@ -173,33 +173,14 @@ public partial class MainWindow
         {
             Margin = new Thickness(0, 8, 0, 8)
         };
-        foreach (var n in new[]
-        {
-            3,
-            8,
-            15,
-            30
-        }
-
-        )
-            freq.Items.Add($"说话间隔：{n}–{n + 7} 分钟");
-        freq.SelectedIndex = preferences.SpeechMinMinutes switch
-        {
-            3 => 0,
-            15 => 2,
-            30 => 3,
-            _ => 1
-        };
+        foreach (var range in CompanionPreferences.SpeechRanges)
+            freq.Items.Add($"说话间隔：{range.Min}–{range.Max} 分钟");
+        freq.SelectedIndex = preferences.SpeechRangeIndex;
         freq.SelectionChanged += (_, _) =>
         {
-            preferences.SpeechMinMinutes = new[]
-            {
-                3,
-                8,
-                15,
-                30
-            }[freq.SelectedIndex];
-            nextSpeech = DateTime.UtcNow.AddMinutes(preferences.SpeechMinMinutes);
+            if (freq.SelectedIndex < 0) return;
+            preferences.SpeechMinMinutes = CompanionPreferences.SpeechRanges[freq.SelectedIndex].Min;
+            nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
             SaveCompanion();
         };
         p.Children.Add(freq);

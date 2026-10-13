@@ -36,6 +36,11 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2]);
         try
         {
+            if (args[0] == "--speech-flow") return await SpeechFlowVerification.Run(args[1]);
+#if COMPANION_OCR
+            if (args[0] == "--persona-screen") return await PersonaVerification.ActualScreen(args[1], args[2]);
+#endif
+            if (args[0] == "--persona-trial") return await PersonaVerification.Run(args[1], args[2], args[3]);
             if (args[0] == "--weather-cache") return await WeatherCacheVerification.Run(args[1], args.Contains("--live"));
             string root = Path.GetFullPath(args[0]);
             Directory.CreateDirectory(root);
@@ -143,10 +148,16 @@ internal static class Program
 
             var content = "前台应用：Code\n窗口正文：蓝色大肥鱼项目，正在修改 CompanionBrain.cs";
             var request = CompanionBrain.SpeechRequest(content);
-            Check(request.Contains(content) && request.Contains("已展开具体内容") && request.Contains("入口界面"), "SpeechRequest preserves current screen content and facts hierarchy");
+            Check(request.Contains(content) && request.Contains("屏幕资料结束"), "SpeechRequest preserves current screen content as delimited data");
             var ocr = CompanionBrain.OcrSpeechRequest("我：明天中午一起吃火锅，十二点见。");
-            Check(ocr.Contains("明天中午一起吃火锅") && ocr.Contains("桌宠旁观者"), "OCR request preserves chat topic and observer viewpoint");
-            Check(CompanionBrain.Persona.Contains("主体正文、编辑区、聊天记录") && CompanionBrain.Persona.Contains("桌面、新标签页、主页"), "Persona matches current content and entry-screen behavior");
+            Check(ocr.Contains("明天中午一起吃火锅") && !ocr.Contains("你是"), "OCR user message preserves chat topic without persona instructions");
+            var messages = CompanionBrain.BuildMessages(CompanionBrain.OcrPersona, ocr);
+            Check(messages.Length == 2 && messages[0].role == "system" && messages[1].role == "user", "production messages preserve standard system/user roles");
+            Check(((string)messages[0].content).Contains("聊天正文") && ((string)messages[0].content).Contains("这一回可以") && (string)messages[1].content == ocr,
+                "observer guidance and random voice are system instructions while user content is screen data");
+            Check(CompanionBrain.BuildMessages(CompanionBrain.Persona, request, new CompanionWindowImage("data:image/jpeg;base64,AA==", 1, 1))[1].content is object[] { Length: 2 },
+                "vision content keeps image and screen text in the user role");
+            Check(CompanionBrain.Persona.Contains("当前活动") && CompanionBrain.Persona.Contains("桌面、新标签页、主页"), "Persona matches current content and entry-screen behavior");
             Console.WriteLine($"RESULT {checks} runner/prompt checks passed ({CompanionBrain.InputMode}); child responses are fault fixtures, not real model evaluation");
             return 0;
         }

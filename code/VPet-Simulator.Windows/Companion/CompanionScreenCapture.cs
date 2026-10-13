@@ -60,9 +60,18 @@ internal static class CompanionScreenCapture
         if (!CompanionNative.IsVisibleCaptureTarget(handle) || !CompanionNative.GetWindowRect(handle, out var rect))
             return null;
 
-        var width = rect.Right - rect.Left;
-        var height = rect.Bottom - rect.Top;
-        if (width < 32 || height < 32 || width > 12000 || height > 12000)
+        var windowRect = Rectangle.FromLTRB(rect.Left, rect.Top, rect.Right, rect.Bottom);
+        var captureRect = windowRect;
+        // The shell window spans the virtual desktop, including gaps between monitors.
+        // Crop its render to the pointer's monitor before scaling, preserving icon text.
+        if (CompanionNative.IsDesktopWindow(handle))
+        {
+            var monitor = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position);
+            captureRect = Rectangle.Intersect(windowRect, monitor.Bounds);
+        }
+        var width = windowRect.Width;
+        var height = windowRect.Height;
+        if (captureRect.Width < 32 || captureRect.Height < 32 || width > 12000 || height > 12000)
             return null;
 
         using var bitmap = new Bitmap(width, height, PixelFormat.Format32bppArgb);
@@ -76,7 +85,7 @@ internal static class CompanionScreenCapture
                 using var screen = Graphics.FromImage(bitmap);
                 var screenHdc = screen.GetHdc();
                 var desktop = GetDC(IntPtr.Zero);
-                var copied = BitBlt(screenHdc, 0, 0, width, height, desktop, rect.Left, rect.Top, RasterOperationSourceCopy);
+                var copied = BitBlt(screenHdc, 0, 0, width, height, desktop, windowRect.Left, windowRect.Top, RasterOperationSourceCopy);
                 ReleaseDC(IntPtr.Zero, desktop);
                 screen.ReleaseHdc(screenHdc);
                 if (!copied)
@@ -87,7 +96,12 @@ internal static class CompanionScreenCapture
         // 1280px screenshots make the Qwen vision prefill disproportionately slow on
         // the Intel Vulkan path. 768px preserves the application chrome and readable
         // large text while keeping the first-token wait substantially shorter.
-        using var normalized = Resize(bitmap, maxDimension);
+        // PrintWindow can reset the destination DC origin, so crop the rendered pixels
+        // afterwards rather than relying on a translated GDI viewport.
+        using var cropped = captureRect == windowRect ? null : bitmap.Clone(new Rectangle(
+            captureRect.Left - windowRect.Left, captureRect.Top - windowRect.Top,
+            captureRect.Width, captureRect.Height), PixelFormat.Format32bppArgb);
+        using var normalized = Resize(cropped ?? bitmap, maxDimension);
         using var output = new MemoryStream();
         normalized.Save(output, lossless ? ImageFormat.Png : ImageFormat.Jpeg);
         return new CompanionWindowImage(

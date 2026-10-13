@@ -45,7 +45,16 @@ internal static class Program
             w=new MainWindow();w.Show();Wait(()=>(bool)Read(w,"companionReady"),10,"video load");
             ((DispatcherTimer)Read(w,"companionTimer")).Stop();
             var player=Read(w,"videoPlayer");var prefs=Read(w,"preferences");var layout=(Grid)Read(w,"companionLayout");
+            Check(Property<double>(player,"PlaybackRate")==1.5,"startup greeting uses 1.5x playback");
             var start=Stopwatch.StartNew();
+            var welcome=(string)Invoke(w,"WelcomeText",DateTime.Now)!;
+            Check(((TextBlock)Read(w,"bubbleText")).Text==welcome,"welcome appears immediately with model disabled");
+            foreach(var sample in new[]{(Hour:5,Period:"早上"),(Hour:10,Period:"早上"),(Hour:11,Period:"中午"),(Hour:13,Period:"中午"),(Hour:14,Period:"下午"),(Hour:17,Period:"下午"),(Hour:18,Period:"晚上"),(Hour:0,Period:"晚上")})
+                Check((string)Invoke(w,"WelcomeText",new DateTime(2026,10,14,sample.Hour,0,0))! == $"主人{sample.Period}好，鱼鱼给主人请安啦~","system time greeting boundary "+sample.Hour);
+            Wait(()=>(string)Read(w,"animationPhase")!="Startup",9,"startup greeting completes at faster speed");
+            Check(start.Elapsed.TotalSeconds>=6.4&&start.Elapsed.TotalSeconds<8,"full startup bow lasts about 6.7 seconds");
+            Check(((Border)Read(w,"bubble")).Visibility!=Visibility.Visible,"welcome closes with bow, independent of 2 minute bubble setting");
+            start.Restart();
             Invoke(w,"PlayCompanion","待机呼吸休闲");
             Wait(()=>Property<long>(player,"Frames")>=240,13,"240-frame playback");
             Check(start.Elapsed.TotalSeconds>=9.8&&start.Elapsed.TotalSeconds<12,"original fps playback: "+start.Elapsed.TotalSeconds);
@@ -79,7 +88,7 @@ internal static class Program
             interval.Value=70;Pump();Check(Property<int>(prefs,"AnimationIntervalSeconds")==70,"interval saved live");
             Check(File.ReadAllText("preferences.json").Contains("\"AnimationIntervalSeconds\": 70"),"interval persisted");
             Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&Property<int>(prefs,"BubbleDurationIndex")==5,"settings opening preserved choices");
-            foreach(var scale in new[]{.65,1.0,1.6})
+            foreach(var scale in new[]{.5,1.0,2.0})
             {
                 Set(prefs,"Scale",scale);Invoke(w,"ApplyCompanionScale",false);Pump();
                 w.Left=-800;w.Top=-800;Invoke(w,"ClampCompanion");Pump();
@@ -94,7 +103,9 @@ internal static class Program
             settings.Close();Console.WriteLine("Settings navigation, persistence, scaling and scroll verified.");Set(prefs,"Scale",1.0);Invoke(w,"ApplyCompanionScale",false);w.Left=500;w.Top=250;Invoke(w,"ClampCompanion");
             Invoke(w,"ClickAnimation");Check(((string)Read(w,"currentAction")).StartsWith("点击回应-"),"click pool");
             Invoke(w,"PlayCompanion","drag");Check((string)Read(w,"animationPhase")=="Drag","drag starts");
-            Wait(()=>Property<long>(player,"Frames")==241,13,"drag full clip"); // Original assets have 241 frames.
+            Check(Property<double>(player,"StartSeconds")==1.5,"drag begins directly in suspended segment");
+            Wait(()=>Property<long>(player,"Frames")==108,7,"drag plays only 1.5-6 second segment");
+            Check(Property<double>(player,"PositionSeconds")>=5.9&&Property<double>(player,"PositionSeconds")<6,"drag ends before landing segment");
             Check((string)Read(w,"animationPhase")=="Drag","drag holds until release");Invoke(w,"FinishDragAnimation");Check((string)Read(w,"animationPhase")=="Idle","drag release idle");
             var policy=Read(w,"animationPolicy");var rule=Invoke(policy,"Find","原地左转奔跑")!;
             var origin=w.Left;Invoke(w,"StartAnimationEvent",rule);
@@ -106,8 +117,15 @@ internal static class Program
             Set(prefs,"ModelEnabled",true);((Task)Invoke(w,"SpeakCompanionTest")!).GetAwaiter().GetResult();
             Pump(2000);var text=(TextBlock)Read(w,"bubbleText");Check(text.Text=="主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。","speech test battery notice");
             Check(Property<int?>(Read(w,"brain"),"RunnerPid")==null,"animation logic did not start model");
+            var context=(ContextMenu)Read(w,"companionContextMenu");
+            var hide=context.Items.Cast<MenuItem>().Single(m=>(string)m.Header=="隐藏桌宠");
+            hide.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump();
+            Check(!w.IsVisible&&(bool)Read(w,"hiddenByUser"),"direct pet context menu hides character");
+            Invoke(w,"RestoreCompanion");Pump();Check(w.IsVisible&&!(bool)Read(w,"hiddenByUser"),"tray restore path still shows character");
             start.Restart();w.Close();Check((string)Read(w,"animationPhase")=="Exit"&&w.IsVisible,"closing farewell starts once");
-            Wait(()=>!w.IsVisible,13,"farewell completed and window closed");Check(start.Elapsed.TotalSeconds>=9.8,"farewell not truncated");
+            Check(Property<double>(player,"PlaybackRate")==1.5,"farewell greeting uses 1.5x playback");
+            Check(((TextBlock)Read(w,"bubbleText")).Text=="主人再见~鱼鱼喜欢主人哦","farewell appears immediately with exact single tilde");
+            Wait(()=>!w.IsVisible,9,"farewell completed and window closed");Check(start.Elapsed.TotalSeconds>=6.5&&start.Elapsed.TotalSeconds<8,"farewell full clip finishes at 1.5x: "+start.Elapsed.TotalSeconds);
             Console.WriteLine($"Animation UI: {checks} checks passed, settings snapshots and alpha render saved to {sandbox}.");return 0;
         }
         catch(Exception e){Console.Error.WriteLine(e);if(w!=null){Field(w,"exitReady",true);w.Close();}return 1;}

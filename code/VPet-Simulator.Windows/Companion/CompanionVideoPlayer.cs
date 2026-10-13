@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Controls;
@@ -23,36 +24,47 @@ internal sealed class CompanionVideoPlayer : IDisposable
     private bool disposed;
     internal long Frames { get; private set; }
     internal double PositionSeconds { get; private set; }
+    internal double PlaybackRate { get; private set; } = 1;
+    internal double StartSeconds { get; private set; }
     internal bool Paused { get => paused; set => paused = value; }
     internal event Action<string>? Failed;
     internal event Action<double>? FramePresented;
     internal CompanionVideoPlayer(Image target) { image = target; image.Source = bitmap; }
-    internal void Play(string file, bool mirrored, Action completed)
+    internal void Play(string file, bool mirrored, Action completed, double startSeconds = 0,
+        double? endSeconds = null, double playbackRate = 1)
     {
+        if (!double.IsFinite(startSeconds) || startSeconds < 0 || !double.IsFinite(playbackRate) || playbackRate <= 0
+            || (endSeconds.HasValue && (!double.IsFinite(endSeconds.Value) || endSeconds.Value <= startSeconds)))
+            throw new ArgumentOutOfRangeException(nameof(startSeconds));
         Stop();
         if (disposed) return;
         image.RenderTransformOrigin = new(.5, .5);
         image.RenderTransform = mirrored ? new ScaleTransform(-1, 1) : Transform.Identity;
-        Frames = 0; PositionSeconds = 0;
+        Frames = 0; PositionSeconds = startSeconds;
+        StartSeconds = startSeconds; PlaybackRate = playbackRate;
         cancellation = new();
         var token = cancellation.Token;
         var id = ++generation;
         var start = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "media", "ffmpeg.exe"))
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in new[] { "-v", "error", "-nostdin", "-threads", "1", "-c:v", "libvpx-vp9", "-i", file, "-an", "-sn", "-f", "rawvideo", "-pix_fmt", "bgra", "pipe:1" }) start.ArgumentList.Add(arg);
+        foreach (var arg in new[] { "-v", "error", "-nostdin", "-threads", "1", "-c:v", "libvpx-vp9" }) start.ArgumentList.Add(arg);
+        if (startSeconds > 0) { start.ArgumentList.Add("-ss"); start.ArgumentList.Add(startSeconds.ToString("R", CultureInfo.InvariantCulture)); }
+        start.ArgumentList.Add("-i"); start.ArgumentList.Add(file);
+        if (endSeconds.HasValue) { start.ArgumentList.Add("-t"); start.ArgumentList.Add((endSeconds.Value - startSeconds).ToString("R", CultureInfo.InvariantCulture)); }
+        foreach (var arg in new[] { "-an", "-sn", "-f", "rawvideo", "-pix_fmt", "bgra", "pipe:1" }) start.ArgumentList.Add(arg);
         var process = new Process { StartInfo = start };
         try
         {
             process.Start(); decoder = process;
             if (!job.Attach(process)) throw new IOException("无法关联动画解码进程");
-            _ = Task.Run(() => Decode(process, id, token, completed));
+            _ = Task.Run(() => Decode(process, id, token, completed, startSeconds, playbackRate));
         }
         catch (Exception ex)
         {
             Stop(); process.Dispose(); Failed?.Invoke(ex.Message);
         }
     }
-    private async Task Decode(Process process, long id, CancellationToken token, Action completed)
+    private async Task Decode(Process process, long id, CancellationToken token, Action completed, double startSeconds, double playbackRate)
     {
         var errors = process.StandardError.ReadToEndAsync(token);
         try
@@ -71,7 +83,7 @@ internal sealed class CompanionVideoPlayer : IDisposable
             }
             while (true)
             {
-                await WaitUntil(count / (double)Fps);
+                await WaitUntil(count / (Fps * playbackRate));
                 int offset = 0;
                 while (offset < data.Length)
                 {
@@ -90,11 +102,11 @@ internal sealed class CompanionVideoPlayer : IDisposable
                 {
                     if (id != generation || disposed) return;
                     bitmap.WritePixels(new System.Windows.Int32Rect(0, 0, VideoWidth, VideoHeight), data, VideoWidth * 4, 0);
-                    Frames = ++count; PositionSeconds = (count - 1) / (double)Fps;
+                    Frames = ++count; PositionSeconds = startSeconds + (count - 1) / (double)Fps;
                     FramePresented?.Invoke(PositionSeconds);
                 }, System.Windows.Threading.DispatcherPriority.Render, token);
             }
-            await WaitUntil(count / (double)Fps); // Give the final frame its full display interval.
+            await WaitUntil(count / (Fps * playbackRate)); // Give the final frame its full display interval.
             await process.WaitForExitAsync(token);
             var error = await errors;
             if (process.ExitCode != 0 || count == 0) throw new IOException("动画解码失败：" + error);
