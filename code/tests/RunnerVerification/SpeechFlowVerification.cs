@@ -55,13 +55,14 @@ internal static class SpeechFlowVerification
         MainWindow? window = null;
         try
         {
+            root = Path.GetFullPath(root);
             var app = new App(); app.InitializeComponent();
             typeof(Application).GetField("_startupUri", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(app, null);
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Directory.SetCurrentDirectory(Path.GetFullPath(root));
             File.Copy(Path.Combine(AppContext.BaseDirectory, "vpeticon.ico"), "vpeticon.ico", true);
             // Isolated settings; real runtime/model/resources are junctions supplied by the caller.
-            File.WriteAllText("preferences.json", "{\"ModelEnabled\":false,\"GpuEnabled\":true,\"ForegroundEnabled\":true,\"PublicInfo\":false,\"Scale\":0.85,\"SpeechMinMinutes\":3,\"Left\":400,\"Top\":250}");
+            File.WriteAllText("preferences.json", "{\"ModelEnabled\":false,\"GpuEnabled\":true,\"StopModelOnBattery\":false,\"ForegroundEnabled\":true,\"PublicInfo\":false,\"Scale\":0.85,\"SpeechMinMinutes\":3,\"Left\":400,\"Top\":250}");
             var random = new Random(20261014);
             foreach (var range in CompanionPreferences.SpeechRanges)
             {
@@ -113,7 +114,8 @@ internal static class SpeechFlowVerification
             Check(duplicate.IsCompleted && !task.IsCompleted, "repeated clicks coalesce into one existing request");
             double? first = null;
             Wait(() => {
-                if (first == null && ((TextBlock)Field(window, "bubbleText")!).Text.Length > 0) first = watch.Elapsed.TotalSeconds;
+                if (first == null && (bool)Field(window, "bubbleIsModelReply")!
+                    && ((TextBlock)Field(window, "bubbleText")!).Text.Length > 0) first = watch.Elapsed.TotalSeconds;
                 return task.IsCompleted;
             }, "real test finishes through production streaming handler", 45);
             task.GetAwaiter().GetResult(); warmup.GetAwaiter().GetResult();

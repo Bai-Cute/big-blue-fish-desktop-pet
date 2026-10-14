@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Media;
 
 namespace VPet_Simulator.Windows;
 
@@ -13,16 +14,29 @@ public partial class MainWindow
     private void BuildCompanionContextMenu()
     {
         companionContextMenu = new ContextMenu { PlacementTarget = this, Placement = PlacementMode.MousePoint };
+        companionContextMenu.Resources.MergedDictionaries.Add(new ResourceDictionary
+        { Source = new Uri("/VPet-Simulator.Windows;component/Companion/CompanionMenuStyles.xaml", UriKind.Relative) });
+        companionContextMenu.Style = (Style)companionContextMenu.FindResource(typeof(ContextMenu));
+        TextBlock Icon(string glyph) => new()
+        {
+            Text = glyph, FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 16,
+            Foreground = new SolidColorBrush(Color.FromRgb(80, 96, 152)),
+            VerticalAlignment = VerticalAlignment.Center
+        };
         var settings = new MenuItem { Header = "设置" };
+        settings.Icon = Icon("\uE713");
         settings.Click += (_, _) => { companionContextMenu.IsOpen = false; OpenCompanionSettings(); };
         var weather = new MenuItem { Header = "天气" };
+        weather.Icon = Icon("\uE706");
         weather.Click += async (_, _) => { companionContextMenu.IsOpen = false; await SpeakCompanionWeather(); };
         companionContextMenu.Items.Add(settings);
         companionContextMenu.Items.Add(weather);
         var test = new MenuItem { Header = "吐字测试" };
+        test.Icon = Icon("\uE8F2");
         test.Click += async (_, _) => { companionContextMenu.IsOpen = false; await SpeakCompanionTest(); };
         companionContextMenu.Items.Add(test);
         var hide = new MenuItem { Header = "隐藏桌宠" };
+        hide.Icon = Icon("\uE8A7");
         hide.Click += (_, _) => { companionContextMenu.IsOpen = false; HideCompanion(); };
         companionContextMenu.Items.Add(hide);
     }

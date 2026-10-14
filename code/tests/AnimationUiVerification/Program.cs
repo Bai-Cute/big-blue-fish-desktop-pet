@@ -123,6 +123,48 @@ internal static class Program
         public Window Window=>window;
         public void Dispose()=>window.Close();
     }
+    static void VerifyMenus(MainWindow w)
+    {
+        var menu=(ContextMenu)Read(w,"companionContextMenu");
+        var items=menu.Items.Cast<MenuItem>().ToArray();
+        Check(items.Select(i=>i.Header?.ToString()).SequenceEqual(new[]{"设置","天气","吐字测试","隐藏桌宠"}),"pet menu retains its four actions");
+        menu.IsOpen=true;Pump(120);menu.UpdateLayout();
+        Check(menu.Style!=null&&menu.FontSize==14&&menu.ActualWidth>=184,"modern menu template and readable sizing applied");
+        var frame=Children<Border>(menu).First(b=>b.CornerRadius.TopLeft==12);
+        Check(frame.Background is SolidColorBrush color&&color.Color==Colors.White,"menu uses white rounded settings-style panel");
+        Check(items.All(i=>i.ActualHeight>=38&&i.Icon is TextBlock {Text.Length:1}),"all menu actions have full-height rows and system vector icons");
+        var rows=items.Select(i=>i.TransformToAncestor(menu).TransformBounds(new Rect(0,0,i.ActualWidth,i.ActualHeight))).ToArray();
+        Check(rows.Zip(rows.Skip(1)).All(pair=>pair.First.Bottom<=pair.Second.Top+.1),"menu rows do not overlap");
+        Render(menu,"menu-normal.png",(int)Math.Ceiling(menu.ActualWidth),(int)Math.Ceiling(menu.ActualHeight));
+        items[0].Focus();Pump(80);
+        Render(menu,"menu-focused.png",(int)Math.Ceiling(menu.ActualWidth),(int)Math.Ceiling(menu.ActualHeight));
+        items[0].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump(100);
+        Check(!menu.IsOpen&&Read(w,"companionSettings") is Window {IsVisible:true},"styled settings action opens actual settings and dismisses menu");
+        ((Window)Read(w,"companionSettings")).Close();
+        menu.IsOpen=true;Pump();items[1].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump();
+        Check(!menu.IsOpen&&((TextBlock)Read(w,"bubbleText")).Text.Contains("启用本地大模型"),"weather action retains model-off behavior");
+        menu.IsOpen=true;Pump();items[2].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump();
+        Check(!menu.IsOpen&&((TextBlock)Read(w,"bubbleText")).Text.Contains("当前设置暂停了模型"),"speech test action retains model-off behavior");
+        menu.IsOpen=true;Pump();items[3].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump();
+        Check(!w.IsVisible&&(bool)Read(w,"hiddenByUser"),"styled hide action uses existing hide lifecycle");
+        Invoke(w,"RestoreCompanion");Pump();Check(w.IsVisible&&!(bool)Read(w,"hiddenByUser"),"existing restore still works");
+        var tray=(System.Windows.Forms.ContextMenuStrip)((System.Windows.Forms.NotifyIcon)Read(w,"notifyIcon")).ContextMenuStrip!;
+        Check(tray.Renderer.GetType().Name=="CompanionTrayMenuRenderer"&&!tray.ShowImageMargin,"tray uses matching palette without obsolete image gutter");
+        Check(tray.Items.Cast<System.Windows.Forms.ToolStripItem>().Select(i=>i.Text).SequenceEqual(new[]{"显示桌宠","设置","天气","吐字测试","关闭桌宠"}),"tray retains all original actions");
+        tray.Show(new System.Drawing.Point(500,300));System.Windows.Forms.Application.DoEvents();
+        using(var bitmap=new System.Drawing.Bitmap(tray.Width,tray.Height))
+        {tray.DrawToBitmap(bitmap,new System.Drawing.Rectangle(0,0,tray.Width,tray.Height));bitmap.Save("tray-menu.png");}
+        Check(tray.Items.Cast<System.Windows.Forms.ToolStripItem>().All(i=>
+        {
+            // WinForms may extend an item's paint surface into its hidden image
+            // gutter. Check visible text/padding, not that internal paint surface.
+            var visible=System.Drawing.Rectangle.Intersect(tray.ClientRectangle,i.Bounds);
+            var textSize=System.Windows.Forms.TextRenderer.MeasureText(i.Text,i.Font);
+            return visible.Height>=textSize.Height+i.Padding.Vertical&&visible.Width>=textSize.Width+i.Padding.Horizontal;
+        }),"tray labels and vertical padding fit visible rows");
+        tray.Close();
+        Console.WriteLine($"Menus: {checks} real WPF/WinForms checks passed.");
+    }
     [STAThread] static int Main(string[] args)
     {
         MainWindow? w=null;
@@ -137,6 +179,11 @@ internal static class Program
             native.GetField("TestPowerOverride",Access)!.SetValue(null,false);
             w=new MainWindow();w.Show();Wait(()=>(bool)Read(w,"companionReady"),10,"video load");
             ((DispatcherTimer)Read(w,"companionTimer")).Stop();
+            if(args.Contains("--menus"))
+            {
+                Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before menu verification");
+                VerifyMenus(w);Field(w,"exitReady",true);w.Close();return 0;
+            }
             if(args.Contains("--settings-focus"))
             {
                 Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before focus verification");
