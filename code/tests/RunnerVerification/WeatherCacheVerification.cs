@@ -1,8 +1,8 @@
-﻿using System.IO;
+using System.IO;
 using System.Net.Http;
 using System.Net;
 using System.Text.Json;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 internal static class WeatherCacheVerification
 {

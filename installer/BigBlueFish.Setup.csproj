@@ -15,7 +15,7 @@
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <DebugType>embedded</DebugType>
-    <ApplicationIcon>..\code\VPet-Simulator.Windows\vpeticon.ico</ApplicationIcon>
+    <ApplicationIcon>..\code\BigBlueFish.Windows\BigBlueFish.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup Condition="'$(CompanionInputMode)' == 'Ocr'">
     <DefineConstants>$(DefineConstants);COMPANION_OCR</DefineConstants>

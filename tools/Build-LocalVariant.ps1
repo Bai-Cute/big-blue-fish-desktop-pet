@@ -7,9 +7,9 @@ $root = Split-Path $PSScriptRoot -Parent
 & "$PSScriptRoot/Setup-Media.ps1"
 $version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -InputMode $InputMode
 $destination = Join-Path $root ".work/BigBlueFish-v$version-$($InputMode.ToLowerInvariant())"
-& $SdkPath publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release `
+& $SdkPath publish "$root/code/BigBlueFish.Windows/BigBlueFish.Windows.csproj" -c Release `
     -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -o $destination --nologo
 if ($LASTEXITCODE -ne 0) { throw '本地对照版本构建失败。' }
-$actual = (Get-Item -LiteralPath (Join-Path $destination 'VPet-Simulator.Windows.exe')).VersionInfo.ProductVersion
+$actual = (Get-Item -LiteralPath (Join-Path $destination 'BigBlueFish.exe')).VersionInfo.ProductVersion
 if ($actual -ne $version) { throw "构建版本不一致：期望 $version，实际 $actual。" }
 Write-Output $destination

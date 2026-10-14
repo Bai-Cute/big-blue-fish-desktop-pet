@@ -103,7 +103,7 @@ https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e486
 
 ## 开源许可与权利信息
 
-本项目使用的源码、动画、推理运行时、模型、地区数据和天气数据分别来自不同项目，具体来源、许可和版权说明见 [LICENSE](LICENSE)、[第三方声明](code/THIRD-PARTY.md) 和 [许可文件目录](code/licenses)。蓝色大肥鱼是基于 VPet 和社区素材制作的定制桌宠项目，不代表 VPet、DeepSeek、Qwen、llama.cpp 或其他来源项目的官方产品。
+本项目使用的源码、动画、推理运行时、模型、地区数据和天气数据分别来自不同项目，具体来源、许可和版权说明见 [LICENSE](LICENSE)、[第三方声明](code/THIRD-PARTY.md) 和 [许可文件目录](code/licenses)。蓝色大肥鱼使用独立的桌宠运行逻辑，并结合社区动画素材与本地模型，为主人带来可爱的桌面陪伴。
 
 ## 项目结构
 

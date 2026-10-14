@@ -163,6 +163,17 @@ internal static class Checks
             var weatherCache = Path.Combine(target, "cache", "weather.json");
             File.WriteAllText(weatherCache, "weather-retention-marker");
             var before = File.ReadAllBytes(settings);
+            var legacyFiles = new[] { "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll",
+                "VPet-Simulator.Windows.deps.json", "VPet-Simulator.Windows.runtimeconfig.json", "vpeticon.ico" };
+            foreach (var legacy in legacyFiles) File.WriteAllText(Path.Combine(target, legacy), "old-application-marker");
+            var legacyPath = Path.Combine(target, InstallationLifecycle.LegacyApplicationName);
+            var newPath = Path.Combine(target, InstallationLifecycle.ApplicationName);
+            Check(InstallationLifecycle.MigrateStartupCommand($"\"{legacyPath}\" --example", target) == $"\"{newPath}\" --example",
+                "upgrade migrates enabled startup command and preserves arguments");
+            Check(InstallationLifecycle.MigrateStartupCommand(legacyPath, target) == $"\"{newPath}\"",
+                "upgrade migrates an unquoted legacy startup path");
+            Check(InstallationLifecycle.MigrateStartupCommand($"\"{target}-other\\VPet-Simulator.Windows.exe\"", target)
+                == $"\"{target}-other\\VPet-Simulator.Windows.exe\"", "upgrade leaves unrelated startup entry alone");
             using var versionStream = typeof(Checks).Assembly.GetManifestResourceStream(typeof(Checks).Assembly.GetManifestResourceNames().Single(n => n.EndsWith("Version.props")))!;
             string expectedVersion = XDocument.Load(versionStream).Descendants("Version").Single().Value;
             Check(InstallerForm.ProductVersion == expectedVersion, "installer product version matches Version.props");
@@ -170,12 +181,13 @@ internal static class Checks
             using var stream = InstallerForm.OpenPayload(args[0]);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             var names = archive.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var required in new[] { "VPet-Simulator.Windows.exe", "Uninstall.exe", "VPet-Simulator.Windows.dll",
+            foreach (var required in new[] { "BigBlueFish.exe", "Uninstall.exe", "BigBlueFish.dll",
                 "coreclr.dll", "hostfxr.dll",
                 "PresentationFramework.dll", "runtime/llama-server.exe", "runtime/ggml-vulkan.dll", "runtime/mtmd.dll",
                 "media/ffmpeg.exe", "media/FFmpeg-LICENSE.txt", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
                 Check(names.Contains(required), "payload includes " + required);
             foreach (var obsolete in new[] { "VPet-Simulator.Core.dll", "VPet-Simulator.Windows.Interface.dll",
+                "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll",
                 "steam_api.dll", "steam_api64.dll", "Facepunch.Steamworks.Win64.dll", "LinePutScript.dll",
                 "Panuon.WPF.dll", "Panuon.WPF.UI.dll", "NAudio.dll", "SkiaSharp.dll", "WpfAnimatedGif.dll" })
                 Check(!names.Contains(obsolete), "payload excludes unused upstream component " + obsolete);
@@ -185,6 +197,7 @@ internal static class Checks
             Check(!names.Any(n => n.StartsWith("assets/pet/")), "old PNG animation pack is absent");
             Check(names.Contains("WinRT.Runtime.dll") == !InstallerForm.RequiresVision, "OCR projections match input mode");
             InstallerForm.ExtractApplication(archive, target);
+            foreach (var legacy in legacyFiles) Check(!File.Exists(Path.Combine(target, legacy)), "upgrade removes old application file " + legacy);
             Check(File.ReadAllBytes(settings).SequenceEqual(before), "existing settings preserved");
             Check(File.ReadAllText(retained) == "retained-model-marker", "existing model directory preserved");
             Check(File.ReadAllText(weatherCache) == "weather-retention-marker", "existing weather cache preserved by update");
@@ -200,7 +213,7 @@ internal static class Checks
             Check(manifest.RootElement.GetProperty("Version").GetString() == expectedVersion, "installed manifest version matches");
             Check(manifest.RootElement.GetProperty("InputMode").GetString() == InstallerForm.InputMode,
                 "installed manifest mode matches");
-            using var runtime = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "VPet-Simulator.Windows.runtimeconfig.json")));
+            using var runtime = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "BigBlueFish.runtimeconfig.json")));
             Check(runtime.RootElement.GetProperty("runtimeOptions").TryGetProperty("includedFrameworks", out _),
                 "application is self-contained");
             if (args.Contains("--lifecycle"))
@@ -225,19 +238,21 @@ internal static class Checks
                 string ownShortcut = target + "-own.lnk", unrelatedShortcut = target + "-other.lnk";
                 string uninstallShortcut = target + "-uninstall.lnk";
                 var createShortcut = typeof(InstallerForm).GetMethod("CreateShortcut", BindingFlags.Static | BindingFlags.NonPublic)!;
-                createShortcut.Invoke(null, [ownShortcut, target, "VPet-Simulator.Windows.exe", ""]);
-                createShortcut.Invoke(null, [unrelatedShortcut, target + "-other", "VPet-Simulator.Windows.exe", ""]);
+                createShortcut.Invoke(null, [ownShortcut, target, "BigBlueFish.exe", ""]);
+                createShortcut.Invoke(null, [unrelatedShortcut, target + "-other", "BigBlueFish.exe", ""]);
                 createShortcut.Invoke(null, [uninstallShortcut, target, "Uninstall.exe", $"--uninstall \"{target}\""]);
                 string startupName = "BigBlueFish-Verification-" + Guid.NewGuid().ToString("N");
                 using (var startup = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
-                    startup.SetValue(startupName, $"\"{Path.Combine(target, "VPet-Simulator.Windows.exe")}\"");
+                    startup.SetValue(startupName, $"\"{legacyPath}\" --example");
                 InstallationLifecycle.Register(target, ownShortcut, unrelatedShortcut, uninstallShortcut);
+                using (var startup = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
+                    Check(startup?.GetValue(startupName) as string == $"\"{newPath}\" --example", "registration migrates real Windows startup entry");
                 InstallationLifecycle.GrantUserAccess(target);
                 Check(RestrictedUserProbe.Run(target) == 0, "ordinary token creates modifies renames and deletes data after installer ACL grant");
                 Check(folder.Parent.GetAccessControl().GetSecurityDescriptorBinaryForm().SequenceEqual(parentAcl), "installer leaves parent directory ACL unchanged");
                 using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
                 using (var application = machine.OpenSubKey(InstallationLifecycle.ApplicationPathKey))
-                    Check(application?.GetValue("") as string == Path.Combine(target, "VPet-Simulator.Windows.exe"), "application registered in Windows App Paths");
+                    Check(application?.GetValue("") as string == Path.Combine(target, "BigBlueFish.exe"), "application registered in Windows App Paths");
                 string keyPath = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\" + InstallationLifecycle.RegistrationName(target);
                 using (var key = machine.OpenSubKey(keyPath))
                 {
@@ -254,7 +269,7 @@ internal static class Checks
                 File.Delete(unrelatedShortcut);
                 using (var startup = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
                     Check(startup?.GetValue(startupName) == null, "uninstall clears this install's startup entry");
-                Check(!File.Exists(Path.Combine(target, "VPet-Simulator.Windows.exe")) && !File.Exists(Path.Combine(target, "Uninstall.exe")), "uninstall removes application and uninstaller");
+                Check(!File.Exists(Path.Combine(target, "BigBlueFish.exe")) && !File.Exists(Path.Combine(target, "Uninstall.exe")), "uninstall removes application and uninstaller");
                 Check(File.ReadAllBytes(settings).SequenceEqual(before) && File.Exists(retained), "uninstall can preserve model and settings");
                 Check(File.ReadAllText(weatherCache) == "weather-retention-marker", "retain-data uninstall preserves weather cache");
                 using (var key = machine.OpenSubKey(keyPath)) Check(key == null, "uninstall removes Windows registration");

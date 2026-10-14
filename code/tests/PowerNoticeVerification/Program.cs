@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 internal static class Program
 {
@@ -46,7 +46,7 @@ internal static class Program
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Directory.SetCurrentDirectory(sandbox);
             File.WriteAllText("preferences.json", "{\"ModelEnabled\":true,\"GpuEnabled\":false,\"StopModelOnBattery\":true,\"PublicInfo\":false,\"ForegroundEnabled\":false,\"BubbleDurationIndex\":0}");
-            var native = typeof(App).Assembly.GetType("VPet_Simulator.Windows.CompanionNative")!;
+            var native = typeof(App).Assembly.GetType("BigBlueFish.Windows.CompanionNative")!;
             void Power(bool value) => native.GetField("TestPowerOverride", Access)!.SetValue(null, value);
             Power(false);
             window = new MainWindow(); window.Show();

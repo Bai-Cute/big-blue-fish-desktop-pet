@@ -196,7 +196,7 @@ internal sealed class InstallerForm : Form
         {
             await InstallAsync(target);
             status.Text = "安装完成，正在启动蓝色大肥鱼…";
-            var exe = Path.Combine(target, "VPet-Simulator.Windows.exe");
+            var exe = Path.Combine(target, "BigBlueFish.exe");
             Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = target, UseShellExecute = true });
             await Task.Delay(700);
             Close();
@@ -287,7 +287,9 @@ internal sealed class InstallerForm : Form
         // Older installers had no manifest. These are the known OCR-only runtime
         // projections and the old generated installation instructions.
         foreach (var relative in previous.Concat(new[] {
-            "Microsoft.Windows.SDK.NET.dll", "WinRT.Runtime.dll", "INSTALL-README.txt", "Setup-Model.ps1" }))
+            "Microsoft.Windows.SDK.NET.dll", "WinRT.Runtime.dll", "INSTALL-README.txt", "Setup-Model.ps1",
+            "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll", "VPet-Simulator.Windows.deps.json",
+            "VPet-Simulator.Windows.runtimeconfig.json", "VPet-Simulator.Windows.pdb", "vpeticon.ico" }))
         {
             if (current.Contains(relative) || Preserved(relative)) continue;
             var path = Resolve(relative);
@@ -363,7 +365,7 @@ internal sealed class InstallerForm : Form
         return new LimitedStream(stream, length);
     }
 
-    private static void CreateShortcut(string shortcutPath, string target, string executableName = "VPet-Simulator.Windows.exe", string arguments = "")
+    private static void CreateShortcut(string shortcutPath, string target, string executableName = "BigBlueFish.exe", string arguments = "")
     {
         try
         {
@@ -374,7 +376,7 @@ internal sealed class InstallerForm : Form
             shortcut.TargetPath = Path.Combine(target, executableName);
             shortcut.Arguments = arguments;
             shortcut.WorkingDirectory = target;
-            shortcut.IconLocation = Path.Combine(target, "vpeticon.ico") + ",0";
+            shortcut.IconLocation = Path.Combine(target, "BigBlueFish.ico") + ",0";
             shortcut.Description = "蓝色大肥鱼桌宠";
             shortcut.Save();
         }

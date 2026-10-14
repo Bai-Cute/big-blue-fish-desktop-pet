@@ -2,7 +2,7 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows7.0": {
-      "vpet-simulator.windows": {
+      "BigBlueFish": {
         "type": "Project"
       }
     },

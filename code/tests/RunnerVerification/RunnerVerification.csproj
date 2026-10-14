@@ -13,5 +13,5 @@
     <SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion>
     <DefineConstants>$(DefineConstants);COMPANION_OCR</DefineConstants>
   </PropertyGroup>
-  <ItemGroup><ProjectReference Include="../../VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../../BigBlueFish.Windows/BigBlueFish.Windows.csproj" /></ItemGroup>
 </Project>

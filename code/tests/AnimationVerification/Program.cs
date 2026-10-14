@@ -1,6 +1,6 @@
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
-var directory = args.Length == 0 ? Path.GetFullPath("code/VPet-Simulator.Windows/assets/fish") : args[0];
+var directory = args.Length == 0 ? Path.GetFullPath("code/BigBlueFish.Windows/assets/fish") : args[0];
 var policy = CompanionAnimationPolicy.Load(directory);
 int checks = 0;
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }

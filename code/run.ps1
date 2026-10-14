@@ -2,7 +2,7 @@ param([string]$SdkPath,[string]$RuntimeDirectory,[string]$ModelsDirectory,[Valid
 $ErrorActionPreference='Stop'
 & "$PSScriptRoot/build.ps1" -SdkPath $SdkPath -Locked -InputMode $InputMode
 $tfm=if($InputMode -eq 'Ocr'){'net10.0-windows10.0.26100.0'}else{'net10.0-windows7.0'}
-$directory=Join-Path $PSScriptRoot "VPet-Simulator.Windows/bin/x64/Release/$tfm"
+$directory=Join-Path $PSScriptRoot "BigBlueFish.Windows/bin/x64/Release/$tfm"
 if(!$RuntimeDirectory){$RuntimeDirectory=$env:BLUE_WHALE_RUNTIME}
 if(!$ModelsDirectory){$ModelsDirectory=$env:BLUE_WHALE_MODELS}
 if(!$RuntimeDirectory){$RuntimeDirectory='C:\Program Files\蓝色大肥鱼\runtime'}
@@ -14,7 +14,7 @@ foreach($item in @(@('runtime',$RuntimeDirectory,'llama-server.exe'),@('models',
         New-Item -ItemType Junction -Path $destination -Target (Resolve-Path -LiteralPath $item[1]).Path | Out-Null
     }
 }
-if(Get-CimInstance Win32_Process -Filter "Name='VPet-Simulator.Windows.exe'"){
+if(Get-CimInstance Win32_Process -Filter "Name='BigBlueFish.exe' OR Name='VPet-Simulator.Windows.exe'"){
     throw '已有桌宠实例运行。请从其托盘菜单退出后再启动源码版。'
 }
-Start-Process -FilePath (Join-Path $directory 'VPet-Simulator.Windows.exe') -WorkingDirectory $directory -WindowStyle Hidden
+Start-Process -FilePath (Join-Path $directory 'BigBlueFish.exe') -WorkingDirectory $directory -WindowStyle Hidden

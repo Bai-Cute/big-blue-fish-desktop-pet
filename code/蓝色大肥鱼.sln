@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VPet-Simulator.Windows", "VPet-Simulator.Windows/VPet-Simulator.Windows.csproj", "{BC9FC4CB-6A54-412F-AF21-3AFA8525393E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BigBlueFish.Windows", "BigBlueFish.Windows/BigBlueFish.Windows.csproj", "{BC9FC4CB-6A54-412F-AF21-3AFA8525393E}"
 EndProject
 Global
     GlobalSection(SolutionConfigurationPlatforms) = preSolution

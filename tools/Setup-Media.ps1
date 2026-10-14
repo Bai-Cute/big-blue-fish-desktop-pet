@@ -1,7 +1,7 @@
-﻿param([string]$DestinationDirectory)
+param([string]$DestinationDirectory)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
-if(!$DestinationDirectory){$DestinationDirectory=Join-Path $root 'code/VPet-Simulator.Windows/media'}
+if(!$DestinationDirectory){$DestinationDirectory=Join-Path $root 'code/BigBlueFish.Windows/media'}
 $executable=Join-Path $DestinationDirectory 'ffmpeg.exe'
 if((Test-Path -LiteralPath $executable) -and (Test-Path -LiteralPath (Join-Path $DestinationDirectory 'FFmpeg-LICENSE.txt'))){return $executable}
 function Get-ArchiveSha256([string]$Path){

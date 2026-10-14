@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../VPet-Simulator.Windows/Companion/CompanionNative.cs" Link="CompanionNative.cs" />
-    <Compile Include="../../VPet-Simulator.Windows/Companion/CompanionScreenCapture.cs" Link="CompanionScreenCapture.cs" />
+    <Compile Include="../../BigBlueFish.Windows/Companion/CompanionNative.cs" Link="CompanionNative.cs" />
+    <Compile Include="../../BigBlueFish.Windows/Companion/CompanionScreenCapture.cs" Link="CompanionScreenCapture.cs" />
   </ItemGroup>
 </Project>

@@ -4,7 +4,7 @@ Push-Location $PSScriptRoot
 try {
     & "$PSScriptRoot/../tools/Setup-Media.ps1"
     $sdk=& "$PSScriptRoot/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
-    $project=Join-Path $PSScriptRoot 'VPet-Simulator.Windows/VPet-Simulator.Windows.csproj'
+    $project=Join-Path $PSScriptRoot 'BigBlueFish.Windows/BigBlueFish.Windows.csproj'
     $argsBuild=@('build',$project,'-c','Release','-p:Platform=x64',"-p:CompanionInputMode=$InputMode",'--nologo')
     if($Locked){$argsBuild+='-p:RestoreLockedMode=true'}
     & $sdk @argsBuild

@@ -1,5 +1,0 @@
-<Window x:Class="VPet_Simulator.Windows.MainWindow"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="蓝色大肥鱼 · VPet" WindowStyle="None" ResizeMode="NoResize"
-        ShowInTaskbar="False" ShowActivated="False" Background="{x:Null}" />

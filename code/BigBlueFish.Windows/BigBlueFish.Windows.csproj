@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows7.0</TargetFramework>
+    <TargetFramework Condition="'$(CompanionInputMode)' == 'Ocr'">net10.0-windows10.0.26100.0</TargetFramework>
+    <SupportedOSPlatformVersion Condition="'$(CompanionInputMode)' == 'Ocr'">10.0.19041.0</SupportedOSPlatformVersion>
+    <DefineConstants Condition="'$(CompanionInputMode)' == 'Ocr'">$(DefineConstants);COMPANION_OCR</DefineConstants>
+    <NuGetLockFilePath Condition="'$(CompanionInputMode)' == 'Vision'">packages.vision.lock.json</NuGetLockFilePath>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <OutputType>WinExe</OutputType>
+    <RootNamespace>BigBlueFish.Windows</RootNamespace>
+    <AssemblyName>BigBlueFish</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>BigBlueFish.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <AssemblyTitle>蓝色大肥鱼</AssemblyTitle>
+    <Description>蓝色大肥鱼桌面宠物</Description>
+    <Product>蓝色大肥鱼</Product>
+    <StartupObject>BigBlueFish.Windows.App</StartupObject>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Res/Font/LemiXiaoNaiPaoTi.ttf" />
+    <None Update="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="assets/fish/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="media/ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="media/FFmpeg-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <EmbeddedResource Include="assets/regions/china-regions.json" />
+  </ItemGroup>
+  <Target Name="EnsureAnimationDecoder" BeforeTargets="PrepareForBuild" Condition="!Exists('$(MSBuildProjectDirectory)/media/ffmpeg.exe')">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Setup-Media.ps1&quot;" />
+  </Target>
+</Project>

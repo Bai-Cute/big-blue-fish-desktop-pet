@@ -5,6 +5,6 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="../../VPet-Simulator.Windows/Companion/CompanionOcrLayout.cs" Link="CompanionOcrLayout.cs" />
+    <Compile Include="../../BigBlueFish.Windows/Companion/CompanionOcrLayout.cs" Link="CompanionOcrLayout.cs" />
   </ItemGroup>
 </Project>

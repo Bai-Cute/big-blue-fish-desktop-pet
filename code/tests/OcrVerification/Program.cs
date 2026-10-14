@@ -10,7 +10,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Text;
 using System.Linq;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 class Program
 {

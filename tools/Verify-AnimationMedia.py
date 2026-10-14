@@ -2,8 +2,8 @@
 import concurrent.futures, json, subprocess, sys
 from pathlib import Path
 root = Path(__file__).resolve().parents[1]
-directory = root/'code/VPet-Simulator.Windows/assets/fish'
-ffmpeg = root/'code/VPet-Simulator.Windows/media/ffmpeg.exe'
+directory = root/'code/BigBlueFish.Windows/assets/fish'
+ffmpeg = root/'code/BigBlueFish.Windows/media/ffmpeg.exe'
 def verify(path):
     result = subprocess.run([str(ffmpeg),'-v','error','-nostdin','-threads','1','-c:v','libvpx-vp9','-i',str(path),'-ss','2','-frames:v','1','-f','rawvideo','-pix_fmt','bgra','pipe:1'], capture_output=True, check=True)
     data = result.stdout

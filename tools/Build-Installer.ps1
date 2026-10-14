@@ -31,7 +31,7 @@ if (Test-Path -LiteralPath $output) { throw "发布文件已存在，请使用�
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 New-Item -ItemType Directory -Force -Path $payload | Out-Null
-& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" "-p:InformationalVersion=$Version" -o $payload --nologo
+& $sdk publish "$root/code/BigBlueFish.Windows/BigBlueFish.Windows.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" "-p:InformationalVersion=$Version" -o $payload --nologo
 if ($LASTEXITCODE -ne 0) { throw '桌宠发布失败。' }
 $runtimeTarget = Join-Path $payload 'runtime'
 New-Item -ItemType Directory -Force -Path $runtimeTarget | Out-Null

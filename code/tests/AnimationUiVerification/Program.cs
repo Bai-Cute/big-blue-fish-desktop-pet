@@ -10,7 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 internal static class Program
 {
@@ -201,9 +201,9 @@ internal static class Program
             string sandbox=Path.GetFullPath(args[0]);Directory.CreateDirectory(sandbox);
             var app=new App();app.InitializeComponent();typeof(Application).GetField("_startupUri",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(app,null);app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
             Directory.SetCurrentDirectory(sandbox);
-            File.Copy(Path.Combine(AppContext.BaseDirectory,"vpeticon.ico"),"vpeticon.ico",true);
+            File.Copy(Path.Combine(AppContext.BaseDirectory,"BigBlueFish.ico"),"BigBlueFish.ico",true);
             File.WriteAllText("preferences.json","{\"ModelEnabled\":false,\"PublicInfo\":false,\"ForegroundEnabled\":false,\"Scale\":1,\"Left\":400,\"Top\":250,\"WeatherRegionCode\":\"340104\",\"BubbleDurationIndex\":5,\"AnimationIntervalSeconds\":40}");
-            var native=typeof(App).Assembly.GetType("VPet_Simulator.Windows.CompanionNative")!;
+            var native=typeof(App).Assembly.GetType("BigBlueFish.Windows.CompanionNative")!;
             native.GetField("TestPowerOverride",Access)!.SetValue(null,false);
             w=new MainWindow();w.Show();Wait(()=>(bool)Read(w,"companionReady"),10,"video load");
             ((DispatcherTimer)Read(w,"companionTimer")).Stop();

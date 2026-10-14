@@ -2,7 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Text.Json;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 internal static class PersonaVerification
 {

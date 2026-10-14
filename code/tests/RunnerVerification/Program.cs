@@ -4,7 +4,7 @@ using System.Net.Http;
 using System.Net;
 using System.Reflection;
 using System.Text;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 internal static class Program
 {

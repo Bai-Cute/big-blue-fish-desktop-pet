@@ -12,6 +12,8 @@ namespace BigBlueFish.Setup;
 
 internal static class InstallationLifecycle
 {
+    internal const string ApplicationName = "BigBlueFish.exe";
+    internal const string LegacyApplicationName = "VPet-Simulator.Windows.exe";
     internal const string UninstallerName = "Uninstall.exe";
     private const string InfoName = "uninstall-info.json";
     private const string UninstallRoot = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
@@ -81,15 +83,42 @@ internal static class InstallationLifecycle
         key.SetValue("DisplayVersion", typeof(InstallationLifecycle).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
         key.SetValue("Publisher", "Bai-Cute");
         key.SetValue("InstallLocation", target);
-        key.SetValue("DisplayIcon", Path.Combine(target, "vpeticon.ico"));
+        key.SetValue("DisplayIcon", Path.Combine(target, "BigBlueFish.ico"));
         key.SetValue("URLInfoAbout", "https://github.com/Bai-Cute/big-blue-fish-desktop-pet");
         key.SetValue("UninstallString", $"\"{Path.Combine(target, UninstallerName)}\" --uninstall \"{target}\"");
         key.SetValue("NoModify", 1, RegistryValueKind.DWord);
         key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
         key.SetValue("InstallDate", DateTime.Now.ToString("yyyyMMdd"));
         using var application = machine.CreateSubKey(ApplicationPathKey);
-        application.SetValue("", Path.Combine(target, "VPet-Simulator.Windows.exe"));
+        application.SetValue("", Path.Combine(target, ApplicationName));
         application.SetValue("Path", target);
+        MigrateStartupEntries(target);
+    }
+
+    // Preserve enabled startup entries while changing the executable name.
+    internal static string MigrateStartupCommand(string command, string directory)
+    {
+        var oldPath = Path.Combine(directory, LegacyApplicationName);
+        var newPath = Path.Combine(directory, ApplicationName);
+        var quoted = "\"" + oldPath + "\"";
+        if (command.StartsWith(quoted, StringComparison.OrdinalIgnoreCase))
+            return "\"" + newPath + "\"" + command[quoted.Length..];
+        if (command.Equals(oldPath, StringComparison.OrdinalIgnoreCase)) return "\"" + newPath + "\"";
+        return command;
+    }
+
+    private static void MigrateStartupEntries(string directory)
+    {
+        foreach (var sid in Registry.Users.GetSubKeyNames().Where(s => s.StartsWith("S-1-5-21-") && !s.EndsWith("_Classes")))
+        {
+            using var user = Registry.Users.OpenSubKey(sid + @"\Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
+            foreach (var name in user?.GetValueNames() ?? [])
+            {
+                if (user!.GetValue(name) is not string command) continue;
+                var updated = MigrateStartupCommand(command, directory);
+                if (updated != command) user.SetValue(name, updated, user.GetValueKind(name));
+            }
+        }
     }
 
     internal static string ValidateInstallation(string directory)
@@ -97,7 +126,8 @@ internal static class InstallationLifecycle
         var target = ValidateDirectory(directory);
         using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "installation-manifest.json")));
         if (!manifest.RootElement.GetProperty("Files").EnumerateArray()
-            .Any(x => string.Equals(x.GetString(), "VPet-Simulator.Windows.exe", StringComparison.OrdinalIgnoreCase)))
+            .Any(x => string.Equals(x.GetString(), ApplicationName, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(x.GetString(), LegacyApplicationName, StringComparison.OrdinalIgnoreCase)))
             throw new InvalidDataException("未找到蓝色大肥鱼的安装记录。");
         var info = JsonSerializer.Deserialize<InstallInfo>(File.ReadAllText(Path.Combine(target, InfoName)))!;
         if (!target.Equals(info.Directory, StringComparison.OrdinalIgnoreCase))
@@ -118,20 +148,25 @@ internal static class InstallationLifecycle
                 string? path;
                 try { path = process.MainModule?.FileName; } catch { continue; }
                 if (path == null || !IsWithin(target, path) || process.Id == Environment.ProcessId) continue;
-                if (process.ProcessName == "VPet-Simulator.Windows" && process.CloseMainWindow()) process.WaitForExit(3000);
+                if ((process.ProcessName == "BigBlueFish" || process.ProcessName == "VPet-Simulator.Windows")
+                    && process.CloseMainWindow()) process.WaitForExit(3000);
                 if (!process.HasExited) { process.Kill(entireProcessTree: true); process.WaitForExit(5000); }
             }
         }
-        var executable = Path.Combine(target, "VPet-Simulator.Windows.exe");
+        var executable = Path.Combine(target, "BigBlueFish.exe");
         foreach (var shortcut in info.Shortcuts)
+        {
             RemoveShortcut(shortcut, executable);
+            RemoveShortcut(shortcut, Path.Combine(target, LegacyApplicationName));
+        }
         var menuGroup = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms), "蓝色大肥鱼");
         if (Directory.Exists(menuGroup) && !Directory.EnumerateFileSystemEntries(menuGroup).Any()) Directory.Delete(menuGroup);
         foreach (var sid in Registry.Users.GetSubKeyNames().Where(s => s.StartsWith("S-1-5-21-") && !s.EndsWith("_Classes")))
         {
             using var user = Registry.Users.OpenSubKey(sid + @"\Software\Microsoft\Windows\CurrentVersion\Run", writable: true);
             foreach (var name in user?.GetValueNames() ?? [])
-                if ((user!.GetValue(name) as string)?.Contains(executable, StringComparison.OrdinalIgnoreCase) == true)
+                if (user!.GetValue(name) is string command && (command.Contains(executable, StringComparison.OrdinalIgnoreCase)
+                    || command.Contains(Path.Combine(target, LegacyApplicationName), StringComparison.OrdinalIgnoreCase)))
                     user.DeleteValue(name, throwOnMissingValue: false);
         }
         foreach (var relative in files.Concat(new[] { UninstallerName, InfoName, "installation-manifest.json" }))

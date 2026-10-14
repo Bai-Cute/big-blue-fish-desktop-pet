@@ -45,7 +45,7 @@ with source.open(encoding="utf-8-sig", newline="") as f:
             lon, lat = wgs84(lon, lat)
         result.append(dict(Code=row["id"], ParentCode=row["pid"], Level=int(row["deep"]),
                            Name=row["ext_name"], Latitude=lat, Longitude=lon))
-target = Path(__file__).resolve().parents[1]/"VPet-Simulator.Windows/assets/regions"
+target = Path(__file__).resolve().parents[1]/"BigBlueFish.Windows/assets/regions"
 target.mkdir(parents=True, exist_ok=True)
 (target/"china-regions.json").write_text(json.dumps(result, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 (target/"source.json").write_text(json.dumps(dict(

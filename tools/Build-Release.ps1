@@ -9,7 +9,7 @@ $destination=Join-Path $root "release/$name"
 if((Test-Path -LiteralPath $destination) -and (Get-ChildItem -LiteralPath $destination -Force | Select-Object -First 1)){throw "发布目录已存在：$destination。请使用新的版本号或先自行移走该目录。"}
 $sdk=& "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
 New-Item -ItemType Directory -Force -Path $destination | Out-Null
-& $sdk publish "$root/code/VPet-Simulator.Windows/VPet-Simulator.Windows.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" -o $destination --nologo
+& $sdk publish "$root/code/BigBlueFish.Windows/BigBlueFish.Windows.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:RestoreLockedMode=true "-p:Version=$Version" -o $destination --nologo
 if($LASTEXITCODE -ne 0){throw '发布编译失败。未完成的发布目录保留供检查。'}
 $runtimeDestination=Join-Path $destination 'runtime'
 if($RuntimeDirectory){

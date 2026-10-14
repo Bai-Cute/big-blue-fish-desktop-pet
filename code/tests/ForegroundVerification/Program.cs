@@ -4,7 +4,7 @@ using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using VPet_Simulator.Windows;
+using BigBlueFish.Windows;
 
 class Program
 {
