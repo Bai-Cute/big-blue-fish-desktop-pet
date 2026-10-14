@@ -667,23 +667,15 @@ public partial class MainWindow
 
     private void BuildCompanionTray()
     {
-        var menu = new Forms.ContextMenuStrip
-        {
-            Renderer = new CompanionTrayMenuRenderer(),
-            ShowImageMargin = false,
-            BackColor = System.Drawing.Color.White,
-            ForeColor = System.Drawing.Color.FromArgb(49, 64, 94),
-            Font = new System.Drawing.Font("Microsoft YaHei UI", 10),
-            Padding = new Forms.Padding(1, 6, 1, 6)
-        };
+        var menu = new CompanionTrayMenu();
         menu.Opening += (_, _) => lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
         menu.Items.Add("显示桌宠", null, (_, _) => Dispatcher.Invoke(RestoreCompanion));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenCompanionSettings));
         menu.Items.Add("天气", null, async (_, _) => await Dispatcher.InvokeAsync(SpeakCompanionWeather).Task.Unwrap());
         menu.Items.Add("吐字测试", null, async (_, _) => await Dispatcher.InvokeAsync(SpeakCompanionTest).Task.Unwrap());
         menu.Items.Add("关闭桌宠", null, (_, _) => Dispatcher.Invoke(() => base.Close()));
-        foreach (Forms.ToolStripItem item in menu.Items)
-            item.Padding = new Forms.Padding(12, 8, 12, 8);
+        string[] icons = ["\uE7F4", "\uE713", "\uE706", "\uE8F2", "\uE8BB"];
+        for (int index = 0; index < menu.Items.Count; index++) menu.Items[index].Tag = icons[index];
         notifyIcon = new Forms.NotifyIcon
         {
             Icon = new System.Drawing.Icon("BigBlueFish.ico"),

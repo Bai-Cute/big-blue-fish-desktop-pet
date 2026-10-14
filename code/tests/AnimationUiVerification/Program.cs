@@ -160,6 +160,12 @@ internal static class Program
         Check(tray.Renderer.GetType().Name=="CompanionTrayMenuRenderer"&&!tray.ShowImageMargin,"tray uses matching palette without obsolete image gutter");
         Check(tray.Items.Cast<System.Windows.Forms.ToolStripItem>().Select(i=>i.Text).SequenceEqual(new[]{"显示桌宠","设置","天气","吐字测试","关闭桌宠"}),"tray retains all original actions");
         tray.Show(new System.Drawing.Point(500,300));System.Windows.Forms.Application.DoEvents();
+        Console.WriteLine($"TRAY_METRICS dpi={tray.DeviceDpi} font={tray.Font.Size}/{tray.Font.Unit} size={tray.Size} client={tray.ClientSize} items="+string.Join(";",tray.Items.Cast<System.Windows.Forms.ToolStripItem>().Select(i=>$"{i.Text}:{i.Bounds},font={i.Font.Size}")));
+        Check(tray.GetType().Name=="CompanionTrayMenu"&&tray.Region!=null
+            &&!tray.Region.IsVisible(0,0)&&tray.Region.IsVisible(tray.Width/2,tray.Height/2),"native tray menu has a real rounded window region");
+        Check(tray.Items.Cast<System.Windows.Forms.ToolStripItem>().All(i=>i.Tag is string{Length:1}
+            &&i.Height>=38*tray.DeviceDpi/96),"all tray rows include vector glyphs and DPI-scaled comfortable height");
+        tray.Items[1].Select();System.Windows.Forms.Application.DoEvents();
         using(var bitmap=new System.Drawing.Bitmap(tray.Width,tray.Height))
         {tray.DrawToBitmap(bitmap,new System.Drawing.Rectangle(0,0,tray.Width,tray.Height));bitmap.Save("tray-menu.png");}
         Check(tray.Items.Cast<System.Windows.Forms.ToolStripItem>().All(i=>
@@ -168,9 +174,13 @@ internal static class Program
             // gutter. Check visible text/padding, not that internal paint surface.
             var visible=System.Drawing.Rectangle.Intersect(tray.ClientRectangle,i.Bounds);
             var textSize=System.Windows.Forms.TextRenderer.MeasureText(i.Text,i.Font);
-            return visible.Height>=textSize.Height+i.Padding.Vertical&&visible.Width>=textSize.Width+i.Padding.Horizontal;
+            return visible.Height>=textSize.Height+i.Padding.Vertical&&visible.Width>=textSize.Width+56*tray.DeviceDpi/96;
         }),"tray labels and vertical padding fit visible rows");
         tray.Close();
+        Invoke(w,"HideCompanion");tray.Show(new System.Drawing.Point(500,300));System.Windows.Forms.Application.DoEvents();
+        Check(!w.IsVisible&&tray.Visible,"styled native tray remains usable while character is hidden");
+        ((System.Windows.Forms.ToolStripMenuItem)tray.Items[0]).PerformClick();tray.Close();Pump();
+        Check(w.IsVisible,"native tray display action restores hidden character");
         Console.WriteLine($"Menus: {checks} real WPF/WinForms checks passed.");
     }
     static void VerifyMenuOutsideClick(MainWindow w)
