@@ -17,6 +17,7 @@ public partial class MainWindow
         companionContextMenu.Resources.MergedDictionaries.Add(new ResourceDictionary
         { Source = new Uri("/VPet-Simulator.Windows;component/Companion/CompanionMenuStyles.xaml", UriKind.Relative) });
         companionContextMenu.Style = (Style)companionContextMenu.FindResource(typeof(ContextMenu));
+        companionMenuDismissal = new CompanionMenuDismissal(companionContextMenu);
         TextBlock Icon(string glyph) => new()
         {
             Text = glyph, FontFamily = new FontFamily("Segoe MDL2 Assets"), FontSize = 16,

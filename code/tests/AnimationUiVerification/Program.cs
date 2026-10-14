@@ -129,6 +129,14 @@ internal static class Program
         var items=menu.Items.Cast<MenuItem>().ToArray();
         Check(items.Select(i=>i.Header?.ToString()).SequenceEqual(new[]{"设置","天气","吐字测试","隐藏桌宠"}),"pet menu retains its four actions");
         menu.IsOpen=true;Pump(120);menu.UpdateLayout();
+        var dismissal=Read(w,"companionMenuDismissal");
+        Check(Property<bool>(dismissal,"IsListening"),"outside-click observer attaches only while menu is open");
+        Invoke(dismissal,"DismissOutside",menu.PointToScreen(new Point(menu.ActualWidth/2,menu.ActualHeight/2)));Pump();
+        Check(menu.IsOpen,"pointer inside menu does not dismiss it");
+        Invoke(dismissal,"DismissOutside",menu.PointToScreen(new Point(-20,-20)));Pump();
+        Check(!menu.IsOpen&&!Property<bool>(dismissal,"IsListening"),"outside pointer closes menu and detaches observer");
+        menu.IsOpen=true;Pump();
+        Check(Property<bool>(dismissal,"IsListening"),"reopening menu reattaches observer");
         Check(menu.Style!=null&&menu.FontSize==14&&menu.ActualWidth>=184,"modern menu template and readable sizing applied");
         var frame=Children<Border>(menu).First(b=>b.CornerRadius.TopLeft==12);
         Check(frame.Background is SolidColorBrush color&&color.Color==Colors.White,"menu uses white rounded settings-style panel");
@@ -165,6 +173,26 @@ internal static class Program
         tray.Close();
         Console.WriteLine($"Menus: {checks} real WPF/WinForms checks passed.");
     }
+    static void VerifyMenuOutsideClick(MainWindow w)
+    {
+        var area=CompanionEdgeLayout.WorkArea(w);
+        int clicks=0;
+        var button=new Button {Content="点这里验证外部点击",Margin=new Thickness(35),FontSize=18};
+        button.Click+=(_,_)=>clicks++;
+        using var fixture=new CloseWindow(new Window {Title="大肥鱼菜单外部点击验证",Width=420,Height=220,
+            Left=area.Left+40,Top=area.Top+40,Content=button,ShowInTaskbar=true});
+        fixture.Window.Show();fixture.Window.Activate();Pump();
+        var menu=(ContextMenu)Read(w,"companionContextMenu");
+        menu.Placement=System.Windows.Controls.Primitives.PlacementMode.AbsolutePoint;
+        menu.HorizontalOffset=area.Left+500;menu.VerticalOffset=area.Top+150;menu.IsOpen=true;Pump(100);
+        Check(Property<bool>(Read(w,"companionMenuDismissal"),"IsListening"),"native observer installed for real outside click");
+        Console.WriteLine("OUTSIDE_CLICK_READY: click the button in 大肥鱼菜单外部点击验证.");
+        Wait(()=>clicks>0,60,"outside target receives a real click");Pump(100);
+        Check(!menu.IsOpen,"real click outside pet/menu closes context menu");
+        Check(!Property<bool>(Read(w,"companionMenuDismissal"),"IsListening"),"native observer removed after outside click");
+        Check(w.Topmost&&!w.ShowActivated&&!w.ShowInTaskbar,"outside-click handling preserves pet window policy");
+        Console.WriteLine($"Outside click: {checks} real mouse/WPF checks passed.");
+    }
     [STAThread] static int Main(string[] args)
     {
         MainWindow? w=null;
@@ -179,6 +207,11 @@ internal static class Program
             native.GetField("TestPowerOverride",Access)!.SetValue(null,false);
             w=new MainWindow();w.Show();Wait(()=>(bool)Read(w,"companionReady"),10,"video load");
             ((DispatcherTimer)Read(w,"companionTimer")).Stop();
+            if(args.Contains("--menu-dismiss"))
+            {
+                Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before outside-click verification");
+                VerifyMenuOutsideClick(w);Field(w,"exitReady",true);w.Close();return 0;
+            }
             if(args.Contains("--menus"))
             {
                 Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before menu verification");

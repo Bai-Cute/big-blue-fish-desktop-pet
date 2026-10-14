@@ -1275,3 +1275,13 @@ ChatGPT 桌面页面存在一种已知的内容误判：当聊天正文描述桌
 使用生产ExtractApplication/FinishInstallation覆盖C盘，关键exe/DLL/runtimeconfig/WinRT哈希与最终payload一致；更新瞬间preferences哈希未变，模型SHA256、2708804480字节大小和2026-10-07修改时间均保持。安装目录确认已删除旧Core/Interface、Steam、Panuon、LinePutScript、NAudio、SkiaSharp、WpfAnimatedGif组件，未移动数据目录。新安装器314963981字节，清理前同版本设置修复包349301394字节；没有重压模型或改变推理依赖。
 
 安装版测试模式下使用既有inspectable命令便于Computer Use发现窗口（只临时显示任务栏入口/去除ToolWindow位），真实右键角色图像后，新菜单的四项文字、图标、圆角和高亮在截图/无障碍树中可见。菜单弹出超出父窗边界时，自动化点击“设置”遭坐标限制，未将该点击记作通过；菜单功能依据上述15项生产控件回调测试。随后恢复normal-style、正常退出诊断实例，按本轮进程启动时间清理诊断文件，重新普通启动，Computer Use已reset。最终0.4.1运行于C盘，health=ok，.NET/VC/Vulkan模块均从安装目录加载；没有源码提示词或模型配置改动，没有上传GitHub。
+
+### 29.6 菜单外部点击收起
+
+用户实测非前台桌宠菜单仅在点击本窗空白时关闭。Windows限制后台窗口的鼠标捕获范围，不能只依赖WPF ContextMenu的默认捕获。新增CompanionMenuDismissal，菜单Opened时安装WH_MOUSE_LL，Closed及程序退出时释放；只处理左/右/中/侧键按下，移动/滚轮不处理。按下点和menu.PointToScreen计算的真实物理像素边界比较，内部点击交给菜单，外部点击关闭菜单。
+
+原生回调不拦截事件，始终CallNextHookEx；回调安装于UI线程时先同步关闭菜单、释放捕获，再交还该次输入，避免第一下外部点击只被旧捕获吃掉。只做两次坐标变换和关闭，不执行布局、文件IO或模型操作。若回调不在UI线程则通过Dispatcher Input优先级处理，使用会话代次防止旧回调关闭重新打开的菜单。主窗口WS_EX_NOACTIVATE/WM_MOUSEACTIVATE及常态前台逻辑不变，无需把桌宠激活或永久注册全局监听。
+
+专用AnimationUiVerification --menu-dismiss中，Computer Use真实点击位于桌宠和菜单以外的样例按钮，第一下点击到达按钮且菜单关闭，监听随之移除，7项检查通过；曾尝试仅异步关闭，外部目标未收到第一次点击，因此改为上述同步释放捕获。--menus增加内部点不关闭、外部点关闭、挂接/释放/重开检查。正式安装结果随后补记。
+
+本轮--menus共19项通过，主工程OCR构建0警告/0错误。新自包含OCR安装器557项检查通过，以生产更新器覆盖C盘；应用exe/DLL/runtimeconfig与最终payload哈希一致，更新前后preferences和GGUF哈希一致。随后直接以普通参数启动0.4.1，模型health=ok，未进入C盘诊断模式；Computer Use内核已reset。此次不改变版本号、不上传GitHub，菜单修复以独立本地提交保留回退路径。

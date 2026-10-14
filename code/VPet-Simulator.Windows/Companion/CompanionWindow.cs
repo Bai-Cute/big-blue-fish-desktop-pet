@@ -30,6 +30,7 @@ public partial class MainWindow
     private Grid companionLayout = null !;
     private Window? companionSettings;
     private ContextMenu companionContextMenu = null!;
+    private CompanionMenuDismissal? companionMenuDismissal;
     private bool weatherRequestPending;
     private bool speechRequestPending;
     private DateTime nextSpeech, nextAction, bubbleUntil;
@@ -736,6 +737,7 @@ public partial class MainWindow
             return;
         companionClosed = true;
         companionContextMenu.IsOpen = false;
+        companionMenuDismissal?.Dispose();
         companionTimer?.Stop();
         videoPlayer?.Dispose();
         loadingTimer?.Stop();
