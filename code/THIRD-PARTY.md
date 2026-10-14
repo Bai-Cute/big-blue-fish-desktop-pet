@@ -2,7 +2,7 @@
 
 This is a customized companion build, not an official VPet or DeepSeek release.
 
-* VPet: https://github.com/LorisYounger/VPet , commit 2e99a42ebeff71d792118f2e8de744b773042f8d. Apache-2.0. Modified startup, companion behavior, local inference, power handling and PNG tint rendering. Original copyright notices are retained in source.
+* VPet: https://github.com/LorisYounger/VPet , commit 2e99a42ebeff71d792118f2e8de744b773042f8d. Apache-2.0, historical project basis; the original attribution and Apache-2.0 license are retained.
 * Character animation: https://github.com/PC2005-cloud/dsh-pet , commit eb7426771342413cdbf55298dae576b1d8137f52. MIT, copyright (c) 2026 PC2005-cloud. The 106 original transparent WebM animations and MIT license are in assets/fish. Original colors, alpha and 24-fps timing are retained. Animation selection and triggering are customized for this desktop companion.
 * FFmpeg 9.0.1: https://ffmpeg.org/ , Windows static essentials build from https://github.com/GyanD/codexffmpeg/releases/tag/9.0.1 . GPL-3.0-or-later; accompanying license is media/FFmpeg-LICENSE.txt. The unmodified executable runs as a separate animation-decoding process. Build scripts and dependency versions: https://github.com/GyanD/codexffmpeg ; FFmpeg corresponding source: https://github.com/FFmpeg/FFmpeg/tree/n9.0.1 . The build archive SHA256 is fec81ae03971d9dd4be3ebe02e263bd2ec1d789483f931bdba5f5715e65da2e9.
 * llama.cpp: https://github.com/ggml-org/llama.cpp , b10809, Windows x64 runtime. MIT. Copyright (c) 2023-2026 The ggml authors. LLVM OpenMP license included.
@@ -14,8 +14,6 @@ This is a customized companion build, not an official VPet or DeepSeek release.
 * Windows OCR: Microsoft Windows.Media.Ocr, provided by the installed Windows text recognition language component. The 0.3.0 OCR build uses Microsoft.Windows.SDK.NET.Ref 10.0.26100.1 and its runtime projections; Microsoft Windows SDK license: https://aka.ms/WinSDKLicenseURL .
 * Weather: https://open-meteo.com/ , CC BY 4.0 attribution. User-selected district center coordinates; current and daily forecast are queried at runtime. No weather dataset is bundled.
 * News: IT之家, https://www.ithome.com/rss/ . Headlines are retrieved at runtime; no news archive is bundled.
-
-VPet dependencies include LinePutScript, Panuon WPF, SkiaSharp, NAudio, WpfAnimatedGif and Facepunch Steamworks. Original package license metadata remains in the accompanying source project; Steam and the upstream online reporting/chat startup paths are bypassed in this companion build.
 
 * Administrative region data: https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov , commit c6c6e35bea3066d674efe2cded189dc57a86e7d8, release 2025.251231.260403. MIT; see licenses/AreaCity-MIT.txt. Only hierarchy and approximate center coordinates are embedded. Mainland GCJ-02 centers are approximately converted to WGS84; polygons are not redistributed.
 

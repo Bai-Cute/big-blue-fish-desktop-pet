@@ -1,4 +1,3 @@
-using LinePutScript;
 using Microsoft.Win32;
 using System;
 using System.IO;
@@ -10,8 +9,6 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
-using VPet_Simulator.Core;
-using static VPet_Simulator.Core.GraphInfo;
 using Forms = System.Windows.Forms;
 using Ellipse = System.Windows.Shapes.Ellipse;
 
@@ -75,7 +72,6 @@ public partial class MainWindow
             StopOnBattery = preferences.StopModelOnBattery,
             WeatherRegionCode = preferences.WeatherRegionCode
         };
-        Set = new Setting(this, "gameconfig:|nofunction#true:|allowmove#true:|autochangewindow#true:|\nzoomlevel#0.56:|");
         InitializeComponent();
         System.Windows.Shell.WindowChrome.SetWindowChrome(this, null);
         AllowsTransparency = true;
@@ -300,7 +296,6 @@ public partial class MainWindow
     {
         Width = SpriteSize * 640 / 360 + 20;
         Height = SpriteSize + 35;
-        Set.ZoomLevel = SpriteSize / 500;
         if (videoImage != null) { videoImage.Width = SpriteSize * 640 / 360; videoImage.Height = SpriteSize; }
         PositionLoadingIndicator();
 
@@ -741,8 +736,6 @@ public partial class MainWindow
         SystemEvents.PowerModeChanged -= CompanionPowerChanged;
         SystemEvents.DisplaySettingsChanged -= CompanionDisplayChanged;
         notifyIcon?.Dispose();
-        Main?.Dispose();
-        Core.Graph?.Dispose();
         instanceLock?.Dispose();
         singleInstance?.Dispose();
         System.Windows.Application.Current.Shutdown();

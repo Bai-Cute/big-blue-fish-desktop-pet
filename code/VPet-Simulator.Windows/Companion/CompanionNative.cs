@@ -7,11 +7,6 @@ using System.Text;
 using System.Windows.Automation;
 
 namespace VPet_Simulator.Windows;
-internal static class CompanionBuild
-{
-    public static readonly bool Enabled = true;
-}
-
 internal static class CompanionNative
 {
     internal static bool? TestPowerOverride;

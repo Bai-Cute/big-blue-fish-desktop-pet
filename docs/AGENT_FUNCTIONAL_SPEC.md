@@ -5,6 +5,8 @@
 本文件是公开仓库中的完整功能规格，供开发者和 AI 接手、修改、构建与验收时使用。README 提供面向用户的简介，本文件记录源码实际行为、输入输出契约、状态机、资源、发布流程和验证方法。
 本文面向需要维护、扩展、验证和发布该软件的 agent，独立于 README。
 
+2026-10-14 本地0.4.1已移除未使用的VPet引擎和游戏入口，当前工程组成与清理契约见第29节；第1—27节涉及三个应用程序集、旧界面或旧依赖的内容为历史记录，不再作为当前构建清单。
+
 ## 0. 如何使用本规格
 
 1. 先读第 1、2 节，明确项目身份、不可替代的用户要求及维护边界。
@@ -1231,3 +1233,25 @@ ChatGPT 桌面页面存在一种已知的内容误判：当聊天正文描述桌
 `AnimationUiVerification <隔离目录> --settings-focus` 验证真实 WPF/Win32 前台窗口句柄：普通样例窗在前台时经生产角色菜单回调打开设置，在 Input 优先级模拟菜单后置焦点恢复，再确认设置获得前台；覆盖普通窗口切换、重开同一设置、最小化恢复、最大化保留、设置无 NOACTIVATE、不绑定宠物Owner，以及桌宠/气泡仍置顶且不抢前台和关闭后延迟回调失效。本机14项通过；这些属于实窗自动回归，菜单项以WPF事件触发，不等同于真实鼠标逐项点击。安装后验收另补。
 
 同日安装后验收：本轮安装器569项通过，调用生产更新覆盖C盘，应用exe/DLL/runtimeconfig与本轮payload哈希一致，更新瞬间preferences哈希未变。安装版经诊断settings命令走正常OpenCompanionSettings，未先通过Computer Use激活；实际截图已显示设置页，test-status报告前台HWND3149220等于设置窗口句柄，宠物句柄8651504保持独立。随后Computer Use真实点击最小化按钮，再次触发同一入口，设置自行恢复且前台仍为3149220，截图再次确认显示。验收后关闭设置、正常退出诊断实例、清除本轮test-status/test-command，恢复C盘普通0.4.1运行；未提交或上传GitHub。
+
+## 29. 0.4.1 清理未使用的 VPet 实现（2026-10-14）
+
+### 29.1 回退基线与清理范围
+
+用户明确要求谨慎清理、保持可回滚。清理前先提交 `3c007f125c1c0e2a1410d9d157707ec45294ae3e`，包含已验收的气泡独立缩放与设置前台修复；该提交是本次清理的完整源码回退点。没有复制安装目录或模型作为备份，没有上传GitHub。用户的未跟踪 `durations.json` 不参与清理或提交。
+
+依赖盘点确认Companion目录中的动画、模型、OCR、天气、菜单、设置、气泡和Win32代码不调用旧引擎；遗留引用仅为无效的Setting初始化、ZoomLevel写入和空引擎Dispose。删除这些调用和using后，将MainWindow基类由Panuon WindowX改为原生WPF Window，保留InitializeCompanion生命周期。App只保留现行工作目录、Args及本地异常日志，不保留旧游戏启动和异常报告分支。
+
+删除未使用的Core、Windows.Interface工程，旧MainWindow分部、Function、WinDesign、MutiPlayer、PetHelper，旧养成/物品/成就/图库/联机/Steam/创意工坊代码、Steam本机DLL和富状态文件、旧PNG界面素材与字体，以及仅针对旧恢复版的RecoveryVerification。按Git跟踪文件逐个删除，共222个文件；不递归删除目录，不接触未跟踪文件、构建输出或目录链接。历史来源记录和Apache-2.0等必要署名、当前动画与字体许可保留。
+
+### 29.2 当前工程及依赖
+
+解决方案只含 `VPet-Simulator.Windows` 一个原生WPF主工程，继续支持Windows x64的OCR及历史Vision编译选择，不重命名程序集、命名空间、可执行文件、安装注册入口或单实例Mutex。主工程不再引用Core/Interface或Facepunch、LinePutScript、Panuon、NAudio、SkiaSharp、WpfAnimatedGif等NuGet包；Windows/.NET自带WPF、WinForms托盘、Windows OCR投影和外部FFmpeg/llama.cpp仍按原方式使用。重新生成主工程两种路线及保留测试工程的锁文件。
+
+106段透明WebM、动画配置、乐米小奶泡体、图标、地区数据、模型请求/提示词/流式显示/供电逻辑均保留。卸载器和安装器未更换架构，仍由installation-manifest.json管理应用文件，更新时删除旧清单中不再属于新payload的Core、Interface、Steam和其他旧依赖，保留models/preferences/cache。InstallerVerification新增断言确保新payload不携带被移除组件。
+
+`code/test.ps1`只运行当前产品回归，不再提供LegacyRecovery分支；保留动画UI、权重、Runner故障恢复、天气缓存、前台捕获、OCR布局、真实OCR/模型及电源提示验证。run.ps1默认借用当前C盘安装的runtime/models；生产源代码不引用安装目录中的应用DLL。
+
+### 29.3 清理阶段验证
+
+移除后OCR与Vision均locked编译通过，0警告/0错误；完整动画/设置实窗56项通过，包括原帧率及透明点击、三页设置、缩放、拖拽悬空段、往返移动、离电提示、隐藏恢复及欢迎/告别完整退出。动画权重2326项、Runner/消息字段21项、天气缓存21项通过。Runner该组使用故障夹具，不当作真实模型验证。菜单改动与最终自包含安装验收随后另记。

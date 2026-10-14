@@ -5,8 +5,8 @@ $tfm=if($InputMode -eq 'Ocr'){'net10.0-windows10.0.26100.0'}else{'net10.0-window
 $directory=Join-Path $PSScriptRoot "VPet-Simulator.Windows/bin/x64/Release/$tfm"
 if(!$RuntimeDirectory){$RuntimeDirectory=$env:BLUE_WHALE_RUNTIME}
 if(!$ModelsDirectory){$ModelsDirectory=$env:BLUE_WHALE_MODELS}
-if(!$RuntimeDirectory){$RuntimeDirectory='D:\Program Files\蓝色大肥鱼\runtime'}
-if(!$ModelsDirectory){$ModelsDirectory='D:\Program Files\蓝色大肥鱼\models'}
+if(!$RuntimeDirectory){$RuntimeDirectory='C:\Program Files\蓝色大肥鱼\runtime'}
+if(!$ModelsDirectory){$ModelsDirectory='C:\Program Files\蓝色大肥鱼\models'}
 foreach($item in @(@('runtime',$RuntimeDirectory,'llama-server.exe'),@('models',$ModelsDirectory,'Qwen3.5-4B-heretic-Q4_K_M.gguf'))){
     if(!(Test-Path -LiteralPath (Join-Path $item[1] $item[2]))){throw "缺少 $($item[2])，请指定正确的目录。"}
     $destination=Join-Path $directory $item[0]

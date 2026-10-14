@@ -80,7 +80,8 @@ internal static class SpeechFlowVerification
             Invoke(window, "OpenCompanionSettings"); Pump(150);
             var settingsWindow = (Window)Field(window, "companionSettings")!;
             var sliders = Children<Slider>(settingsWindow).ToArray();
-            var scaleSlider = sliders.Single(s => s.Minimum == .5 && s.Maximum == 2.0);
+            var scaleSlider = sliders.Single(s => s.Minimum == .5 && s.Maximum == 2.0
+                && System.Windows.Automation.AutomationProperties.GetName(s) != "文字气泡大小");
             Check(scaleSlider.TickFrequency == .05, "50%-200% settings slider uses 5% steps");
             foreach (var scale in new[] { .5, 2.0, .85 })
             {

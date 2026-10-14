@@ -171,10 +171,14 @@ internal static class Checks
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             var names = archive.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var required in new[] { "VPet-Simulator.Windows.exe", "Uninstall.exe", "VPet-Simulator.Windows.dll",
-                "VPet-Simulator.Core.dll", "VPet-Simulator.Windows.Interface.dll", "coreclr.dll", "hostfxr.dll",
+                "coreclr.dll", "hostfxr.dll",
                 "PresentationFramework.dll", "runtime/llama-server.exe", "runtime/ggml-vulkan.dll", "runtime/mtmd.dll",
                 "media/ffmpeg.exe", "media/FFmpeg-LICENSE.txt", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
                 Check(names.Contains(required), "payload includes " + required);
+            foreach (var obsolete in new[] { "VPet-Simulator.Core.dll", "VPet-Simulator.Windows.Interface.dll",
+                "steam_api.dll", "steam_api64.dll", "Facepunch.Steamworks.Win64.dll", "LinePutScript.dll",
+                "Panuon.WPF.dll", "Panuon.WPF.UI.dll", "NAudio.dll", "SkiaSharp.dll", "WpfAnimatedGif.dll" })
+                Check(!names.Contains(obsolete), "payload excludes unused upstream component " + obsolete);
             foreach (var required in new[] { "runtime/msvcp140.dll", "runtime/vcruntime140.dll", "runtime/vcruntime140_1.dll", "runtime/visual-cpp-runtime.json", "licenses/Microsoft-Visual-Cpp-Runtime.txt" })
                 Check(names.Contains(required), "payload includes native runtime dependency " + required);
             Check(names.Count(n => n.StartsWith("assets/fish/") && n.EndsWith(".webm")) == 106, "payload includes all 106 animations");

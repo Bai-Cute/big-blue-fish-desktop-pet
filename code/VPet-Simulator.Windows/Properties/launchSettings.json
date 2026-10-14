@@ -1,8 +1,0 @@
-{
-  "profiles": {
-    "VPet-Simulator.Windows": {
-      "commandName": "Project",
-      "nativeDebugging": false
-    }
-  }
-}
