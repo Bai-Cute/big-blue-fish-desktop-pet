@@ -35,7 +35,7 @@ OCR 版在本机读取当前前台窗口的可见文字，并按文字在界面�
 
 ## 一键安装
 
-普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载 `BigBlueFish-v0.4.1-OCR-Setup.exe`。从 0.4.0 起公开更新只维护 OCR 版；0.3.1 的视觉版仍可在历史 Release 中下载。
+普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载 `BigBlueFish-v0.4.2-OCR-Setup.exe`。从 0.4.0 起公开更新只维护 OCR 版；0.3.1 的视觉版仍可在历史 Release 中下载。
 
 双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时安装到电脑中，并从 Hugging Face 的固定来源下载约 2.7 GB 的 4B 模型。下载文件会经过 SHA-256 校验，安装完成后创建快捷方式并启动桌宠。
 
