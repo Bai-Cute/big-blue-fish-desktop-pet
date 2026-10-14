@@ -36,6 +36,8 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2]);
         try
         {
+            if (args[0] == "--news-rules") return NewsVerification.Rules();
+            if (args[0] == "--news-live") return await NewsVerification.Live(args[1]);
             if (args[0] == "--speech-flow") return await SpeechFlowVerification.Run(args[1]);
 #if COMPANION_OCR
             if (args[0] == "--persona-screen") return await PersonaVerification.ActualScreen(args[1], args[2]);

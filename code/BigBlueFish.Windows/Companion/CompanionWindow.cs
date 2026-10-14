@@ -21,9 +21,7 @@ public partial class MainWindow
     private Border bubble = null !;
     private TextBlock bubbleText = null !;
     private Border loadingIndicator = null !;
-    private Ellipse loadingSpinner = null !;
-    private DispatcherTimer loadingTimer = null !;
-    private double loadingAngle;
+    private CompanionLoadingRing loadingSpinner = null !;
     private CompanionSpeech speech = null!;
     private bool bubbleIsModelReply;
     private long speechRequestVersion;
@@ -141,23 +139,22 @@ public partial class MainWindow
         };
         companionLayout.Children.Add(bubble);
         ApplyCompanionBubbleScale(false);
-        loadingSpinner = new Ellipse
+        loadingSpinner = new CompanionLoadingRing
         {
-            Width = 18,
-            Height = 18,
-            Stroke = new SolidColorBrush(global::BigBlueFish.Windows.CompanionBubble.HairBlue),
-            StrokeThickness = 2.5,
-            StrokeDashArray = new DoubleCollection { 2.2, 3.8 },
-            RenderTransformOrigin = new Point(.5, .5),
-            RenderTransform = new RotateTransform()
+            Width = 24,
+            Height = 24
         };
         loadingIndicator = new Border
         {
-            Width = 28,
-            Height = 28,
-            Padding = new Thickness(5),
-            Background = new SolidColorBrush(Color.FromArgb(235, 255, 251, 244)),
-            CornerRadius = new CornerRadius(14),
+            Width = 34,
+            Height = 34,
+            Padding = new Thickness(4),
+            Background = new SolidColorBrush(Color.FromArgb(248, 255, 251, 244)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(35, 80, 96, 152)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(17),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            { Color = global::BigBlueFish.Windows.CompanionBubble.HairBlue, BlurRadius = 7, ShadowDepth = 1, Opacity = .16 },
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(0),
@@ -167,15 +164,6 @@ public partial class MainWindow
         };
         Panel.SetZIndex(loadingIndicator, 20);
         companionLayout.Children.Add(loadingIndicator);
-        loadingTimer = new DispatcherTimer(DispatcherPriority.Render)
-        {
-            Interval = TimeSpan.FromMilliseconds(60)
-        };
-        loadingTimer.Tick += (_, _) =>
-        {
-            loadingAngle = (loadingAngle + 28) % 360;
-            ((RotateTransform)loadingSpinner.RenderTransform).Angle = loadingAngle;
-        };
         speech = new CompanionSpeech(bubbleText, bubble, () => CompanionEdgeLayout.Refresh(this), ResetBubbleDeadline);
         Content = companionLayout;
         ApplyCompanionScale(false);
@@ -428,19 +416,19 @@ public partial class MainWindow
 
     private void BeginModelSpeech()
     {
-        if (loadingIndicator == null || loadingTimer == null)
+        if (loadingIndicator == null || loadingSpinner == null)
             return;
         ClearCompanionModelReply();
         loadingIndicator.Visibility = Visibility.Visible;
-        loadingTimer.Start();
+        loadingSpinner.Start();
         CompanionEdgeLayout.Refresh(this);
     }
 
     private void EndModelSpeech()
     {
-        if (loadingIndicator == null || loadingTimer == null)
+        if (loadingIndicator == null || loadingSpinner == null)
             return;
-        loadingTimer.Stop();
+        loadingSpinner.Stop();
         loadingIndicator.Visibility = Visibility.Collapsed;
         CompanionEdgeLayout.Refresh(this);
     }
@@ -732,7 +720,7 @@ public partial class MainWindow
         companionMenuDismissal?.Dispose();
         companionTimer?.Stop();
         videoPlayer?.Dispose();
-        loadingTimer?.Stop();
+        loadingSpinner?.Stop();
         speech?.Dispose();
         brain?.Dispose();
         SaveCompanion();

@@ -12,7 +12,6 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace BigBlueFish.Windows;
 internal sealed class CompanionBrain : IDisposable
@@ -33,9 +32,9 @@ internal sealed class CompanionBrain : IDisposable
     private int port;
     private CancellationTokenSource? active;
     private readonly CompanionWeather weather;
-    private string[] newsTitles = Array.Empty<string>();
+    private CompanionNews.Item[] newsItems = Array.Empty<CompanionNews.Item>();
     private DateTime newsExpires = DateTime.MinValue;
-    private readonly CompanionNewsGate newsGate = new(DateTime.Now, "news-last-day.txt");
+    private readonly Func<double> newsRoll;
     private string lastNewsTitle = "";
     internal string Status { get; private set; } = "等待说话时启动";
     internal bool Busy { get; private set; }
@@ -57,10 +56,11 @@ internal sealed class CompanionBrain : IDisposable
     internal CompanionBrain() : this(Process.Start, TimeSpan.FromSeconds(60)) { }
 
     // The verification harness substitutes a real child process, not model output in the app.
-    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null)
+    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null, Func<double>? newsRoll = null)
     {
         this.startRunner = startRunner;
         this.runnerLoadTimeout = runnerLoadTimeout;
+        this.newsRoll = newsRoll ?? Random.Shared.NextDouble;
         weather = new CompanionWeather(weatherClient ?? publicWeb, weatherCachePath ?? (weatherClient == null ? "cache/weather.json" : null));
     }
 
@@ -74,7 +74,8 @@ internal sealed class CompanionBrain : IDisposable
     internal static string OcrSpeechRequest(string context) => ScreenRequest(context);
     internal static string OcrPersona => Persona + CompanionDialogue.OcrObserverGuidance;
     internal const string NewsPersona = CompanionDialogue.NewsPersona;
-    internal static string NewsRequest(string title) => "本轮获取到的单条公开科技新闻标题：\n" + title;
+    internal static string NewsRequest(string context) => $"当前时间：{DateTime.Now:yyyy-MM-dd HH:mm}\n【本轮单条科技新闻资料】\n" + context
+        + "\n【新闻资料结束】\n请直接对主人说两小句：先说这条新闻最重要的事，再说一点自己的感受或对主人的关切。合起来约30–60字。";
 
     internal sealed record ChatMessage(string role, object content);
     internal static ChatMessage[] BuildMessages(string persona, string request, CompanionWindowImage? image = null)
@@ -298,7 +299,7 @@ internal sealed class CompanionBrain : IDisposable
             messages,
             temperature,
             top_p = .9,
-            max_tokens = persona == WeatherPersona ? 220 : 180,
+            max_tokens = persona == NewsPersona ? 160 : persona == WeatherPersona ? 220 : 180,
             stream = StreamingResponses,
             chat_template_kwargs = new { enable_thinking = false }
         };
@@ -358,25 +359,27 @@ internal sealed class CompanionBrain : IDisposable
         return Clean(raw.ToString());
     }
 
-    private async Task<string?> NewsTitle(CancellationToken token)
+    private async Task<CompanionNews.Item?> NewsItem(CancellationToken token)
     {
         if (DateTime.UtcNow >= newsExpires)
         {
-            newsTitles = Array.Empty<string>();
-            newsExpires = DateTime.UtcNow.AddMinutes(45);
             try
             {
                 using var r = await publicWeb.GetAsync("https://www.ithome.com/rss/", token);
                 r.EnsureSuccessStatusCode();
-                var x = XDocument.Parse(await r.Content.ReadAsStringAsync(token));
-                newsTitles = x.Descendants("item").Where(i => DateTimeOffset.TryParse((string? )i.Element("pubDate"), out var date) && date <= DateTimeOffset.UtcNow && DateTimeOffset.UtcNow - date < TimeSpan.FromDays(2)).Select(i => ((string? )i.Element("title"))?.Trim() ?? "").Where(CompanionNewsGate.IsClearTitle).Distinct().Take(10).ToArray();
+                newsItems = CompanionNews.ReadFeed(await r.Content.ReadAsStringAsync(token), DateTimeOffset.UtcNow);
+                newsExpires = DateTime.UtcNow.AddMinutes(45);
             }
             catch (Exception e)when (e is not OperationCanceledException)
             {
+                newsItems = newsItems.Where(i => DateTimeOffset.UtcNow - i.Published < TimeSpan.FromDays(2)).ToArray();
+                newsExpires = DateTime.UtcNow.AddMinutes(2);
             }
         }
 
-        return newsTitles.FirstOrDefault(t => t != lastNewsTitle);
+        var candidates = newsItems.Where(i => i.Title != lastNewsTitle
+            && DateTimeOffset.UtcNow - i.Published < TimeSpan.FromDays(2)).ToArray();
+        return candidates.Length == 0 ? null : candidates[Random.Shared.Next(candidates.Length)];
     }
 
     internal async Task<string> Generate(bool usePublic, bool useForeground, IntPtr foregroundHandle = default, Action<string>? onPartial = null)
@@ -396,9 +399,9 @@ internal sealed class CompanionBrain : IDisposable
 #endif
         try
         {
-            string? news = null;
-            if (usePublic && newsGate.TryReserve(DateTime.Now, Random.Shared.NextDouble()))
-                news = await NewsTitle(token);
+            CompanionNews.Item? news = null;
+            if (usePublic && CompanionNews.ShouldSelect(newsRoll()))
+                news = await NewsItem(token);
 #if COMPANION_OCR
             publicInfoMs = generationWatch.Elapsed.TotalMilliseconds;
 #endif
@@ -409,8 +412,7 @@ internal sealed class CompanionBrain : IDisposable
 #endif
             if (news != null)
             {
-                lastNewsTitle = news;
-                request = NewsRequest(news);
+                request = NewsRequest(news.Context);
             }
             else
             {
@@ -458,7 +460,7 @@ internal sealed class CompanionBrain : IDisposable
 #else
             var selectedPersona = news == null ? Persona : NewsPersona;
 #endif
-            var text = await Complete(selectedPersona, request, CompanionDialogue.Temperature, token, image, partial =>
+            var text = await Complete(selectedPersona, request, news == null ? CompanionDialogue.Temperature : .35, token, image, partial =>
             {
                 firstContentMs ??= generationWatch.Elapsed.TotalMilliseconds;
                 onPartial?.Invoke(partial);
@@ -470,10 +472,8 @@ internal sealed class CompanionBrain : IDisposable
             WriteVisionDiagnostic(image, request, text, true, generationWatch.Elapsed.TotalMilliseconds,
                 firstContentMs, runnerReadyMs);
 #endif
-            if (news != null && text.Contains("略过"))
-                text = "";
-            if (news == null && text.Length > 0)
-                newsGate.RecordOrdinarySpeech();
+            if (news != null && text.Length > 0)
+                lastNewsTitle = news.Title;
             Status = "本地模型就绪";
             return CanRunOnCurrentPower ? text : "";
         }

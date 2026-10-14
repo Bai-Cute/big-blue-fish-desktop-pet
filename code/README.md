@@ -27,7 +27,7 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 | `BigBlueFish.Windows/Companion/CompanionBrain.cs` | 模型启动、推理、电池策略和提示词 |
 | `BigBlueFish.Windows/Companion/CompanionSpeech.cs` | 所有模型回复的逐字显示、Unicode 字符边界、替换和取消 |
 | `BigBlueFish.Windows/Companion/CompanionEdgeLayout.cs` | 贴边、独立气泡窗口和 DPI 换算 |
-| `BigBlueFish.Windows/Companion/CompanionNewsGate.cs` | 新闻概率、静默期和每日上限 |
+| `BigBlueFish.Windows/Companion/CompanionNews.cs` | 新闻概率、RSS标题和摘要整理 |
 | `BigBlueFish.Windows/Companion/CompanionVideoPlayer.cs` | 透明视频解码、帧计时与播放 |
 | `BigBlueFish.Windows/assets/regions/` | 地区数据、来源版本和输入 SHA256 |
 | `tests/RunnerVerification/` | 当前提示词、真实子进程故障恢复及本地模型验证 |
@@ -53,7 +53,7 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 
 默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout` 检查卸载界面，追加 `--system-dpi` 可使用当前显示器 DPI。
 
-发布脚本生成 `BigBlueFish-v0.4.1-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
+发布脚本生成 `BigBlueFish-v0.4.2-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
 
 
 根目录 `Version.props` 统一管理项目版本。主程序、安装器和卸载器的产品版本由它生成；Windows 文件版本采用对应的四段格式。构建脚本默认读取该文件，也可以用 `-Version` 指定构建版本。
