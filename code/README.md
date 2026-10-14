@@ -47,13 +47,13 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 先退出桌宠，再运行：
 
 ```powershell
-./test.ps1 -InstalledDirectory "C:\Program Files\蓝色大肥鱼" -InputMode Vision
+./test.ps1 -InstalledDirectory "C:\Program Files\蓝色大肥鱼" -InputMode Ocr
 ../tools/Build-Installer.ps1 -InputMode Ocr -RuntimeDirectory "已核对的运行时目录"
 ```
 
 默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout` 检查卸载界面，追加 `--system-dpi` 可使用当前显示器 DPI。
 
-发布脚本生成 `BigBlueFish-v0.4.0-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随 0.4.0 公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
+发布脚本生成 `BigBlueFish-v0.4.1-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
 
 
 根目录 `Version.props` 统一管理项目版本。主程序、安装器和卸载器的产品版本由它生成；Windows 文件版本采用对应的四段格式。构建脚本默认读取该文件，也可以用 `-Version` 指定构建版本。
