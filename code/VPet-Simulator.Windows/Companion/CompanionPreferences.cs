@@ -12,6 +12,7 @@ internal sealed class CompanionPreferences
     public bool StopModelOnBattery { get; set; } = true;
     public string WeatherRegionCode { get; set; } = CompanionRegions.DefaultCode;
     public double Scale { get; set; } = 1;
+    public double BubbleScale { get; set; } = 1;
     public int SpeechMinMinutes { get; set; } = 10;
     internal static readonly (int Min, int Max)[] SpeechRanges = [(2, 3), (3, 5), (5, 8), (10, 16), (15, 23), (20, 30)];
     internal int SpeechRangeIndex => Array.FindIndex(SpeechRanges, r => r.Min == NormalizeSpeechMinimum(SpeechMinMinutes));
@@ -77,6 +78,7 @@ internal sealed class CompanionPreferences
                 if (s != null)
                 {
                     s.Scale = Math.Clamp(s.Scale, .5, 2.0);
+                    s.BubbleScale = double.IsFinite(s.BubbleScale) ? Math.Clamp(s.BubbleScale, .5, 2.0) : 1;
                     s.AnimationIntervalSeconds = Math.Clamp(s.AnimationIntervalSeconds, 30, 300);
                     s.BreakfastHour = Math.Clamp(s.BreakfastHour, 0, 23);
                     s.LunchHour = Math.Clamp(s.LunchHour, 0, 23);

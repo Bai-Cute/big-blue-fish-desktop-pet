@@ -53,6 +53,7 @@ public partial class MainWindow
     internal double CompanionSpriteSize => SpriteSize;
     internal Border CompanionBubble => bubble;
     internal TextBlock CompanionBubbleText => bubbleText;
+    internal double CompanionBubbleScale => preferences.BubbleScale;
     internal string CompanionBubbleLayoutText => speech?.FullText ?? bubbleText.Text;
 
     private void InitializeCompanion()
@@ -142,6 +143,7 @@ public partial class MainWindow
             Child = bubbleContent
         };
         companionLayout.Children.Add(bubble);
+        ApplyCompanionBubbleScale(false);
         loadingSpinner = new Ellipse
         {
             Width = 18,
@@ -287,6 +289,13 @@ public partial class MainWindow
         ClampCompanion();
         anchor = new Point(Left, Top);
     });
+    private void ApplyCompanionBubbleScale(bool save = true)
+    {
+        bubble.LayoutTransform = new ScaleTransform(preferences.BubbleScale, preferences.BubbleScale);
+        CompanionEdgeLayout.Refresh(this);
+        if (save) SaveCompanion();
+    }
+
     private void ApplyCompanionScale(bool save = true)
     {
         Width = SpriteSize * 640 / 360 + 20;

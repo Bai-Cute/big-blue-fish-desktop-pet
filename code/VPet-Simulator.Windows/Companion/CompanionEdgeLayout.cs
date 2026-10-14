@@ -159,8 +159,10 @@ public static class CompanionEdgeLayout
 
                 Rect area = WorkArea(pet);
                 var styledBubble = bubble as VPet_Simulator.Windows.CompanionBubble;
+                double scale = ((VPet_Simulator.Windows.MainWindow)pet).CompanionBubbleScale;
                 Rect petBounds = PetBounds(pet);
-                double maximumWidth = Math.Max(1.0, Math.Min(300.0, area.Width - 16.0));
+                // Measure in the bubble's own units; position its scaled window in desktop DIP.
+                double maximumWidth = Math.Max(1.0, Math.Min(300.0, (area.Width - 16.0) / scale));
                 bubble.MaxWidth = maximumWidth;
                 measuringText.Text = ((VPet_Simulator.Windows.MainWindow)pet).CompanionBubbleLayoutText;
                 measuringText.FontFamily = text.FontFamily;
@@ -172,8 +174,12 @@ public static class CompanionEdgeLayout
                 double vertical = bubble.Padding.Top + bubble.Padding.Bottom + bubble.BorderThickness.Top + bubble.BorderThickness.Bottom;
                 measuringText.Measure(new System.Windows.Size(Math.Max(1, maximumWidth - horizontal), double.PositiveInfinity));
                 double bubbleWidth = Math.Min(maximumWidth, Math.Max(26, measuringText.DesiredSize.Width) + horizontal);
-                measuringText.Measure(new System.Windows.Size(Math.Max(1, bubbleWidth - horizontal), double.PositiveInfinity));
-                double bubbleHeight = Math.Min(Math.Max(1.0, area.Height - 16.0), Math.Max(22, measuringText.DesiredSize.Height) + vertical);
+                // WPF rounds the scaled arrange width; reserve two base DIP while
+                // measuring so a wrap at that boundary cannot add an unmeasured line.
+                measuringText.Measure(new System.Windows.Size(Math.Max(1, bubbleWidth - horizontal - 2), double.PositiveInfinity));
+                double bubbleHeight = Math.Min(Math.Max(1.0, (area.Height - 16.0) / scale), Math.Max(22, measuringText.DesiredSize.Height) + vertical);
+                bubbleWidth *= scale;
+                bubbleHeight *= scale;
                 double left = Limit(pet.Left + petBounds.Left + petBounds.Width / 2.0 - bubbleWidth / 2.0, area.Left + 8.0, area.Right - bubbleWidth - 8.0);
                 double top = pet.Top + petBounds.Top - bubbleHeight - 10.0;
                 bool belowPet = false;
@@ -184,7 +190,7 @@ public static class CompanionEdgeLayout
                 }
 
                 top = Limit(top, area.Top + 8.0, area.Bottom - bubbleHeight - 8.0);
-                styledBubble?.PointAt(pet.Left + petBounds.Left + petBounds.Width / 2.0 - left, belowPet);
+                styledBubble?.PointAt((pet.Left + petBounds.Left + petBounds.Width / 2.0 - left) / scale, belowPet);
                 popup.Width = Math.Max(1.0, bubbleWidth);
                 popup.Height = Math.Max(1.0, bubbleHeight);
                 popup.Left = left;

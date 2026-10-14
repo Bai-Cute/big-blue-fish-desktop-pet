@@ -14,7 +14,7 @@ public partial class MainWindow
         if (exitAnimation) return;
         if (companionSettings != null)
         {
-            companionSettings.Activate();
+            ActivateCompanionSettings(companionSettings);
             return;
         }
 
@@ -31,7 +31,9 @@ public partial class MainWindow
             Background = new SolidColorBrush(Color.FromRgb(246, 248, 252)),
             FontFamily = new FontFamily("Microsoft YaHei UI"),
             FontSize = 14,
-            ShowInTaskbar = true
+            ShowInTaskbar = true,
+            ShowActivated = true,
+            Topmost = false
         };
         w.Resources.MergedDictionaries.Add(new ResourceDictionary
         { Source = new Uri("/VPet-Simulator.Windows;component/Companion/CompanionSettingsStyles.xaml", UriKind.Relative) });
@@ -141,6 +143,27 @@ public partial class MainWindow
             ApplyCompanionScale();
         };
         p.Children.Add(scale);
+        p = pages[1];
+        var bubbleScaleLabel = new TextBlock
+        {
+            Text = $"文字气泡大小：{preferences.BubbleScale:P0}",
+            Margin = new Thickness(0, 18, 0, 4)
+        };
+        p.Children.Add(bubbleScaleLabel);
+        var bubbleScale = new Slider
+        {
+            Minimum = .5, Maximum = 2.0, Value = preferences.BubbleScale,
+            TickFrequency = .05, IsSnapToTickEnabled = true
+        };
+        System.Windows.Automation.AutomationProperties.SetName(bubbleScale, "文字气泡大小");
+        bubbleScale.ValueChanged += (_, _) =>
+        {
+            preferences.BubbleScale = bubbleScale.Value;
+            bubbleScaleLabel.Text = $"文字气泡大小：{bubbleScale.Value:P0}";
+            ApplyCompanionBubbleScale();
+        };
+        p.Children.Add(bubbleScale);
+        p = pages[0];
         var intervalLabel = new TextBlock { Text = $"动作触发间隔：{preferences.AnimationIntervalSeconds} 秒", Margin = new Thickness(0, 18, 0, 4) };
         p.Children.Add(intervalLabel);
         var interval = new Slider { Minimum = 30, Maximum = 300, Value = preferences.AnimationIntervalSeconds, TickFrequency = 10, IsSnapToTickEnabled = true };
@@ -266,7 +289,29 @@ public partial class MainWindow
             companionSettings = null;
             SaveCompanion();
         };
-        w.Show();
+        ActivateCompanionSettings(w);
+    }
+
+    private void ActivateCompanionSettings(Window window)
+    {
+        if (window.WindowState == WindowState.Minimized)
+            window.WindowState = WindowState.Normal;
+        window.Show();
+        window.Activate();
+        // Pet/tray menus finish restoring their previous foreground window after
+        // the click handler. Activate once that input/menu work has completed.
+        window.Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, (Action)(() =>
+        {
+            if (companionSettings == window && window.IsVisible && !companionClosed && !exitAnimation)
+            {
+                // A non-activating pet can open settings while another process
+                // owns foreground. Raise this explicit user-requested window once,
+                // then return it to the ordinary (non-topmost) window band.
+                window.Topmost = true;
+                window.Topmost = false;
+                window.Activate();
+            }
+        }));
     }
 
 }

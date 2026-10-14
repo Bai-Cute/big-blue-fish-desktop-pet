@@ -30,6 +30,99 @@ internal static class Program
     {for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);if(child is T target)yield return target;foreach(var nested in Children<T>(child))yield return nested;}}
     static void Render(Visual visual,string file,int width,int height)
     {var b=new RenderTargetBitmap(width,height,96,96,PixelFormats.Pbgra32);b.Render(visual);var e=new PngBitmapEncoder();e.Frames.Add(BitmapFrame.Create(b));using var s=File.Create(file);e.Save(s);}
+    static void VerifyBubbleScale(MainWindow w)
+    {
+        var prefs=Read(w,"preferences");
+        var readPrefs=prefs.GetType().GetMethod("Read",Access)!;
+        Check(Property<double>(prefs,"BubbleScale")==1,"old settings default bubble to 100 percent");
+        Invoke(w,"OpenCompanionSettings");Pump(100);
+        var settings=(Window)Read(w,"companionSettings");
+        Children<Button>(settings).Single(b=>b.Content?.ToString()=="说话与天气").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
+        var slider=Children<Slider>(settings).Single(s=>System.Windows.Automation.AutomationProperties.GetName(s)=="文字气泡大小");
+        Check(slider.IsVisible&&slider.Minimum==.5&&slider.Maximum==2&&slider.TickFrequency==.05,"independent bubble slider visible with range and steps");
+        var bubble=(Border)Read(w,"bubble");var text=(TextBlock)Read(w,"bubbleText");
+        var sprite=(Image)Read(w,"videoImage");double petWidth=sprite.Width;
+        double baseWidth=0,baseHeight=0;
+        foreach(var scale in new[]{1.0,.5,2.0,1.35})
+        {
+            slider.Value=scale;Invoke(w,"ShowCompanionNotice","主人，鱼鱼陪你呀~",false);Pump(120);
+            var popup=w.OwnedWindows.Cast<Window>().Single(p=>p.Title=="蓝色大肥鱼 · 对话");
+            if(scale==1){baseWidth=popup.Width;baseHeight=popup.Height;}
+            Check(Math.Abs(popup.Width-baseWidth*scale)<1&&Math.Abs(popup.Height-baseHeight*scale)<1,"complete bubble scales proportionally "+scale);
+            Check(sprite.Width==petWidth&&Property<double>(prefs,"Scale")==1,"bubble scaling leaves pet unchanged "+scale);
+            Check(Math.Abs(Property<double>(readPrefs.Invoke(null,null)!,"BubbleScale")-scale)<.001,"bubble size survives settings reload "+scale);
+            Check(((ScaleTransform)bubble.LayoutTransform).ScaleX==scale&&text.FontSize==17,"font button padding and outline share one transform "+scale);
+            Render((Visual)popup.Content,$"bubble-{scale:0.00}.png",(int)Math.Ceiling(popup.Width),(int)Math.Ceiling(popup.Height));
+        }
+        foreach(var petScale in new[]{.5,1.0,2.0})
+        foreach(var bubbleScale in new[]{.5,1.0,2.0})
+        foreach(var corner in new[]{(X:-5000.0,Y:-5000.0),(X:5000.0,Y:-5000.0),(X:-5000.0,Y:5000.0),(X:5000.0,Y:5000.0)})
+        {
+            Set(prefs,"Scale",petScale);Invoke(w,"ApplyCompanionScale",false);slider.Value=bubbleScale;
+            w.Left=corner.X;w.Top=corner.Y;Invoke(w,"ClampCompanion");
+            Invoke(w,"ShowCompanionNotice","主人，鱼鱼看到你在认真研究新的功能啦，先伸个懒腰再慢慢来好不好呀？小尾巴也跟着主人一起加油哦~",false);Pump(80);
+            var popup=w.OwnedWindows.Cast<Window>().Single(p=>p.Title=="蓝色大肥鱼 · 对话");var area=CompanionEdgeLayout.WorkArea(w);
+            Check(popup.IsVisible&&popup.Left>=area.Left-1&&popup.Top>=area.Top-1&&popup.Left+popup.Width<=area.Right+1&&popup.Top+popup.Height<=area.Bottom+1,"scaled bubble stays inside work area");
+            Check(Math.Abs(Property<double>(prefs,"BubbleScale")-bubbleScale)<.001,"pet resize preserves bubble setting");
+            var bounds=text.TransformToAncestor(popup).TransformBounds(new Rect(0,0,text.ActualWidth,text.ActualHeight));
+            Check(bounds.Right<=popup.Width+1&&bounds.Bottom<=popup.Height+1,$"full text fits scaled popup pet={petScale} bubble={bubbleScale} corner={corner} bounds={bounds} popup={popup.Width}x{popup.Height}");
+        }
+        Children<Button>(bubble).Single().RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
+        Check(!w.OwnedWindows.Cast<Window>().Single(p=>p.Title=="蓝色大肥鱼 · 对话").IsVisible,"scaled close button dismisses bubble");
+        settings.Close();
+        foreach(var sample in new[]{(Value:.1,Expected:.5),(Value:9.0,Expected:2.0)})
+        {
+            File.WriteAllText("preferences.json","{\"BubbleScale\":"+sample.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)+"}");
+            Check(Property<double>(readPrefs.Invoke(null,null)!,"BubbleScale")==sample.Expected,"loaded bubble scale clamps to range");
+        }
+        Console.WriteLine($"Bubble scale: {checks} real WPF checks passed.");
+    }
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    static extern IntPtr GetForegroundWindow();
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint="GetWindowLongPtrW")]
+    static extern IntPtr GetWindowStyle(IntPtr handle,int index);
+    static IntPtr Handle(Window window)=>new System.Windows.Interop.WindowInteropHelper(window).Handle;
+    static void VerifySettingsFocus(MainWindow w)
+    {
+        using var closeFixture=new CloseWindow(new Window { Title="大肥鱼设置前台回归样例",Width=460,Height=220,ShowInTaskbar=true,Content=new TextBlock {Text="普通窗口切换检查",Margin=new Thickness(30)} });
+        var other=closeFixture.Window;other.Show();other.Activate();Pump(100);
+        Console.WriteLine("FOCUS_FIXTURE_READY: click the normal regression window to grant genuine foreground input.");
+        Wait(()=>GetForegroundWindow()==Handle(other),60,"ordinary fixture receives genuine foreground input before opening settings");
+        var menu=(ContextMenu)Read(w,"companionContextMenu");
+        var item=menu.Items.Cast<MenuItem>().Single(i=>i.Header?.ToString()=="设置");
+        menu.IsOpen=true;Pump();item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        // Reproduce late menu focus restoration after its click handler returns.
+        w.Dispatcher.BeginInvoke(DispatcherPriority.Input,(Action)(()=>other.Activate()));Pump(120);
+        var settings=(Window)Read(w,"companionSettings");
+        Check(GetForegroundWindow()==Handle(settings)&&settings.IsActive,$"new settings become foreground after menu focus restoration: foreground={GetForegroundWindow()}, settings={Handle(settings)}, other={Handle(other)}, active={settings.IsActive}, menu={menu.IsOpen}");
+        Check(!settings.Topmost&&settings.ShowActivated&&settings.ShowInTaskbar&&settings.Owner==null,"settings remain independent ordinary taskbar window");
+        Check((GetWindowStyle(Handle(settings),-20).ToInt64()&0x08000000)==0,"settings do not inherit pet no-activate style");
+        other.Activate();Pump();
+        Check(GetForegroundWindow()==Handle(other)&&!settings.IsActive,"switching to ordinary window leaves settings behind normally");
+        Invoke(w,"OpenCompanionSettings");Pump();
+        Check(ReferenceEquals(settings,Read(w,"companionSettings"))&&GetForegroundWindow()==Handle(settings),"reopening existing settings brings same window forward");
+        settings.WindowState=WindowState.Minimized;other.Activate();Pump();
+        Invoke(w,"OpenCompanionSettings");Pump();
+        Check(settings.WindowState==WindowState.Normal&&GetForegroundWindow()==Handle(settings),"reopening minimized settings restores and activates");
+        settings.WindowState=WindowState.Maximized;other.Activate();Pump();
+        Invoke(w,"OpenCompanionSettings");Pump();
+        Check(settings.WindowState==WindowState.Maximized&&GetForegroundWindow()==Handle(settings),"reopening maximized settings preserves maximized state");
+        settings.Close();other.Activate();Pump();
+        var petStyle=GetWindowStyle(Handle(w),-20).ToInt64();
+        Check(w.Topmost&&!w.ShowActivated&&!w.ShowInTaskbar&&(petStyle&0x08000080)==0x08000080,"pet remains topmost non-activating tool window");
+        Invoke(w,"ShowCompanionNotice","主人，鱼鱼在这里呀~",false);Pump();
+        var bubble=w.OwnedWindows.Cast<Window>().Single(p=>p.Title=="蓝色大肥鱼 · 对话");
+        Check(bubble.IsVisible&&bubble.Topmost&&!bubble.ShowActivated&&!bubble.ShowInTaskbar,"bubble retains topmost no-activate behavior");
+        Check(GetForegroundWindow()==Handle(other),"showing pet bubble does not take foreground from ordinary window");
+        Invoke(w,"OpenCompanionSettings");((Window)Read(w,"companionSettings")).Close();other.Activate();Pump();
+        Check(GetForegroundWindow()==Handle(other),"queued activation ignores settings already closed");
+        Console.WriteLine($"Settings focus: {checks} real WPF/Win32 checks passed.");
+    }
+    sealed class CloseWindow(Window window):IDisposable
+    {
+        public Window Window=>window;
+        public void Dispose()=>window.Close();
+    }
     [STAThread] static int Main(string[] args)
     {
         MainWindow? w=null;
@@ -44,6 +137,16 @@ internal static class Program
             native.GetField("TestPowerOverride",Access)!.SetValue(null,false);
             w=new MainWindow();w.Show();Wait(()=>(bool)Read(w,"companionReady"),10,"video load");
             ((DispatcherTimer)Read(w,"companionTimer")).Stop();
+            if(args.Contains("--settings-focus"))
+            {
+                Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before focus verification");
+                VerifySettingsFocus(w);Field(w,"exitReady",true);w.Close();return 0;
+            }
+            if(args.Contains("--bubble-scale"))
+            {
+                Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before bubble verification");
+                VerifyBubbleScale(w);Field(w,"exitReady",true);w.Close();return 0;
+            }
             var player=Read(w,"videoPlayer");var prefs=Read(w,"preferences");var layout=(Grid)Read(w,"companionLayout");
             Check(Property<double>(player,"PlaybackRate")==1.5,"startup greeting uses 1.5x playback");
             var start=Stopwatch.StartNew();
