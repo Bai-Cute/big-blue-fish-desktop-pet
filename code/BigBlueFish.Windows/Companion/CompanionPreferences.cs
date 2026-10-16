@@ -10,6 +10,8 @@ internal sealed class CompanionPreferences
     public bool PublicInfo { get; set; } = true;
     public bool ForegroundEnabled { get; set; } = true;
     public bool StopModelOnBattery { get; set; } = true;
+    public bool HideOnFullscreen { get; set; } = true;
+    public bool CheckUpdatesOnStartup { get; set; } = true;
     public string WeatherRegionCode { get; set; } = CompanionRegions.DefaultCode;
     public double Scale { get; set; } = 1;
     public double BubbleScale { get; set; } = 1;

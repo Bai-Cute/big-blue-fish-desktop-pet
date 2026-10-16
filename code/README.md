@@ -30,6 +30,9 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 | `BigBlueFish.Windows/Companion/CompanionNews.cs` | 新闻概率、RSS标题和摘要整理 |
 | `BigBlueFish.Windows/Companion/CompanionVideoPlayer.cs` | 透明视频解码、帧计时与播放 |
 | `BigBlueFish.Windows/assets/regions/` | 地区数据、来源版本和输入 SHA256 |
+| `../deployment/` | 主程序、安装器和卸载器共用的模型准备、下载、更新与现代界面 |
+| `BigBlueFish.Windows/Companion/CompanionMaintenance.cs` | 设置中安装模型、检查更新与更新提示 |
+| `tests/InstallerVerification/` | 下载故障、模型安装交互、更新事务和完整安装卸载验证 |
 | `tests/RunnerVerification/` | 当前提示词、真实子进程故障恢复及本地模型验证 |
 
 地区数据由 MIT 许可的 [AreaCity](https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov) `2025.251231.260403` 版本生成，包含 34 个省级项、392 个市级项、3209 个县区级项。上游部分台湾地区没有坐标；保留选择，查询时明确提示。区划为固定版本快照，不保证后续行政调整实时同步。
@@ -51,9 +54,9 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 ../tools/Build-Installer.ps1 -InputMode Ocr -RuntimeDirectory "已核对的运行时目录"
 ```
 
-默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout` 检查卸载界面，追加 `--system-dpi` 可使用当前显示器 DPI。
+默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout <目录>` 检查安装、卸载、模型与更新窗口布局；`--deployment <目录>` 检查模型选择、下载恢复、更新元数据与失败恢复；`--model-ui <目录>` 验证下载失败出口与手动安装确认。
 
-发布脚本生成 `BigBlueFish-v0.4.2-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型在安装过程中从固定来源下载并校验，视觉版同时配置配套的视觉投影组件。
+发布脚本生成 `BigBlueFish-v0.5.0-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型可从 Hugging Face 或 ModelScope 固定来源下载并校验，也支持手动安装或无模型启动。模型选择记录在安装目录的 model-selection.json。
 
 
 根目录 `Version.props` 统一管理项目版本。主程序、安装器和卸载器的产品版本由它生成；Windows 文件版本采用对应的四段格式。构建脚本默认读取该文件，也可以用 `-Version` 指定构建版本。

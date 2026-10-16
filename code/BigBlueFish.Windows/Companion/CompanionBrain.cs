@@ -42,6 +42,21 @@ internal sealed class CompanionBrain : IDisposable
     internal bool StopOnBattery { get; set; } = true;
     internal string WeatherRegionCode { get; set; } = CompanionRegions.DefaultCode;
     internal bool CanRunOnCurrentPower => !StopOnBattery || CompanionNative.OnAC;
+    private DateTime nextModelCheck;
+    private bool modelAvailable;
+    internal bool ModelAvailable
+    {
+        get
+        {
+            if (DateTime.UtcNow >= nextModelCheck)
+            {
+                modelAvailable = BigBlueFish.Deployment.ModelStore.Resolve(Environment.CurrentDirectory) != null;
+                nextModelCheck = DateTime.UtcNow.AddSeconds(2);
+            }
+            return modelAvailable;
+        }
+    }
+    internal void RefreshModelAvailability() => nextModelCheck = DateTime.MinValue;
 #if COMPANION_OCR
     internal bool VisionAvailable => false;
     internal const string InputMode = "OCR";
@@ -137,9 +152,9 @@ internal sealed class CompanionBrain : IDisposable
     private async Task StartRunner(CancellationToken token)
     {
         var path = Path.GetFullPath("runtime/llama-server.exe");
-        var model = Path.GetFullPath("models/Qwen3.5-4B-heretic-Q4_K_M.gguf");
-        if (!File.Exists(path) || !File.Exists(model))
-            throw new IOException("模型或推理程序尚未就绪");
+        var model = BigBlueFish.Deployment.ModelStore.Resolve(Environment.CurrentDirectory);
+        if (!File.Exists(path)) throw new IOException("未找到本地推理程序：" + path);
+        if (model == null) throw new IOException("尚未安装可用模型，可以在设置中安装模型。");
         var probe = new TcpListener(IPAddress.Loopback, 0);
         probe.Start();
         port = ((IPEndPoint)probe.LocalEndpoint).Port;

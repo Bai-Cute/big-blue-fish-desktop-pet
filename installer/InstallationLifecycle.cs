@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
@@ -80,7 +81,7 @@ internal static class InstallationLifecycle
         using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
         using var key = machine.CreateSubKey(UninstallRoot + "\\" + RegistrationName(target));
         key.SetValue("DisplayName", "蓝色大肥鱼");
-        key.SetValue("DisplayVersion", typeof(InstallationLifecycle).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
+        key.SetValue("DisplayVersion", FileVersionInfo.GetVersionInfo(Path.Combine(target, ApplicationName)).ProductVersion ?? typeof(InstallationLifecycle).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
         key.SetValue("Publisher", "Bai-Cute");
         key.SetValue("InstallLocation", target);
         key.SetValue("DisplayIcon", Path.Combine(target, "BigBlueFish.ico"));
@@ -175,6 +176,12 @@ internal static class InstallationLifecycle
             if (!IsWithin(target, path)) throw new InvalidDataException("安装记录中的文件路径无效。");
             if (File.Exists(path)) File.Delete(path);
         }
+        foreach (var name in new[] { ".update-previous", ".update-next" })
+        {
+            var path = Path.Combine(target, name);
+            if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
+        }
+        foreach (var path in Directory.EnumerateFiles(target, ".update-state.json*")) File.Delete(path);
         if (removeData)
         {
             foreach (var name in new[] { "models", "cache" })
@@ -182,7 +189,7 @@ internal static class InstallationLifecycle
                 var path = Path.Combine(target, name);
                 if (Directory.Exists(path)) Directory.Delete(path, recursive: true);
             }
-            foreach (var pattern in new[] { "preferences.json*", "news-last-day.txt*", "companion.lock", "ready.status", "companion-errors.log", "test-*.json", "test-command.txt", "test-render.png", "test-settings.png", "ocr-status.json", "vision-status.json", "vision-input.jpg" })
+            foreach (var pattern in new[] { "preferences.json*", "model-selection.json*", "news-last-day.txt*", "companion.lock", "ready.status", "companion-errors.log", "test-*.json", "test-command.txt", "test-render.png", "test-settings.png", "ocr-status.json", "vision-status.json", "vision-input.jpg" })
                 foreach (var path in Directory.EnumerateFiles(target, pattern)) File.Delete(path);
         }
         DeleteEmptyDirectories(target);

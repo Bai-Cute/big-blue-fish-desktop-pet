@@ -1,6 +1,6 @@
 # 蓝色大肥鱼桌宠 / Big Blue Fish Desktop Pet
 
-一只内置 4B 本地大模型的 Windows AI 桌面宠物。蓝色大肥鱼会读懂当前窗口里的画面或文字，结合主人正在做的事情、天气和科技新闻，以鱼娘人设弹出温柔又俏皮的文字气泡，陪主人工作与休息。目前公开维护 OCR 版一键安装器，自动配置模型与运行环境。
+一只可配置 4B 本地大模型的 Windows AI 桌面宠物。蓝色大肥鱼会读懂当前窗口里的画面或文字，结合主人正在做的事情、天气和科技新闻，以鱼娘人设弹出温柔又俏皮的文字气泡，陪主人工作与休息。目前公开维护 OCR 版一键安装器，可以自动配置模型与运行环境，也可以先让鱼鱼以无模型模式住进桌面。
 
 蓝色大肥鱼是一只可爱的 Windows 桌宠软件，形象来自“蓝色大肥鱼”的二创设定。她有一身柔软的蓝色长发和小小的鲸鱼尾巴，穿着整洁可爱的鱼娘服饰，头顶的发饰、围裙和轻轻摇动的尾巴，让她看起来像一位住进电脑里的小鱼娘。她会安静地待在桌面边缘，也会在主人忙碌时探头、挥手、伸展或开心地蹦起来，用小小的动作陪着主人工作。
 
@@ -35,23 +35,15 @@ OCR 版在本机读取当前前台窗口的可见文字，并按文字在界面�
 
 ## 一键安装
 
-普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载 `BigBlueFish-v0.4.2-OCR-Setup.exe`。从 0.4.0 起公开更新只维护 OCR 版；0.3.1 的视觉版仍可在历史 Release 中下载。
+普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载 `BigBlueFish-v0.5.0-OCR-Setup.exe`。从 0.4.0 起公开更新只维护 OCR 版；0.3.1 的视觉版仍可在历史 Release 中下载。
 
-双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时安装到电脑中，并从 Hugging Face 的固定来源下载约 2.7 GB 的 4B 模型。下载文件会经过 SHA-256 校验，安装完成后创建快捷方式并启动桌宠。
+双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时安装到电脑中，并提供 Hugging Face（推荐）、国内源（稳定）和手动安装三种模型准备方式。两个源的模型有所不同，但是均适合本应用；模型大小约 2.7 GB，自动下载会经过 SHA-256 校验。
 
-更新时先退出正在运行的桌宠，再运行安装器并选择原安装目录。安装器会保留已有设置，并校验已有模型；校验通过的模型可以继续使用。更新程序时不需要重新下载已经核验过的模型。
+下载失败时可以重试、改为手动安装，或先无模型启动。手动安装会显示当前安装位置对应的模型文件夹，并打开模型来源页面，也可以直接选择已下载的 GGUF 文件。先无模型启动时，鱼鱼仍会行礼、问候、告别和播放动作；之后可以到设置中的“模型与供电”点击“安装模型”，再为她准备本地模型。
 
-模型下载源是：
+从 0.5.0 起，可以在设置中检查更新，并选择是否在每次启动时自动检查。发现新版本后，应用会下载并校验安装器，退出旧程序、完成更新并重新启动，保留模型和设置。也可以退出桌宠，手动运行新版安装器并选择原安装目录更新。
 
-```text
-https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1/Qwen3.5-4B-heretic-f16_Q4_K_M.gguf?download=true
-```
-
-模型文件名为 `Qwen3.5-4B-heretic-Q4_K_M.gguf`，SHA-256 为：
-
-```text
-8485535a36c9f333574d08b650ad698ac02ec30752bd9cd87e493a3b7531bee1
-```
+Hugging Face 来源为 [Biomanticus/Qwen3.5-4B-heretic-gguf](https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/tree/b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1)，国内来源为 ModelScope 上的 [diodel/Qwen3.5-4B-Q4_K_M-GGUF](https://modelscope.cn/models/diodel/Qwen3.5-4B-Q4_K_M-GGUF/files)。具体文件、固定修订与校验值见[第三方声明](code/THIRD-PARTY.md)。
 
 ## 从仓库部署
 
@@ -77,9 +69,9 @@ https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e486
 ./tools/Build-Installer.ps1 -InputMode Vision -RuntimeDirectory "运行时目录"
 ```
 
-安装器自身携带桌宠程序和运行时；模型由安装器在安装过程中从固定来源下载，不会被写入 Git 仓库。
+安装器自身携带桌宠程序和运行时；模型可以由安装器从所选来源下载，也可以手动准备或稍后从设置中安装。
 
-项目版本统一记录在根目录的 `Version.props`，当前为 **0.4.2**。程序、应用组件和 OCR 安装器均从这份配置生成版本信息。视觉版源码仍保留在工程中用于历史维护，但不再随公开版本同步更新。
+项目版本统一记录在根目录的 `Version.props`，当前为 **0.5.0**。程序、应用组件和 OCR 安装器均从这份配置生成版本信息。视觉版源码仍保留在工程中用于历史维护，但不再随公开版本同步更新。
 
 ## 天气、科技新闻和桌宠行为
 

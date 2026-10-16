@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)*.cs" Link="Deployment/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(MSBuildThisFileDirectory)ModernTheme.xaml" LogicalName="BigBlueFish.ModernTheme.xaml" />
+  </ItemGroup>
+</Project>

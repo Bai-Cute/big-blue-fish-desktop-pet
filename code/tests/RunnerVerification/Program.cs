@@ -39,6 +39,7 @@ internal static class Program
             if (args[0] == "--news-rules") return NewsVerification.Rules();
             if (args[0] == "--news-live") return await NewsVerification.Live(args[1]);
             if (args[0] == "--speech-flow") return await SpeechFlowVerification.Run(args[1]);
+            if (args[0] == "--maintenance") return await MaintenanceVerification.Run(args[1]);
 #if COMPANION_OCR
             if (args[0] == "--persona-screen") return await PersonaVerification.ActualScreen(args[1], args[2]);
 #endif
@@ -77,7 +78,8 @@ internal static class Program
             Directory.CreateDirectory("runtime");
             Directory.CreateDirectory("models");
             File.WriteAllText("runtime/llama-server.exe", "fault-injection fixture, never a release component");
-            File.WriteAllText("models/Qwen3.5-4B-heretic-Q4_K_M.gguf", "fault-injection fixture");
+            using (var fixture = new BinaryWriter(File.Create("models/Qwen3.5-4B-heretic-Q4_K_M.gguf")))
+            { fixture.Write(0x46554747u); fixture.Write(3u); fixture.Write(1ul); fixture.Write(1ul); }
             var modePath = Path.Combine(root, "runner-mode.txt");
             var children = new List<int>();
             Process? Start(ProcessStartInfo original)

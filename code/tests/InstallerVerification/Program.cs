@@ -86,7 +86,9 @@ internal static class Checks
             var dialog = AutomationElement.FromHandle(process.MainWindowHandle);
             Check(dialog.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.NameProperty, "蓝色大肥鱼已卸载。")) != null,
                 "actual standalone worker reports successful removal");
-            var ok = dialog.FindFirst(TreeScope.Descendants, new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button));
+            var ok = dialog.FindFirst(TreeScope.Descendants, new AndCondition(
+                new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
+                new PropertyCondition(AutomationElement.NameProperty, "确定")));
             ((InvokePattern)ok!.GetCurrentPattern(InvokePattern.Pattern)).Invoke();
             Check(process.WaitForExit(5000) && process.ExitCode == 0, "actual standalone worker exits successfully");
         }
@@ -109,37 +111,11 @@ internal static class Checks
                 Console.WriteLine($"RESULT {count} actual installed entry checks passed");
                 return 0;
             }
-            if (args.Length >= 2 && args[0] == "--ui-layout")
-            {
-                bool systemDpi = args.Contains("--system-dpi");
-                Application.SetHighDpiMode(systemDpi ? HighDpiMode.PerMonitorV2 : HighDpiMode.DpiUnaware);
-                Application.EnableVisualStyles();
-                foreach (float scale in systemDpi ? new[] { 1f } : new[] { 1f, 2f })
-                {
-                    using var form = UninstallApplication.CreateUninstallForm(Path.GetTempPath());
-                    form.Show();
-                    Application.DoEvents();
-                    form.Scale(new SizeF(scale, scale));
-                    form.PerformLayout();
-                    Console.WriteLine($"UI actual device DPI: {form.DeviceDpi}");
-                    var table = (TableLayoutPanel)form.Controls[0];
-                    table.PerformLayout();
-                    var label = table.Controls.OfType<Label>().Single();
-                    var checkbox = table.Controls.OfType<CheckBox>().Single();
-                    var button = table.Controls.OfType<Button>().Single();
-                    Check(label.Visible && checkbox.Visible && button.Visible, $"uninstall controls are actually visible at {scale * 100}% scale");
-                    Check(!checkbox.Checked, $"retain-data checkbox unchecked at {scale * 100}% scale");
-                    Check(label.Bottom <= checkbox.Top && checkbox.Bottom <= button.Top,
-                        $"uninstall label checkbox and button do not overlap at {scale * 100}% scale");
-                    Check(table.ClientRectangle.Contains(button.Bounds) && table.ClientRectangle.Contains(checkbox.Bounds),
-                        $"uninstall controls fit inside the layout at {scale * 100}% scale");
-                    using var bitmap = new Bitmap(form.Width, form.Height);
-                    form.DrawToBitmap(bitmap, new Rectangle(Point.Empty, bitmap.Size));
-                    bitmap.Save(args[1] + $"-{scale * 100}.png");
-                }
-                Console.WriteLine($"RESULT {count} uninstall UI checks passed");
-                return 0;
-            }
+            if (args.Length >= 2 && args[0] == "--ui-layout") return DeploymentVerification.Ui(args[1]);
+            if (args.Length >= 2 && args[0] == "--deployment") return DeploymentVerification.Rules(args[1]).GetAwaiter().GetResult();
+            if (args.Length >= 2 && args[0] == "--model-ui") return DeploymentVerification.ModelUi(args[1]);
+            if (args.Length == 4 && args[0] == "--update-live") return UpdateVerification.Run(args[1], args[2], args[3]);
+            if (args.Length == 2 && args[0] == "--model-download-live") return DeploymentVerification.LiveDownload(args[1]).GetAwaiter().GetResult();
             if (args.Length == 2 && args[0] == "--write-probe") return RestrictedUserProbe.WriteProbe(args[1]);
             var target = Path.GetFullPath(args[1]);
             // Local developer deployment uses the very same extractor as the GUI installer.

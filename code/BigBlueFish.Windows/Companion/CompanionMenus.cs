@@ -45,6 +45,7 @@ public partial class MainWindow
     private async Task SpeakCompanionWeather()
     {
         if (weatherRequestPending || companionClosed || exitAnimation) return;
+        if (!brain.ModelAvailable) { OpenModelInstaller(); return; }
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {

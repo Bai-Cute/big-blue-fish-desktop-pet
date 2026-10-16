@@ -116,7 +116,17 @@ public partial class MainWindow
             nextWarmup = DateTime.MinValue;
         });
         p = pages[0];
+        Toggle("全屏时自动隐藏桌宠", preferences.HideOnFullscreen, v =>
+        {
+            preferences.HideOnFullscreen = v;
+            if (!v && fullscreenHidden)
+            {
+                fullscreenHidden = false;
+                if (!hiddenByUser) { Show(); ClampCompanion(); }
+            }
+        });
         Toggle("开机自动启动", StartupEnabled(), SetCompanionStartup);
+        Toggle("启动时检查更新", preferences.CheckUpdatesOnStartup, v => preferences.CheckUpdatesOnStartup = v);
         p = pages[1];
         Toggle("自动获取天气和科技新闻", preferences.PublicInfo, v => preferences.PublicInfo = v);
         Toggle("感知当前应用（仅在本机处理）", preferences.ForegroundEnabled, v => preferences.ForegroundEnabled = v);
@@ -237,6 +247,9 @@ public partial class MainWindow
         };
         p.Children.Add(dwell);
         p = pages[2];
+        var installModel = new Button { Content = "安装模型", Margin = new Thickness(0, 8, 0, 8) };
+        installModel.Click += (_, _) => OpenModelInstaller();
+        p.Children.Add(installModel);
         var status = new TextBlock
         {
             TextWrapping = TextWrapping.Wrap,
@@ -248,8 +261,14 @@ public partial class MainWindow
         {
             Interval = TimeSpan.FromSeconds(1)
         };
-        void UpdateStatus() => status.Text = (CompanionNative.OnAC ? "已插电" :
-            preferences.StopModelOnBattery ? "电池供电 · 已按设置暂停模型" : "电池供电 · 允许模型运行") + "\n" + brain.Status;
+        void UpdateStatus()
+        {
+            bool available = brain.ModelAvailable;
+            installModel.Visibility = available ? Visibility.Collapsed : Visibility.Visible;
+            status.Text = (CompanionNative.OnAC ? "已插电" :
+                preferences.StopModelOnBattery ? "电池供电 · 已按设置暂停模型" : "电池供电 · 允许模型运行")
+                + "\n" + (available ? brain.Status : "尚未安装模型");
+        }
         timer.Tick += (_, _) => UpdateStatus();
         UpdateStatus();
         timer.Start();
@@ -266,6 +285,10 @@ public partial class MainWindow
         }
 
         p = pages[0];
+        Button("检查更新", async () => await CheckForUpdates(true));
+        var updates = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray };
+        p.Children.Add(updates);
+        timer.Tick += (_, _) => updates.Text = updateStatus;
         Button("隐藏到任务栏通知区", HideCompanion);
         Button("回到右下角", () =>
         {

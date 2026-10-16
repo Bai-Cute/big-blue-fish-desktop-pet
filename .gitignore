@@ -12,6 +12,7 @@
 **/runtime/
 **/media/*.exe
 **/preferences.json*
+**/model-selection.json*
 **/news-last-day.txt*
 **/companion.lock
 **/companion-errors.log

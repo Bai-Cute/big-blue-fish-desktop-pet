@@ -1,10 +1,18 @@
 using System.Diagnostics;
+using System.IO;
 using System.IO.Compression;
-using System.Security.Cryptography;
-using System.Text;
-using System.Drawing;
 using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Windows;
+using System.Windows.Controls;
+using BigBlueFish.Deployment;
+using Microsoft.Win32;
+using Application = System.Windows.Application;
+using Button = System.Windows.Controls.Button;
+using TextBox = System.Windows.Controls.TextBox;
+using ProgressBar = System.Windows.Controls.ProgressBar;
+using HorizontalAlignment = System.Windows.HorizontalAlignment;
 
 namespace BigBlueFish.Setup;
 
@@ -13,223 +21,154 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        ApplicationConfiguration.Initialize();
-        Application.Run(new InstallerForm());
+        var app = ModernUI.EnsureApplication();
+        app.ShutdownMode = ShutdownMode.OnMainWindowClose;
+        app.Run(new InstallerForm(args));
         return 0;
     }
 }
 
-internal sealed class InstallerForm : Form
+internal sealed class InstallerForm : ModernWindow
 {
 #if COMPANION_OCR
     internal const bool RequiresVision = false;
     internal const string InputMode = "OCR";
-    private const string ModeLabel = "OCR 版";
 #else
     internal const bool RequiresVision = true;
     internal const string InputMode = "Vision";
-    private const string ModeLabel = "视觉版";
 #endif
-    internal static string ProductVersion => typeof(InstallerForm).Assembly
-        .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+    internal static string ProductVersion => typeof(InstallerForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
     private const string ManifestName = "installation-manifest.json";
     private sealed record InstalledManifest(string Version, string InputMode, string[] Files);
-    private const string ModelName = "Qwen3.5-4B-heretic-Q4_K_M.gguf";
-    private const string ModelUrl = "https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/resolve/b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1/Qwen3.5-4B-heretic-f16_Q4_K_M.gguf?download=true";
-    private const string ModelSha256 = "8485535a36c9f333574d08b650ad698ac02ec30752bd9cd87e493a3b7531bee1";
-    private const string MmprojName = "Qwen3.5-4B-heretic.mmproj-f16.gguf";
-    private const string MmprojUrl = "https://huggingface.co/mradermacher/Qwen3.5-4B-heretic-GGUF/resolve/0d92f575bfcb057411f3d4088c5eabed979a9b3f/Qwen3.5-4B-heretic.mmproj-f16.gguf?download=true";
-    private const string MmprojSha256 = "E638DC8DE3B75309A190092BA006307759343B62AE0D21ED8359DF76B9B76C3B";
     private static readonly byte[] PayloadMarker = Encoding.ASCII.GetBytes("BIGBLUEFISH_PAYLOAD_V1");
-
     private readonly TextBox destination = new();
-    private readonly Button install = new();
+    private readonly TextBlock status = ModernUI.Text("");
     private readonly ProgressBar progress = new();
-    private readonly Label status = new();
-    private readonly LinkLabel source = new();
+    private readonly Button install;
+    private readonly bool updating;
+    private readonly int waitPid;
+    private bool working;
 
-    public InstallerForm()
+    internal InstallerForm(string[]? arguments = null) : base("蓝色大肥鱼安装程序", "让鱼鱼住进你的桌面", "安装桌宠、动画资源和本地运行环境。", 650, 550)
     {
-        Text = $"蓝色大肥鱼 · {ProductVersion} {ModeLabel}安装程序";
-        StartPosition = FormStartPosition.CenterScreen;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
-        MinimizeBox = false;
-        Font = new Font("Microsoft YaHei UI", 10F);
-        AutoScaleDimensions = new SizeF(96F, 96F);
-        AutoScaleMode = AutoScaleMode.Dpi;
-        ClientSize = new Size(660, 480);
-        MinimumSize = new Size(676, 0);
-        AutoSize = true;
-        AutoSizeMode = AutoSizeMode.GrowAndShrink;
-
-        var layout = new TableLayoutPanel
+        var args = arguments ?? [];
+        updating = args.Length >= 2 && args[0] == "--update";
+        int waitIndex = Array.IndexOf(args, "--wait-pid");
+        if (waitIndex >= 0 && waitIndex + 1 < args.Length) int.TryParse(args[waitIndex + 1], out waitPid);
+        destination.Text = updating ? Path.GetFullPath(args[1]) : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "蓝色大肥鱼");
+        destination.IsReadOnly = updating;
+        Body.Children.Add(ModernUI.Text("安装位置")); Body.Children.Add(destination);
+        var browse = ModernUI.Button("选择文件夹", () =>
         {
-            Dock = DockStyle.Top,
-            AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            ColumnCount = 1,
-            RowCount = 9,
-            Padding = new Padding(32, 26, 32, 26)
-        };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        for (var row = 0; row < layout.RowCount; row++)
-            layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        Controls.Add(layout);
-
-        var title = new Label
-        {
-            Text = $"安装蓝色大肥鱼 · {ModeLabel}",
-            Font = new Font("Microsoft YaHei UI", 18F, FontStyle.Bold),
-            AutoSize = true,
-            Margin = new Padding(0, 0, 0, 12)
-        };
-        layout.Controls.Add(title, 0, 0);
-
-        var intro = new Label
-        {
-            Text = RequiresVision
-                ? "这只可爱的桌宠会把程序、本地 4B 模型和视觉投影组件安装到电脑中。安装过程中需要从 Hugging Face 联网下载模型与视觉组件。"
-                : "这只可爱的桌宠会把程序和本地 4B 模型安装到电脑中，使用 Windows 的本地文字识别组件读取当前窗口。安装过程中需要从 Hugging Face 联网下载模型。",
-            AutoSize = true,
-            MaximumSize = new Size(596, 0),
-            Margin = new Padding(0, 0, 0, 22)
-        };
-        layout.Controls.Add(intro, 0, 1);
-
-        var folderLabel = new Label { Text = "安装位置", AutoSize = true, Margin = new Padding(0, 0, 0, 8) };
-        layout.Controls.Add(folderLabel, 0, 2);
-        var folderRow = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            AutoSize = true,
-            ColumnCount = 2,
-            RowCount = 1,
-            Margin = new Padding(0, 0, 0, 22)
-        };
-        folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
-        folderRow.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        folderRow.RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        destination.Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "蓝色大肥鱼");
-        destination.Anchor = AnchorStyles.Left | AnchorStyles.Right;
-        destination.Margin = new Padding(0, 0, 12, 0);
-        folderRow.Controls.Add(destination, 0, 0);
-        var browse = new Button
-        {
-            Text = "浏览…", AutoSize = true,
-            AutoSizeMode = AutoSizeMode.GrowAndShrink,
-            MinimumSize = new Size(90, 40),
-            Padding = new Padding(12, 4, 12, 4),
-            Margin = Padding.Empty
-        };
-        browse.Click += (_, _) => ChooseFolder();
-        folderRow.Controls.Add(browse, 1, 0);
-        layout.Controls.Add(folderRow, 0, 3);
-
-        var model = new Label
-        {
-            Text = RequiresVision
-                ? "模型约 2.7 GB，视觉投影组件约 640 MB。已有文件校验通过后可以继续使用；下载完成后会自动校验文件并继续安装。"
-                : "模型约 2.7 GB。已有模型校验通过后可以继续使用；下载完成后会自动校验文件并继续安装。",
-            AutoSize = true,
-            MaximumSize = new Size(596, 0),
-            Margin = new Padding(0, 0, 0, 10)
-        };
-        layout.Controls.Add(model, 0, 4);
-        source.Text = RequiresVision ? "模型与视觉组件下载源：Hugging Face（点击打开）"
-            : "模型下载源：Hugging Face（点击打开）";
-        source.AutoSize = true;
-        source.LinkColor = Color.FromArgb(55, 105, 170);
-        source.MaximumSize = new Size(596, 0);
-        source.Margin = new Padding(0, 0, 0, 24);
-        source.Click += (_, _) => Process.Start(new ProcessStartInfo(ModelUrl) { UseShellExecute = true });
-        layout.Controls.Add(source, 0, 5);
-
-        progress.Dock = DockStyle.Fill;
-        progress.Height = 23;
-        progress.Margin = new Padding(0, 0, 0, 12);
-        progress.Style = ProgressBarStyle.Continuous;
-        layout.Controls.Add(progress, 0, 6);
-        status.Text = "准备安装";
-        status.AutoSize = true;
-        status.MaximumSize = new Size(596, 0);
-        status.Margin = new Padding(0, 0, 0, 20);
-        layout.Controls.Add(status, 0, 7);
-
-        install.Text = "开始安装";
-        install.AutoSize = true;
-        install.AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        install.MinimumSize = new Size(130, 42);
-        install.Padding = new Padding(18, 6, 18, 6);
-        install.Margin = Padding.Empty;
-        install.Anchor = AnchorStyles.Right;
-        install.Click += async (_, _) => await InstallClickedAsync();
-        layout.Controls.Add(install, 0, 8);
-        layout.Layout += (_, _) =>
-        {
-            var width = Math.Max(1, layout.ClientSize.Width - layout.Padding.Horizontal);
-            foreach (var label in new Label[] { title, intro, model, source, status })
-                if (label.MaximumSize.Width != width)
-                    label.MaximumSize = new Size(width, 0);
-        };
-    }
-
-    private void ChooseFolder()
-    {
-        using var dialog = new FolderBrowserDialog { SelectedPath = destination.Text };
-        if (dialog.ShowDialog(this) == DialogResult.OK)
-            destination.Text = Path.Combine(dialog.SelectedPath, "蓝色大肥鱼");
+            var picker = new OpenFolderDialog { Title = "选择安装位置", InitialDirectory = Path.GetDirectoryName(destination.Text) };
+            if (picker.ShowDialog(this) == true) destination.Text = Path.Combine(picker.FolderName, "蓝色大肥鱼");
+        });
+        browse.IsEnabled = !updating; Body.Children.Add(browse);
+        Body.Children.Add(progress); Body.Children.Add(status);
+        install = ModernUI.Button(updating ? "更新蓝色大肥鱼" : "安装蓝色大肥鱼", async () => await InstallClickedAsync(), true);
+        install.HorizontalAlignment = HorizontalAlignment.Right; Actions.Children.Add(install);
+        Closing += (_, e) => { if (working) e.Cancel = true; };
+        if (updating) Loaded += async (_, _) => await InstallClickedAsync();
     }
 
     private async Task InstallClickedAsync()
     {
-        var target = destination.Text.Trim();
-        if (target.Length == 0)
-        {
-            MessageBox.Show(this, "请选择安装位置。", "蓝色大肥鱼", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        install.Enabled = false;
-        destination.Enabled = false;
+        if (working) return;
+        working = true; install.IsEnabled = false; destination.IsEnabled = false;
+        string? installedTarget = null;
+        bool applicationStarted = false;
+        System.Threading.Mutex? installLock = null;
+        bool ownsLock = false;
         try
         {
-            await InstallAsync(target);
-            status.Text = "安装完成，正在启动蓝色大肥鱼…";
-            var exe = Path.Combine(target, "BigBlueFish.exe");
-            Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = target, UseShellExecute = true });
-            await Task.Delay(700);
-            Close();
+            var target = InstallationLifecycle.ValidateDirectory(destination.Text.Trim());
+            installedTarget = target;
+            var identity = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(target.ToUpperInvariant())))[..24];
+            installLock = new System.Threading.Mutex(false, "Local\\BigBlueFish.Install." + identity);
+            try { ownsLock = installLock.WaitOne(0); } catch (System.Threading.AbandonedMutexException) { ownsLock = true; }
+            if (!ownsLock) throw new IOException("此目录已有一个安装程序正在工作，请等待它完成。");
+            if (updating)
+            {
+                status.Text = "正在等待桌宠退出…";
+                if (waitPid > 0)
+                {
+                    try { using var previous = Process.GetProcessById(waitPid); using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(40)); await previous.WaitForExitAsync(timeout.Token); }
+                    catch (ArgumentException) { }
+                }
+            }
+            EnsureNotRunning(target);
+            status.Text = "正在安装程序文件…"; progress.IsIndeterminate = true;
+            await Task.Run(() =>
+            {
+                UpdateTransaction.Recover(target);
+                using var stream = OpenPayload(); using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+                if (File.Exists(Path.Combine(target, ManifestName)))
+                    UpdateTransaction.Apply(target, archive, () => { ExtractApplication(archive, target); FinishInstallation(target, Environment.ProcessPath!); },
+                        updating ? () => { LaunchAndVerify(target); applicationStarted = true; } : null);
+                else { ExtractApplication(archive, target); FinishInstallation(target, Environment.ProcessPath!); }
+            });
+            progress.IsIndeterminate = false;
+            if (!updating && ModelStore.Resolve(target) == null && ModelStore.ReadSelection(target)?.Source != "none")
+            {
+                var model = new ModelInstallWindow(target) { Owner = this };
+                model.ShowDialog();
+                if (!model.Completed) ModelStore.Save(target, new ModelStore.Selection("none", null, null));
+            }
+            status.Text = "安装完成，正在启动蓝色大肥鱼…"; progress.Value = 100;
+            if (!applicationStarted) Launch(target);
+            working = false; Close();
         }
-        catch (Exception ex)
+        catch (Exception error)
         {
-            status.Text = "安装未完成。可以修正网络或安装位置后重试。";
-            MessageBox.Show(this, ex.Message, "蓝色大肥鱼安装失败", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            install.Enabled = true;
-            destination.Enabled = true;
+            if (updating && ownsLock && installedTarget != null && File.Exists(Path.Combine(installedTarget, "BigBlueFish.exe")))
+            {
+                try { EnsureNotRunning(installedTarget); Launch(installedTarget); } catch { }
+            }
+            status.Text = "安装未完成，可以重试。";
+            ModernUI.Error(this, "安装未完成", error);
+        }
+        finally
+        {
+            if (ownsLock) installLock!.ReleaseMutex();
+            installLock?.Dispose();
+            working = false; install.IsEnabled = true; destination.IsEnabled = !updating; progress.IsIndeterminate = false;
         }
     }
 
-    private async Task InstallAsync(string target)
+    private static Process Launch(string target) => Process.Start(new ProcessStartInfo(Path.Combine(target, "BigBlueFish.exe"))
+        { WorkingDirectory = target, UseShellExecute = true }) ?? throw new IOException("未能启动蓝色大肥鱼。");
+
+    internal static void LaunchAndVerify(string target)
     {
-        target = InstallationLifecycle.ValidateDirectory(target);
-        Directory.CreateDirectory(target);
-        status.Text = "正在解包程序文件…";
-        progress.Value = 0;
-        using (var payload = OpenPayload())
-        using (var archive = new ZipArchive(payload, ZipArchiveMode.Read, leaveOpen: false))
+        var ready = Path.Combine(target, "ready.status");
+        if (File.Exists(ready)) File.Delete(ready);
+        using var process = Launch(target);
+        try
         {
-            ExtractApplication(archive, target);
+            var watch = Stopwatch.StartNew();
+            while (!process.HasExited && !File.Exists(ready) && watch.Elapsed < TimeSpan.FromSeconds(30)) System.Threading.Thread.Sleep(100);
+            if (process.HasExited || !File.Exists(ready)) throw new IOException("新版本未能正常启动，正在恢复原版本。");
+            System.Threading.Thread.Sleep(1000);
+            if (process.HasExited) throw new IOException("新版本启动后退出，正在恢复原版本。");
         }
+        catch
+        {
+            if (!process.HasExited) { process.Kill(true); process.WaitForExit(5000); }
+            throw;
+        }
+    }
 
-        var modelFolder = Path.Combine(target, "models");
-        Directory.CreateDirectory(modelFolder);
-        await EnsureArtifactAsync(modelFolder, ModelName, ModelUrl, ModelSha256, "本地 4B 模型");
-        if (RequiresVision)
-            await EnsureArtifactAsync(modelFolder, MmprojName, MmprojUrl, MmprojSha256, "视觉投影组件");
-
-        FinishInstallation(target, Environment.ProcessPath!);
-        progress.Value = 100;
+    private static void EnsureNotRunning(string target)
+    {
+        foreach (var process in Process.GetProcessesByName("BigBlueFish"))
+        {
+            using (process)
+            {
+                try { if (string.Equals(process.MainModule?.FileName, Path.Combine(target, "BigBlueFish.exe"), StringComparison.OrdinalIgnoreCase))
+                        throw new IOException("请先退出此目录中正在运行的蓝色大肥鱼，再继续安装。"); }
+                catch (System.ComponentModel.Win32Exception) { }
+            }
+        }
     }
 
     internal static void FinishInstallation(string target, string installerPath)
@@ -267,6 +206,7 @@ internal sealed class InstallerForm : Form
             return relative.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
                 || relative.StartsWith("cache/", StringComparison.OrdinalIgnoreCase)
                 || relative.StartsWith("preferences.json", StringComparison.OrdinalIgnoreCase)
+                || relative.StartsWith("model-selection.json", StringComparison.OrdinalIgnoreCase)
                 || relative is "news-last-day.txt" or "companion.lock" or "ready.status"
                     or "companion-errors.log" or "test-command.txt" or "test-status.json"
                     or "ocr-status.json" or "vision-status.json" or "vision-input.jpg";
@@ -299,50 +239,6 @@ internal sealed class InstallerForm : Form
             current.Where(p => !Preserved(p)).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray());
         File.WriteAllText(manifestPath + ".partial", JsonSerializer.Serialize(manifest));
         File.Move(manifestPath + ".partial", manifestPath, overwrite: true);
-    }
-
-    private async Task EnsureArtifactAsync(string folder, string name, string url, string sha256, string label)
-    {
-        var path = Path.Combine(folder, name);
-        if (File.Exists(path) && await MatchesHashAsync(path, sha256))
-        {
-            status.Text = $"{label}已经存在，跳过下载。";
-            return;
-        }
-
-        var partial = path + ".partial";
-        if (File.Exists(partial)) File.Delete(partial);
-        await DownloadArtifactAsync(partial, url, label);
-        if (!await MatchesHashAsync(partial, sha256))
-            throw new InvalidDataException($"{label} SHA-256 校验失败，未使用该文件。\n\n{sha256}");
-        File.Move(partial, path, overwrite: true);
-    }
-
-    private async Task DownloadArtifactAsync(string partial, string url, string label)
-    {
-        status.Text = $"正在从 Hugging Face 下载{label}…";
-        using var client = new HttpClient { Timeout = TimeSpan.FromHours(2) };
-        using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-        var total = response.Content.Headers.ContentLength ?? 0;
-        await using var input = await response.Content.ReadAsStreamAsync();
-        await using var output = File.Create(partial);
-        var buffer = new byte[1024 * 1024];
-        long read = 0;
-        int count;
-        while ((count = await input.ReadAsync(buffer)) > 0)
-        {
-            await output.WriteAsync(buffer.AsMemory(0, count));
-            read += count;
-            if (total > 0) progress.Value = (int)Math.Clamp(read * 100 / total, 0, 100);
-        }
-    }
-
-    private static async Task<bool> MatchesHashAsync(string path, string expected)
-    {
-        await using var stream = File.OpenRead(path);
-        var hash = await SHA256.HashDataAsync(stream);
-        return Convert.ToHexString(hash).Equals(expected, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static Stream OpenPayload(string? installerPath = null)
@@ -415,5 +311,6 @@ internal sealed class InstallerForm : Form
         public override void SetLength(long value) => throw new NotSupportedException();
         public override void Flush() { }
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        protected override void Dispose(bool disposing) { if (disposing) inner.Dispose(); base.Dispose(disposing); }
     }
 }

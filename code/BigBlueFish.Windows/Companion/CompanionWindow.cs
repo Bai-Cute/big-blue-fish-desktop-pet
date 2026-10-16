@@ -177,6 +177,11 @@ public partial class MainWindow
         {
             InstallCompanionHook();
             await LoadCompanionAnimations();
+            if (preferences.CheckUpdatesOnStartup && !App.Args.Contains("--test-mode"))
+            {
+                await Task.Delay(3000);
+                await CheckForUpdates(false);
+            }
         };
         BuildCompanionContextMenu();
         PreviewMouseRightButtonDown += (_, e) =>
@@ -561,13 +566,13 @@ public partial class MainWindow
                 brain.Stop();
             ClearCompanionModelReply();
         }
-        else if (preferences.ModelEnabled && !speechRequestPending && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
+        else if (modelInstaller == null && preferences.ModelEnabled && brain.ModelAvailable && !speechRequestPending && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
         {
             nextWarmup = now.AddMinutes(2);
             _ = brain.WarmUp();
         }
 
-        bool full = CompanionNative.IsFullscreen();
+        bool full = preferences.HideOnFullscreen && CompanionNative.IsFullscreen();
         if (full && !fullscreenHidden && !hiddenByUser)
         {
             fullscreenHidden = true;
@@ -589,7 +594,7 @@ public partial class MainWindow
             return;
         if (bubble.Visibility == Visibility.Visible && now > bubbleUntil)
             bubble.Visibility = Visibility.Collapsed;
-        if (now < nextSpeech || speechRequestPending || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || companionSettings != null)
+        if (now < nextSpeech || speechRequestPending || brain.Busy || weatherRequestPending || modelInstaller != null || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower || companionSettings != null)
             return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600)
         {
@@ -605,7 +610,7 @@ public partial class MainWindow
         var foregroundHandle = speechForegroundOverride
             ?? CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
         speechForegroundOverride = null;
-        if (speechRequestPending || companionClosed || exitAnimation || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower)
+        if (speechRequestPending || companionClosed || exitAnimation || modelInstaller != null || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)
             return;
 
         speechRequestPending = true;
@@ -672,6 +677,7 @@ public partial class MainWindow
             ContextMenuStrip = menu
         };
         notifyIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreCompanion);
+        notifyIcon.BalloonTipClicked += (_, _) => Dispatcher.Invoke(OpenUpdateWindow);
     }
 
     private void RestoreCompanion()
