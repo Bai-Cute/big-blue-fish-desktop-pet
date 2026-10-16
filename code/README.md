@@ -13,6 +13,20 @@
 
 默认可复用本机 `C:\Program Files\蓝色大肥鱼` 的运行依赖，也支持 `BLUE_WHALE_RUNTIME`、`BLUE_WHALE_MODELS`、`BLUE_WHALE_DOTNET` 环境变量。运行脚本通过目录连接复用模型，不把模型提交进仓库。SDK 可用 `-SdkPath` 指定。
 
+准备内置 4B 本地模型时，可以运行以下任一种命令。`DestinationDirectory` 是模型准备目录，脚本会在其下创建 `models` 并保存 `model-selection.json`；两个来源的模型有所不同，均适合本应用。
+
+```powershell
+../tools/Setup-Model.ps1 -Source HuggingFace -DestinationDirectory "D:\BigBlueFish-local"
+../tools/Setup-Model.ps1 -Source ModelScope -DestinationDirectory "D:\BigBlueFish-local"
+../tools/Setup-Model.ps1 -Source Manual -ModelFile "D:\下载\我的模型.gguf" -DestinationDirectory "D:\BigBlueFish-local"
+```
+
+Hugging Face 为推荐来源，ModelScope 为国内稳定来源。手动安装保留文件的实际名称，检查 GGUF 文件头；SHA-256 不属于两个预设模型时，提示确认后仍可使用。自动化调用可用 `-AllowUnverifiedModel` 明确接受这一提示。OCR 模型准备只下载主模型。
+
+源码启动读取模型目录上一级的 `model-selection.json`，按选择记录复用实际文件名，也能识别两个来源的标准文件名。以上述目录为例，运行 `./run.ps1 -InputMode Ocr -ModelsDirectory "D:\BigBlueFish-local\models" -RuntimeDirectory "推理运行时目录"`。切换目录时，脚本会更新构建目录中的连接，保留原模型目录和设置。
+
+无模型启动使用 `./run.ps1 -InputMode Ocr -NoModel`，此时无需模型文件或推理运行时。也可先运行 `../tools/Setup-Model.ps1 -Source None -DestinationDirectory "D:\BigBlueFish-local"` 保存无模型选择，再用对应的 `-ModelsDirectory` 启动。内置模型可以暂不使用，欢迎与告别、动画和鼠标交互照常运行。
+
 OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.26100.0/`；视觉版为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows7.0/`。主程序 `BigBlueFish.exe` 与 `BigBlueFish.dll` 从源码生成。OCR 版依赖在 `packages.lock.json` 中锁定，视觉版使用 `packages.vision.lock.json`。
 
 ## 修改入口
@@ -35,7 +49,7 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 | `tests/InstallerVerification/` | 下载故障、模型安装交互、更新事务和完整安装卸载验证 |
 | `tests/RunnerVerification/` | 当前提示词、真实子进程故障恢复及本地模型验证 |
 
-地区数据由 MIT 许可的 [AreaCity](https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov) `2025.251231.260403` 版本生成，包含 34 个省级项、392 个市级项、3209 个县区级项。上游部分台湾地区没有坐标；保留选择，查询时明确提示。区划为固定版本快照，不保证后续行政调整实时同步。
+地区数据由 MIT 许可的 [AreaCity](https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov) `2025.251231.260403` 版本生成，包含 34 个省级项、392 个市级项、3209 个县区级项。上游部分台湾地区没有坐标；保留选择，查询时明确提示。
 
 更新时下载对应的 `ok_data_level3.csv`、`ok_geo.csv`，运行：
 
@@ -56,7 +70,7 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 
 默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout <目录>` 检查安装、卸载、模型与更新窗口布局；`--deployment <目录>` 检查模型选择、下载恢复、更新元数据与失败恢复；`--model-ui <目录>` 验证下载失败出口与手动安装确认。
 
-发布脚本生成 `BigBlueFish-v0.5.0-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带带 .NET 运行时的 Windows x64 程序和已核对的 llama.cpp `b10809` Vulkan 运行时；模型可从 Hugging Face 或 ModelScope 固定来源下载并校验，也支持手动安装或无模型启动。模型选择记录在安装目录的 model-selection.json。
+发布脚本生成 `BigBlueFish-v0.5.0-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带包含 .NET 运行时的 Windows x64 程序，以及已核对的 llama.cpp `b10809` Vulkan 运行时；模型可从 Hugging Face 或 ModelScope 固定来源下载并校验，也支持手动安装或无模型启动。模型选择记录在安装目录的 model-selection.json。
 
 
 根目录 `Version.props` 统一管理项目版本。主程序、安装器和卸载器的产品版本由它生成；Windows 文件版本采用对应的四段格式。构建脚本默认读取该文件，也可以用 `-Version` 指定构建版本。

@@ -6,4 +6,4 @@
 
 应用现在可以检查更新，并支持启动时自动检查。发现新版本后，可以直接下载并完成更新，已有模型和设置会继续保留。
 
-本版本提供 `BigBlueFish-v0.5.0-OCR-Setup.exe` 一键安装器，携带桌宠程序、动画资源和本地运行环境。更新已有安装时选择原目录即可。配套 `.sha256` 文件提供安装器的 SHA-256 校验值。完整行为见 [功能规格](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/blob/v0.5.0/docs/AGENT_FUNCTIONAL_SPEC.md)，完整变化见 [更新日志](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/blob/v0.5.0/CHANGELOG.md)。
+本版本提供 `BigBlueFish-v0.5.0-OCR-Setup.exe` 一键安装器，携带桌宠程序、动画资源和本地运行环境。更新已有安装时选择原目录即可。配套 `.sha256` 文件提供安装器的 SHA-256 校验值。完整行为见 [功能规格](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/blob/v0.5.0/docs/AGENT_FUNCTIONAL_SPEC.md)，完整变化见 [更新日志](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/blob/main/CHANGELOG.md)。
