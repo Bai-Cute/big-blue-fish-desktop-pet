@@ -1,4 +1,4 @@
-param([string]$SdkPath,[string]$RuntimeDirectory,[string]$ModelsDirectory,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr',[switch]$NoModel)
+﻿param([string]$SdkPath,[string]$RuntimeDirectory,[string]$ModelsDirectory,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr',[switch]$NoModel)
 $ErrorActionPreference='Stop'
 . "$PSScriptRoot/../tools/Model-Helpers.ps1"
 if(Get-CimInstance Win32_Process -Filter "Name='BigBlueFish.exe' OR Name='VPet-Simulator.Windows.exe'"){

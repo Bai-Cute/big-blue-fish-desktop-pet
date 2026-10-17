@@ -1,4 +1,4 @@
-# ModelStore.cs uses the same source catalog and selection format. ModelScriptsVerification.ps1 checks parity.
+﻿# ModelStore.cs uses the same source catalog and selection format. ModelScriptsVerification.ps1 checks parity.
 function Get-ModelSources {
     @(
         [pscustomobject]@{

@@ -1,4 +1,4 @@
-param([string]$DestinationDirectory)
+﻿param([string]$DestinationDirectory)
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 if(!$DestinationDirectory){$DestinationDirectory=Join-Path $root 'code/BigBlueFish.Windows/media'}

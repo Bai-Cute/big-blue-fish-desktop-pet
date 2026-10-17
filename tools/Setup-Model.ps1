@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('HuggingFace','ModelScope','Manual','None')][string]$Source='HuggingFace',
     [string]$ModelFile,
     [string]$DestinationDirectory=$PSScriptRoot,

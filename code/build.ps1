@@ -1,4 +1,4 @@
-param([string]$SdkPath,[switch]$Locked,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
+﻿param([string]$SdkPath,[switch]$Locked,[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {

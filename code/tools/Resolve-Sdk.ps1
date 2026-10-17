@@ -1,4 +1,4 @@
-param([string]$SdkPath)
+﻿param([string]$SdkPath)
 $ErrorActionPreference='Stop'
 $candidates=@()
 if($SdkPath){$candidates+=$SdkPath}

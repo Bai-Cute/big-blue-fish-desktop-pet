@@ -1,4 +1,4 @@
-param([string]$SdkPath,[string]$InstalledDirectory='C:\Program Files\蓝色大肥鱼',[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
+﻿param([string]$SdkPath,[string]$InstalledDirectory='C:\Program Files\蓝色大肥鱼',[ValidateSet('Ocr','Vision')][string]$InputMode='Ocr')
 $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
