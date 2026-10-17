@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><RuntimeIdentifier>linux-x64</RuntimeIdentifier><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AssemblyName>BigBlueFish.Linux</AssemblyName><DefineConstants>$(DefineConstants);COMPANION_OCR;COMPANION_LINUX</DefineConstants></PropertyGroup>
+  <PropertyGroup Condition="'$(CompanionEdition)' == 'Safe'"><NuGetLockFilePath>packages.safe.lock.json</NuGetLockFilePath></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <ProjectReference Include="../BigBlueFish.Control/BigBlueFish.Control.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionPreferences.cs" Link="Shared/CompanionPreferences.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionAnimationPolicy.cs" Link="Shared/CompanionAnimationPolicy.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionDialogue.cs" Link="Shared/CompanionDialogue.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionBrain.cs" Link="Shared/CompanionBrain.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionWeather.cs" Link="Shared/CompanionWeather.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionNews.cs" Link="Shared/CompanionNews.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionRegions.cs" Link="Shared/CompanionRegions.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionOcrLayout.cs" Link="Shared/CompanionOcrLayout.cs" />
+    <Compile Include="../../deployment/ModelStore.cs" Link="Shared/ModelStore.cs" />
+    <Compile Include="../../deployment/ArtifactDownload.cs" Link="Shared/ArtifactDownload.cs" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/china-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.china-regions.json" />
+    <AvaloniaResource Include="../BigBlueFish.Windows/Res/Font/LemiXiaoNaiPaoTi.ttf" Link="Assets/LemiXiaoNaiPaoTi.ttf" />
+    <Content Include="../BigBlueFish.Windows/assets/fish/**/*" Link="assets/fish/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../BigBlueFish.Windows/BigBlueFish.ico" Link="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

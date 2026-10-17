@@ -40,6 +40,8 @@ internal static class CompanionNative
     internal static extern IntPtr GetStyle(IntPtr h, int n);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     internal static extern IntPtr SetStyle(IntPtr h, int n, IntPtr v);
+    [DllImport("user32.dll")]
+    internal static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
     [StructLayout(LayoutKind.Sequential)]
     internal struct Rect
     {

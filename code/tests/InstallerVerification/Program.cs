@@ -157,6 +157,9 @@ internal static class Checks
             using var stream = InstallerForm.OpenPayload(args[0]);
             using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
             var names = archive.Entries.Select(e => e.FullName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            bool mcpIncluded = InstallerForm.Edition == "Standard";
+            foreach (var component in new[] { "BigBlueFish.Mcp.exe", "BigBlueFish.Mcp.dll", "BigBlueFish.Control.dll" })
+                Check(names.Contains(component) == mcpIncluded, "MCP component matches installer edition: " + component);
             foreach (var required in new[] { "BigBlueFish.exe", "Uninstall.exe", "BigBlueFish.dll",
                 "coreclr.dll", "hostfxr.dll",
                 "PresentationFramework.dll", "runtime/llama-server.exe", "runtime/ggml-vulkan.dll", "runtime/mtmd.dll",
@@ -187,6 +190,9 @@ internal static class Checks
                 "mode switch removes OCR-only projections");
             using var manifest = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "installation-manifest.json")));
             Check(manifest.RootElement.GetProperty("Version").GetString() == expectedVersion, "installed manifest version matches");
+            Check(manifest.RootElement.GetProperty("Edition").GetString() == InstallerForm.Edition, "installed manifest edition matches");
+            foreach (var component in new[] { "BigBlueFish.Mcp.exe", "BigBlueFish.Mcp.dll", "BigBlueFish.Control.dll" })
+                Check(File.Exists(Path.Combine(target, component)) == mcpIncluded, "installed MCP component matches edition: " + component);
             Check(manifest.RootElement.GetProperty("InputMode").GetString() == InstallerForm.InputMode,
                 "installed manifest mode matches");
             using var runtime = JsonDocument.Parse(File.ReadAllText(Path.Combine(target, "BigBlueFish.runtimeconfig.json")));

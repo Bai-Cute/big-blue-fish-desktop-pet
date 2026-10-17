@@ -9,6 +9,8 @@ using System.Windows.Threading;
 namespace BigBlueFish.Windows;
 public partial class MainWindow
 {
+    private Action? refreshCompanionSettings;
+    private Action? disposeCompanionSettingsContent;
     private void OpenCompanionSettings()
     {
         if (exitAnimation) return;
@@ -37,6 +39,21 @@ public partial class MainWindow
         };
         w.Resources.MergedDictionaries.Add(new ResourceDictionary
         { Source = new Uri("/BigBlueFish;component/Companion/CompanionSettingsStyles.xaml", UriKind.Relative) });
+        companionSettings = w;
+        BuildCompanionSettingsContent(w);
+        w.Closed += (_, _) =>
+        {
+            disposeCompanionSettingsContent?.Invoke();
+            disposeCompanionSettingsContent = refreshCompanionSettings = null;
+            companionSettings = null;
+            SaveCompanion();
+        };
+        ActivateCompanionSettings(w);
+    }
+
+    private void BuildCompanionSettingsContent(Window w, int selectedPage = 0, double[]? scrollOffsets = null)
+    {
+        disposeCompanionSettingsContent?.Invoke();
         var shell = new Grid { Background = w.Background };
         shell.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
         shell.ColumnDefinitions.Add(new ColumnDefinition());
@@ -47,21 +64,29 @@ public partial class MainWindow
         sidebar.Children.Add(new TextBlock { Text = "蓝色大肥鱼", FontSize = 22, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(53, 76, 129)), Margin = new Thickness(5, 0, 0, 8) });
         var version = typeof(MainWindow).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .Cast<System.Reflection.AssemblyInformationalVersionAttribute>().First().InformationalVersion.Split('+')[0];
+#if COMPANION_SAFE
+        version += " · 无MCP版";
+#endif
         sidebar.Children.Add(new TextBlock { Text = version + " · 陪伴设置", Foreground = Brushes.SlateGray, Margin = new Thickness(5, 0, 0, 28) });
-        var pages = new StackPanel[3];
-        var views = new ScrollViewer[3];
-        var navigation = new Button[3];
+#if COMPANION_SAFE
         var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电" };
+#else
+        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电", "Agent 与 MCP" };
+#endif
+        var pages = new StackPanel[titles.Length];
+        var views = new ScrollViewer[titles.Length];
+        var navigation = new Button[titles.Length];
         for (int i = 0; i < pages.Length; i++)
         {
             pages[i] = new StackPanel { Margin = new Thickness(26, 24, 26, 24) };
             pages[i].Children.Add(new TextBlock { Text = titles[i], FontSize = 25, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(42, 56, 83)), Margin = new Thickness(0, 0, 0, 20) });
-            views[i] = new ScrollViewer { Content = pages[i], VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = i == 0 ? Visibility.Visible : Visibility.Collapsed };
+            views[i] = new ScrollViewer { Content = pages[i], VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = i == selectedPage ? Visibility.Visible : Visibility.Collapsed };
             Grid.SetColumn(views[i], 1); shell.Children.Add(views[i]);
             int selected = i;
-            var button = navigation[i] = new Button { Content = titles[i], HorizontalContentAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(0), Background = i == 0 ? new SolidColorBrush(Color.FromRgb(220, 234, 255)) : Brushes.Transparent };
+            var button = navigation[i] = new Button { Content = titles[i], HorizontalContentAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 10), BorderThickness = new Thickness(0), Background = i == selectedPage ? new SolidColorBrush(Color.FromRgb(220, 234, 255)) : Brushes.Transparent };
             button.Click += (_, _) =>
             {
+                selectedPage = selected;
                 for (int n = 0; n < views.Length; n++)
                 { views[n].Visibility = n == selected ? Visibility.Visible : Visibility.Collapsed; navigation[n].Background = n == selected ? new SolidColorBrush(Color.FromRgb(220, 234, 255)) : Brushes.Transparent; }
             };
@@ -304,21 +329,22 @@ public partial class MainWindow
             w.Close();
             base.Close();
         });
+        Action? disposeMcpSettings = pages.Length > 3 ? AddMcpSettings(pages[3], w) : null;
         foreach (var panel in pages) Card(panel);
-        companionSettings = w;
-        w.Closed += (_, _) =>
+        disposeCompanionSettingsContent = () => { timer.Stop(); disposeMcpSettings?.Invoke(); };
+        refreshCompanionSettings = () => BuildCompanionSettingsContent(w, selectedPage, views.Select(v => v.VerticalOffset).ToArray());
+        if (scrollOffsets != null) w.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() =>
         {
-            timer.Stop();
-            companionSettings = null;
-            SaveCompanion();
-        };
-        ActivateCompanionSettings(w);
+            if (companionSettings != w || w.Content != shell) return;
+            for (int i = 0; i < views.Length; i++) views[i].ScrollToVerticalOffset(scrollOffsets[i]);
+        }));
     }
 
     private void ActivateCompanionSettings(Window window)
     {
         if (window.WindowState == WindowState.Minimized)
             window.WindowState = WindowState.Normal;
+        window.Topmost = false;
         window.Show();
         window.Activate();
         // Pet/tray menus finish restoring their previous foreground window after
@@ -327,11 +353,11 @@ public partial class MainWindow
         {
             if (companionSettings == window && window.IsVisible && !companionClosed && !exitAnimation)
             {
-                // A non-activating pet can open settings while another process
-                // owns foreground. Raise this explicit user-requested window once,
-                // then return it to the ordinary (non-topmost) window band.
-                window.Topmost = true;
+                // This is only reached by an explicit user request. Keep the
+                // ordinary window band even if a native topmost flag was left over.
                 window.Topmost = false;
+                var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+                CompanionNative.SetWindowPos(handle, new IntPtr(-2), 0, 0, 0, 0, 0x0013);
                 window.Activate();
             }
         }));

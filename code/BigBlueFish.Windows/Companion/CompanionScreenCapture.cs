@@ -126,4 +126,19 @@ internal static class CompanionScreenCapture
         graphics.DrawImage(source, new Rectangle(0, 0, width, height));
         return result;
     }
+
+    internal static CompanionWindowImage? CaptureScreen(int maxDimension = 4096)
+    {
+        using var dpi = new CaptureDpiScope();
+        var bounds = System.Windows.Forms.SystemInformation.VirtualScreen;
+        if (bounds.Width <= 0 || bounds.Height <= 0 || (long)bounds.Width * bounds.Height > 150_000_000)
+            throw new IOException("屏幕尺寸无效或超过可用截图范围。");
+        using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
+        using (var graphics = Graphics.FromImage(bitmap))
+            graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+        using var normalized = Resize(bitmap, maxDimension);
+        using var output = new MemoryStream();
+        normalized.Save(output, ImageFormat.Png);
+        return new("data:image/png;base64," + Convert.ToBase64String(output.ToArray()), normalized.Width, normalized.Height);
+    }
 }

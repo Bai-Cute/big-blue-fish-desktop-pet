@@ -40,11 +40,12 @@ public partial class MainWindow
         hide.Icon = Icon("\uE8A7");
         hide.Click += (_, _) => { companionContextMenu.IsOpen = false; HideCompanion(); };
         companionContextMenu.Items.Add(hide);
+        companionContextMenu.Opened += (_, _) => { weather.IsEnabled = !PuppetActive; test.IsEnabled = !PuppetActive; };
     }
 
     private async Task SpeakCompanionWeather()
     {
-        if (weatherRequestPending || companionClosed || exitAnimation) return;
+        if (PuppetActive || weatherRequestPending || companionClosed || exitAnimation) return;
         if (!brain.ModelAvailable) { OpenModelInstaller(); return; }
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
@@ -74,7 +75,7 @@ public partial class MainWindow
             string text;
             try
             {
-                text = await brain.GenerateWeather(partial => ShowCompanionPartial(partial));
+                text = await brain.GenerateWeather(partial => ShowCompanionPartial(partial, version));
             }
             finally
             {
@@ -96,7 +97,7 @@ public partial class MainWindow
 
     private Task SpeakCompanionTest()
     {
-        if (companionClosed || exitAnimation) return Task.CompletedTask;
+        if (PuppetActive || companionClosed || exitAnimation) return Task.CompletedTask;
         if (hiddenByUser) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {

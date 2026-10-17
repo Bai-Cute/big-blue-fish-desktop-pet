@@ -9,4 +9,9 @@
     <DebugType>portable</DebugType>
     <EmbedAllSources>true</EmbedAllSources>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BigBlueFish.Control' Or '$(MSBuildProjectName)' == 'BigBlueFish.Mcp'">
+    <BaseIntermediateOutputPath>obj/$(RuntimeIdentifier)/</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
+    <NuGetLockFilePath>packages.$(RuntimeIdentifier).lock.json</NuGetLockFilePath>
+  </PropertyGroup>
 </Project>

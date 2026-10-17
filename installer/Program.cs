@@ -39,7 +39,14 @@ internal sealed class InstallerForm : ModernWindow
 #endif
     internal static string ProductVersion => typeof(InstallerForm).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
     private const string ManifestName = "installation-manifest.json";
-    private sealed record InstalledManifest(string Version, string InputMode, string[] Files);
+    private sealed record InstalledManifest(string Version, string InputMode, string[] Files, string Edition = "Standard");
+#if COMPANION_SAFE
+    internal const string Edition = "Safe";
+    private const string InstallerTitle = "蓝色大肥鱼无MCP版安装程序";
+#else
+    internal const string Edition = "Standard";
+    private const string InstallerTitle = "蓝色大肥鱼安装程序";
+#endif
     private static readonly byte[] PayloadMarker = Encoding.ASCII.GetBytes("BIGBLUEFISH_PAYLOAD_V1");
     private readonly TextBox destination = new();
     private readonly TextBlock status = ModernUI.Text("");
@@ -49,7 +56,7 @@ internal sealed class InstallerForm : ModernWindow
     private readonly int waitPid;
     private bool working;
 
-    internal InstallerForm(string[]? arguments = null) : base("蓝色大肥鱼安装程序", "让鱼鱼住进你的桌面", "安装桌宠、动画资源和本地运行环境。", 650, 550)
+    internal InstallerForm(string[]? arguments = null) : base(InstallerTitle, "让鱼鱼住进你的桌面", "安装桌宠、动画资源和本地运行环境。", 650, 550)
     {
         var args = arguments ?? [];
         updating = args.Length >= 2 && args[0] == "--update";
@@ -236,7 +243,7 @@ internal sealed class InstallerForm : ModernWindow
             if (File.Exists(path)) File.Delete(path);
         }
         var manifest = new InstalledManifest(ProductVersion, InputMode,
-            current.Where(p => !Preserved(p)).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray());
+            current.Where(p => !Preserved(p)).OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToArray(), Edition);
         File.WriteAllText(manifestPath + ".partial", JsonSerializer.Serialize(manifest));
         File.Move(manifestPath + ".partial", manifestPath, overwrite: true);
     }
