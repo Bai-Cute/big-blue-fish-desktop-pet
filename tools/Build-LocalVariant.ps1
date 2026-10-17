@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('Ocr', 'Vision')][string]$InputMode = 'Ocr',
     [Parameter(Mandatory = $true)][string]$SdkPath
 )

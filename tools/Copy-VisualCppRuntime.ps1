@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$Destination,[string]$SourceDirectory)
+﻿param([Parameter(Mandatory=$true)][string]$Destination,[string]$SourceDirectory)
 $ErrorActionPreference='Stop'
 if(!$SourceDirectory){
     $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'

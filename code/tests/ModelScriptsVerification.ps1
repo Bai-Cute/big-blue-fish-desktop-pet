@@ -1,4 +1,4 @@
-# These transport fixtures exercise scripts and GGUF headers, not model inference.
+﻿# These transport fixtures exercise scripts and GGUF headers, not model inference.
 $ErrorActionPreference='Stop'
 $root=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . "$root/tools/Model-Helpers.ps1"
