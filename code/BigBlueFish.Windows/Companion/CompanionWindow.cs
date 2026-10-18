@@ -189,6 +189,7 @@ public partial class MainWindow
             e.Handled = true;
             if (exitAnimation) return;
             lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+            PublishMcpInteraction("click", new { button = "right", Left, Top });
             companionContextMenu.IsOpen = true;
         };
         PreviewMouseLeftButtonDown += CompanionDown;
@@ -196,7 +197,7 @@ public partial class MainWindow
         PreviewMouseLeftButtonUp += CompanionUp;
         LostMouseCapture += (_, _) =>
         {
-            if (dragging) { dragging = false; FinishDragAnimation(); }
+            if (dragging) { dragging = false; if (dragged) PublishMcpInteraction("drag_end", new { Left, Top, cancelled = true }); FinishDragAnimation(); }
         };
         Closing += CompanionClosing;
         BuildCompanionTray();
@@ -210,6 +211,7 @@ public partial class MainWindow
         nextSpeech = DateTime.UtcNow.AddSeconds(45);
         nextAction = DateTime.UtcNow.AddSeconds(12);
         companionTimer.Start();
+        InitializeMcp();
     }
 
     private Task LoadCompanionAnimations()
@@ -335,6 +337,10 @@ public partial class MainWindow
         if (exitAnimation || e.ChangedButton != MouseButton.Left || bubble.IsMouseOver)
             return;
         e.Handled = true;
+        if (e.ClickCount == 2 && TryOpenMcpInput()) {
+            PublishMcpInteraction("click", new { button = "left", count = 2, Left, Top });
+            return;
+        }
         dragging = true;
         dragged = false;
         CancelMovement();
@@ -355,7 +361,8 @@ public partial class MainWindow
         if (Math.Abs(dx) + Math.Abs(dy) > 4 && !dragged)
         {
             dragged = true;
-            PlayCompanion("drag");
+            PublishMcpInteraction("drag_start", new { Left, Top });
+            if (!PuppetActive) PlayCompanion("drag");
         }
 
         Left = windowStart.X + dx;
@@ -373,7 +380,8 @@ public partial class MainWindow
         ClampCompanion();
         anchor = new Point(Left, Top);
         SaveCompanion();
-        if (dragged) FinishDragAnimation(); else ClickAnimation();
+        if (dragged) { PublishMcpInteraction("drag_end", new { Left, Top, cancelled = false }); FinishDragAnimation(); }
+        else { PublishMcpInteraction("click", new { button = "left", Left, Top }); ClickAnimation(); }
     }
 
     private void PlayCompanion(string name)
@@ -394,20 +402,23 @@ public partial class MainWindow
 
     private void ShowCompanionBubble(string text)
     {
+        if (PuppetActive) return;
+        externalBubble = false;
         bubbleIsModelReply = true;
         bubbleUntil = DateTime.MaxValue;
         speech.Show(text, true);
     }
 
-    private void ShowCompanionPartial(string text)
+    private void ShowCompanionPartial(string text, long? expectedVersion = null)
     {
         if (!Dispatcher.CheckAccess())
         {
-            Dispatcher.Invoke(() => ShowCompanionPartial(text));
+            Dispatcher.Invoke(() => ShowCompanionPartial(text, expectedVersion));
             return;
         }
-        if (companionClosed || exitAnimation || text.Length == 0)
+        if (companionClosed || exitAnimation || PuppetActive || text.Length == 0 || expectedVersion.HasValue && expectedVersion != speechRequestVersion)
             return;
+        externalBubble = false;
         bubbleIsModelReply = true;
         bubbleUntil = DateTime.MaxValue;
         speech.ShowPartial(text);
@@ -440,6 +451,8 @@ public partial class MainWindow
 
     private void ShowCompanionNotice(string text, bool animate = false)
     {
+        if (PuppetActive) return;
+        externalBubble = false;
         bubbleIsModelReply = false;
         bubbleUntil = DateTime.MaxValue;
         speech.Show(text, animate);
@@ -566,7 +579,7 @@ public partial class MainWindow
                 brain.Stop();
             ClearCompanionModelReply();
         }
-        else if (modelInstaller == null && preferences.ModelEnabled && brain.ModelAvailable && !speechRequestPending && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
+        else if (!PuppetActive && modelInstaller == null && preferences.ModelEnabled && brain.ModelAvailable && !speechRequestPending && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup)
         {
             nextWarmup = now.AddMinutes(2);
             _ = brain.WarmUp();
@@ -594,7 +607,8 @@ public partial class MainWindow
             return;
         if (bubble.Visibility == Visibility.Visible && now > bubbleUntil)
             bubble.Visibility = Visibility.Collapsed;
-        if (now < nextSpeech || speechRequestPending || brain.Busy || weatherRequestPending || modelInstaller != null || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower || companionSettings != null)
+        if (PuppetActive || now < nextSpeech || companionSettings != null || modelInstaller != null
+            || !HasScheduledMcpSpeech && (speechRequestPending || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower))
             return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600)
         {
@@ -602,7 +616,7 @@ public partial class MainWindow
             return;
         }
 
-        await SpeechCountdownZeroAsync();
+        if (!ConsumeMcpSpeech()) await SpeechCountdownZeroAsync();
     }
 
     private async Task SpeechCountdownZeroAsync()
@@ -610,7 +624,7 @@ public partial class MainWindow
         var foregroundHandle = speechForegroundOverride
             ?? CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
         speechForegroundOverride = null;
-        if (speechRequestPending || companionClosed || exitAnimation || modelInstaller != null || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)
+        if (PuppetActive || speechRequestPending || companionClosed || exitAnimation || modelInstaller != null || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)
             return;
 
         speechRequestPending = true;
@@ -636,7 +650,7 @@ public partial class MainWindow
             text = await brain.Generate(preferences.PublicInfo, preferences.ForegroundEnabled, foregroundHandle, partial =>
             {
                 streamed = true;
-                ShowCompanionPartial(partial);
+                ShowCompanionPartial(partial, version);
             });
         }
         finally
@@ -661,7 +675,10 @@ public partial class MainWindow
     private void BuildCompanionTray()
     {
         var menu = new CompanionTrayMenu();
-        menu.Opening += (_, _) => lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+        menu.Opening += (_, _) => {
+            lastExternalForeground = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+            foreach (int index in new[] { 2, 3 }) if (menu.Items.Count > index) menu.Items[index].Enabled = !PuppetActive;
+        };
         menu.Items.Add("显示桌宠", null, (_, _) => Dispatcher.Invoke(RestoreCompanion));
         menu.Items.Add("设置", null, (_, _) => Dispatcher.Invoke(OpenCompanionSettings));
         menu.Items.Add("天气", null, async (_, _) => await Dispatcher.InvokeAsync(SpeakCompanionWeather).Task.Unwrap());
@@ -722,6 +739,7 @@ public partial class MainWindow
         if (companionClosed)
             return;
         companionClosed = true;
+        StopMcp();
         companionContextMenu.IsOpen = false;
         companionMenuDismissal?.Dispose();
         companionTimer?.Stop();

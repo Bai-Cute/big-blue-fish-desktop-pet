@@ -80,7 +80,11 @@ internal static class InstallationLifecycle
         File.WriteAllText(Path.Combine(target, InfoName), JsonSerializer.Serialize(info));
         using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
         using var key = machine.CreateSubKey(UninstallRoot + "\\" + RegistrationName(target));
+#if COMPANION_SAFE
+        key.SetValue("DisplayName", "蓝色大肥鱼无MCP版");
+#else
         key.SetValue("DisplayName", "蓝色大肥鱼");
+#endif
         key.SetValue("DisplayVersion", FileVersionInfo.GetVersionInfo(Path.Combine(target, ApplicationName)).ProductVersion ?? typeof(InstallationLifecycle).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
         key.SetValue("Publisher", "Bai-Cute");
         key.SetValue("InstallLocation", target);

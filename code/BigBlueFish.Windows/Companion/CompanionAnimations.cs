@@ -59,8 +59,8 @@ public partial class MainWindow
         };
         videoPlayer.FramePresented += MoveWithAnimation;
         companionReady = true;
-        PlayAnimation(animationPolicy.Find("女仆屈膝礼仪"), "Startup");
-        ShowGreetingNotice(WelcomeText(DateTime.Now));
+        if (PuppetActive) PlayAnimation(animationPolicy.Find("待机呼吸休闲"), "PuppetIdle");
+        else { PlayAnimation(animationPolicy.Find("女仆屈膝礼仪"), "Startup"); ShowGreetingNotice(WelcomeText(DateTime.Now)); }
         File.WriteAllText("ready.status", "ready");
     }
     private CompanionAnimationContext AnimationContext() => new(DateTime.Now,
@@ -81,6 +81,8 @@ public partial class MainWindow
     {
         if (companionClosed) return;
         if (exitAnimation) { exitReady = true; base.Close(); return; }
+        if (!dragging && !hiddenByUser && !fullscreenHidden && PlayQueuedMcpAction()) return;
+        if (PuppetActive) { PlayAnimation(animationPolicy.Find("待机呼吸休闲"), "PuppetIdle"); return; }
         if (animationPhase == "Drag") return; // Hold the final suspended pose until mouse release.
         if (animationPhase == "Outbound" && movementRule != null)
         {
@@ -104,6 +106,7 @@ public partial class MainWindow
     }
     private void AnimationBoundary()
     {
+        if (PuppetActive) { PlayAnimation(animationPolicy.Find("待机呼吸休闲"), "PuppetIdle"); return; }
         if (exitAnimation || dragging || hiddenByUser || fullscreenHidden || companionSettings != null) { PlayIdle(); return; }
         var local = DateTime.Now;
         var date = local.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
@@ -148,18 +151,23 @@ public partial class MainWindow
     private void CancelMovement() { movementRule = null; anchor = new(Left, Top); }
     private void ClickAnimation()
     {
-        if (!companionReady || exitAnimation) return;
+        if (PuppetActive || !companionReady || exitAnimation) return;
         CancelMovement();
         PlayAnimation(animationPolicy.Choose("Click", AnimationContext(), companionRandom), "Click");
     }
     private void FinishDragAnimation()
     {
+        if (PuppetActive) return;
         CancelMovement();
-        if (companionReady && !exitAnimation) PlayIdle();
+        if (companionReady && !exitAnimation)
+        {
+            if (!PlayQueuedMcpAction())
+                if (PuppetActive) PlayAnimation(animationPolicy.Find("待机呼吸休闲"), "PuppetIdle"); else PlayIdle();
+        }
     }
     private void CompanionClosing(object? sender, CancelEventArgs e)
     {
-        if (exitReady || !companionReady || companionClosed) return;
+        if (PuppetActive || exitReady || !companionReady || companionClosed) return;
         e.Cancel = true;
         if (exitAnimation) return;
         exitAnimation = true; CancelMovement();

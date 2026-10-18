@@ -6,6 +6,7 @@
     <SupportedOSPlatformVersion Condition="'$(CompanionInputMode)' == 'Ocr'">10.0.19041.0</SupportedOSPlatformVersion>
     <DefineConstants Condition="'$(CompanionInputMode)' == 'Ocr'">$(DefineConstants);COMPANION_OCR</DefineConstants>
     <NuGetLockFilePath Condition="'$(CompanionInputMode)' == 'Vision'">packages.vision.lock.json</NuGetLockFilePath>
+    <NuGetLockFilePath Condition="'$(CompanionEdition)' == 'Safe'">packages.safe.lock.json</NuGetLockFilePath>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     <OutputType>WinExe</OutputType>
@@ -24,6 +25,7 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../BigBlueFish.Control/BigBlueFish.Control.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
     <Resource Include="Res/Font/LemiXiaoNaiPaoTi.ttf" />
     <None Update="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="assets/fish/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

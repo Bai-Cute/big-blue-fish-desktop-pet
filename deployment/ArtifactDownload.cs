@@ -29,7 +29,7 @@ internal static class ArtifactDownload
             { Timeout = TimeSpan.FromHours(2) } : null;
         var http = client ?? ownedClient!;
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
-        request.Headers.UserAgent.ParseAdd("BigBlueFish/0.5.0");
+        request.Headers.UserAgent.ParseAdd("BigBlueFish/" + typeof(ArtifactDownload).Assembly.GetName().Version!.ToString(3));
         if (offset > 0) request.Headers.Range = new RangeHeaderValue(offset, null);
         using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, token);
         if (response.StatusCode == HttpStatusCode.RequestedRangeNotSatisfiable)

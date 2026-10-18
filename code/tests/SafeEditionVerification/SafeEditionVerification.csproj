@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows10.0.26100.0</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><CompanionEdition>Safe</CompanionEdition></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../BigBlueFish.Windows/BigBlueFish.Windows.csproj" AdditionalProperties="CompanionEdition=Safe" /></ItemGroup>
+</Project>

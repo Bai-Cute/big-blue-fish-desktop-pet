@@ -86,7 +86,8 @@ internal static class ModelStore
         var folder = Path.Combine(directory, "models"); Directory.CreateDirectory(folder);
         var name = Path.GetFileName(sourcePath);
         var destination = Path.Combine(folder, name);
-        if (!Path.GetFullPath(sourcePath).Equals(Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        if (!Path.GetFullPath(sourcePath).Equals(Path.GetFullPath(destination), comparison))
         {
             var partial = destination + ".importing";
             await using (var source = File.OpenRead(sourcePath))

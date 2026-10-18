@@ -19,7 +19,7 @@ internal static class UpdateService
         using var owned = client == null ? new HttpClient { Timeout = TimeSpan.FromSeconds(20) } : null;
         var http = client ?? owned!;
         using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl ?? LatestUrl);
-        request.Headers.UserAgent.ParseAdd("BigBlueFish/0.5.0");
+        request.Headers.UserAgent.ParseAdd("BigBlueFish/" + typeof(UpdateService).Assembly.GetName().Version!.ToString(3));
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         using var response = await http.SendAsync(request, token); response.EnsureSuccessStatusCode();
         using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
@@ -27,7 +27,11 @@ internal static class UpdateService
         if (release.GetProperty("draft").GetBoolean() || release.GetProperty("prerelease").GetBoolean()) return null;
         string version = release.GetProperty("tag_name").GetString()!.TrimStart('v');
         if (!System.Version.TryParse(version, out var next) || !System.Version.TryParse(currentVersion.Split('+')[0].Split('-')[0], out var current) || next <= current) return null;
+#if COMPANION_SAFE
+        string name = $"BigBlueFish-v{version}-Safe-OCR-Setup.exe";
+#else
         string name = $"BigBlueFish-v{version}-OCR-Setup.exe";
+#endif
         var assets = release.GetProperty("assets").EnumerateArray().ToArray();
         var installer = assets.FirstOrDefault(a => a.GetProperty("name").GetString() == name);
         if (installer.ValueKind == JsonValueKind.Undefined) throw new IOException("新版本的安装器暂未准备完成，请稍后重试。");
@@ -38,7 +42,7 @@ internal static class UpdateService
             var checksum = assets.FirstOrDefault(a => a.GetProperty("name").GetString() == name.Replace(".exe", ".sha256"));
             if (checksum.ValueKind == JsonValueKind.Undefined) throw new IOException("新版本的校验文件暂未准备完成。");
             using var checksumRequest = new HttpRequestMessage(HttpMethod.Get, checksum.GetProperty("browser_download_url").GetString());
-            checksumRequest.Headers.UserAgent.ParseAdd("BigBlueFish/0.5.0");
+            checksumRequest.Headers.UserAgent.ParseAdd("BigBlueFish/" + typeof(UpdateService).Assembly.GetName().Version!.ToString(3));
             using var checksumResponse = await http.SendAsync(checksumRequest, token); checksumResponse.EnsureSuccessStatusCode();
             var line = await checksumResponse.Content.ReadAsStringAsync(token);
             hash = line.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";

@@ -68,7 +68,13 @@ internal sealed class CompanionBrain : IDisposable
     // Temporary experiment: show streamed model output as it arrives.
     internal static bool StreamingResponses { get; set; } = true;
 
-    internal CompanionBrain() : this(Process.Start, TimeSpan.FromSeconds(60)) { }
+    internal CompanionBrain() : this(
+#if COMPANION_LINUX
+        LinuxProcesses.Start,
+#else
+        Process.Start,
+#endif
+        TimeSpan.FromSeconds(60)) { }
 
     // The verification harness substitutes a real child process, not model output in the app.
     internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null, Func<double>? newsRoll = null)
@@ -151,7 +157,8 @@ internal sealed class CompanionBrain : IDisposable
 
     private async Task StartRunner(CancellationToken token)
     {
-        var path = Path.GetFullPath("runtime/llama-server.exe");
+        var path = OperatingSystem.IsWindows() ? Path.GetFullPath("runtime/llama-server.exe")
+            : Path.Combine(AppContext.BaseDirectory, "runtime", "llama-server");
         var model = BigBlueFish.Deployment.ModelStore.Resolve(Environment.CurrentDirectory);
         if (!File.Exists(path)) throw new IOException("未找到本地推理程序：" + path);
         if (model == null) throw new IOException("尚未安装可用模型，可以在设置中安装模型。");

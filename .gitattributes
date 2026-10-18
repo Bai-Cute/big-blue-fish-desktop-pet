@@ -9,3 +9,4 @@
 *.ttf binary
 *.dll binary
 *.zip binary
+*.sh text eol=lf

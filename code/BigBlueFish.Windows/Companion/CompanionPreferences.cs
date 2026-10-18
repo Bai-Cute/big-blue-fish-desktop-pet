@@ -12,6 +12,9 @@ internal sealed class CompanionPreferences
     public bool StopModelOnBattery { get; set; } = true;
     public bool HideOnFullscreen { get; set; } = true;
     public bool CheckUpdatesOnStartup { get; set; } = true;
+    public bool McpEnabled { get; set; }
+    public bool PuppetMode { get; set; }
+    public bool McpChatEnabled { get; set; }
     public string WeatherRegionCode { get; set; } = CompanionRegions.DefaultCode;
     public double Scale { get; set; } = 1;
     public double BubbleScale { get; set; } = 1;
@@ -79,6 +82,12 @@ internal sealed class CompanionPreferences
                 var s = JsonSerializer.Deserialize<CompanionPreferences>(File.ReadAllText(p));
                 if (s != null)
                 {
+#if COMPANION_SAFE
+                    s.McpEnabled = false;
+                    s.PuppetMode = false;
+                    s.McpChatEnabled = false;
+#endif
+                    if (!s.McpEnabled) s.PuppetMode = false;
                     s.Scale = Math.Clamp(s.Scale, .5, 2.0);
                     s.BubbleScale = double.IsFinite(s.BubbleScale) ? Math.Clamp(s.BubbleScale, .5, 2.0) : 1;
                     s.AnimationIntervalSeconds = Math.Clamp(s.AnimationIntervalSeconds, 30, 300);
