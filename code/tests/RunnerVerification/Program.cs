@@ -33,9 +33,13 @@ internal static class Program
 
     static async Task<int> Main(string[] args)
     {
-        if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2]);
+        if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2], args.Length < 4 || args[3] == "gpu");
         try
         {
+            if (args[0] == "--performance-export") return PerformanceVerification.Export(args[1]);
+            if (args[0] == "--latency-screen") return await LatencyVerification.Run(args[1]);
+            if (args[0] == "--latency-fixture") return await LatencyVerification.Fixture(args[1]);
+            if (args[0] == "--tray-check") return await TrayVerification.Run(args[1]);
             if (args[0] == "--news-rules") return NewsVerification.Rules();
             if (args[0] == "--news-live") return await NewsVerification.Live(args[1]);
             if (args[0] == "--speech-flow") return await SpeechFlowVerification.Run(args[1]);
@@ -82,21 +86,24 @@ internal static class Program
             { fixture.Write(0x46554747u); fixture.Write(3u); fixture.Write(1ul); fixture.Write(1ul); }
             var modePath = Path.Combine(root, "runner-mode.txt");
             var children = new List<int>();
+            var launches = new List<string[]>();
             Process? Start(ProcessStartInfo original)
             {
+                launches.Add(original.ArgumentList.ToArray());
+                bool gpu = original.ArgumentList[original.ArgumentList.IndexOf("-ngl") + 1] != "0";
                 int index = original.ArgumentList.IndexOf("--port");
                 string port = original.ArgumentList[index + 1];
                 original.FileName = Environment.ProcessPath!;
                 original.ArgumentList.Clear();
                 if (Path.GetFileNameWithoutExtension(original.FileName).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
                     original.ArgumentList.Add(Assembly.GetExecutingAssembly().Location);
-                foreach (var value in new[] { "--fake-runner", port, modePath }) original.ArgumentList.Add(value);
+                foreach (var value in new[] { "--fake-runner", port, modePath, gpu ? "gpu" : "cpu" }) original.ArgumentList.Add(value);
                 var process = Process.Start(original)!;
                 children.Add(process.Id);
                 return process;
             }
             using var weatherClient = new HttpClient(new WeatherFixture());
-            using var brain = new CompanionBrain(Start, TimeSpan.FromSeconds(5), weatherClient) { StopOnBattery = false };
+            using var brain = new CompanionBrain(Start, TimeSpan.FromSeconds(5), weatherClient, gpuDevices: _ => Task.FromResult("Vulkan0: verification GPU (16384 MiB, 15000 MiB free)")) { StopOnBattery = false };
             async Task Ensure(CancellationToken token = default) =>
                 await (Task)typeof(CompanionBrain).GetMethod("EnsureRunner", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(brain, [token])!;
             static bool Exited(int pid)
@@ -141,6 +148,10 @@ internal static class Program
             File.WriteAllText(modePath, "exit");
             try { await Ensure(); throw new Exception("Expected exited child"); } catch (IOException) { }
             Check(brain.RunnerPid == null && Exited(children[^1]), "child startup exit releases process reference");
+
+            File.WriteAllText(modePath, "out-of-memory");
+            await brain.WarmUp();
+            Check(brain.RunnerPid == null && brain.Status.Contains("内存或显存不足"), "warmup preserves startup memory failure reason and disposes failed runner");
             File.WriteAllText(modePath, "loading");
             await brain.WarmUp();
             Check(brain.RunnerPid == null && !brain.Busy && Exited(children[^1]), "warmup failure continues to clean up correctly");
@@ -149,6 +160,21 @@ internal static class Program
             Check(brain.RunnerPid != null, "warmup retries successfully on same brain");
             brain.Stop();
             Check(children.All(Exited), "no injected child remains alive after stop");
+            Check(launches.Where(a => a[Array.IndexOf(a, "-ngl") + 1] != "0").All(a => a[Array.IndexOf(a, "-ngl") + 1] == "auto" && a[Array.IndexOf(a, "--fit") + 1] == "on"), "GPU startup lets llama.cpp fit layers to available device memory");
+            Check(launches.All(a => !a.Contains("--log-disable") && a[Array.IndexOf(a, "--log-verbosity") + 1] == "1"), "startup errors remain available without verbose model request logging");
+            brain.UseGpu = false; File.WriteAllText(modePath, "ready"); await brain.WarmUp();
+            var cpu = launches[^1];
+            Check(cpu[Array.IndexOf(cpu, "-ngl") + 1] == "0" && cpu[Array.IndexOf(cpu, "--fit") + 1] == "off" && cpu[Array.IndexOf(cpu, "-ub") + 1] == "512", "CPU mode keeps explicit CPU layers and its microbatch");
+            brain.Stop(); Check(children.All(Exited), "CPU verification leaves no injected process alive");
+            brain.UseGpu = true; File.WriteAllText(modePath, "gpu-fail"); await brain.WarmUp();
+            Console.WriteLine("Fallback fixture state: pid=" + brain.RunnerPid + ", status=" + brain.Status + ", launch=" + string.Join(" ", launches[^1]));
+            Check(brain.RunnerPid != null && brain.Status.Contains("CPU兼容模式") && launches[^1][Array.IndexOf(launches[^1], "--device") + 1] == "none", "GPU initialization failure retries once on CPU and reports actual compatibility mode");
+            int fallback = brain.RunnerPid!.Value;
+            Check((await brain.Generate(false, false)).Length > 0 && brain.RunnerPid == fallback && brain.Status.Contains("CPU兼容模式"), "healthy CPU compatibility runner is reused without repeated failing GPU launches");
+            brain.Stop(); Check(children.All(Exited), "GPU fallback verification leaves no child process alive");
+            Check(CompanionBrain.GpuMicroBatch("Vulkan0: Arc (18409 MiB, 17000 MiB free)") == 2048, "high-memory GPU preserves verified microbatch");
+            Check(CompanionBrain.GpuMicroBatch("Vulkan0: AMD (8886 MiB, 8441 MiB free)\nVulkan1: RTX3050 (3979 MiB, 3382 MiB free)") == 128, "smallest reported device budget protects mixed laptop GPUs");
+            Check(CompanionBrain.GpuMicroBatch("Vulkan0: GPU (8192 MiB, 6000 MiB free)") == 512, "medium free-memory budget uses intermediate compute buffer");
 
             var content = "前台应用：Code\n窗口正文：蓝色大肥鱼项目，正在修改 CompanionBrain.cs";
             var request = CompanionBrain.SpeechRequest(content);
@@ -156,6 +182,8 @@ internal static class Program
             var ocr = CompanionBrain.OcrSpeechRequest("我：明天中午一起吃火锅，十二点见。");
             Check(ocr.Contains("明天中午一起吃火锅") && !ocr.Contains("你是"), "OCR user message preserves chat topic without persona instructions");
             var messages = CompanionBrain.BuildMessages(CompanionBrain.OcrPersona, ocr);
+            Check(((string)messages[0].content).StartsWith(CompanionBrain.FixedSpeechInstructions(CompanionBrain.OcrPersona), StringComparison.Ordinal),
+                "fixed production instructions precede variable reaction and screen data");
             Check(messages.Length == 2 && messages[0].role == "system" && messages[1].role == "user", "production messages preserve standard system/user roles");
             Check(((string)messages[0].content).Contains("聊天正文") && ((string)messages[0].content).Contains("这一回可以") && (string)messages[1].content == ocr,
                 "observer guidance and random voice are system instructions while user content is screen data");
@@ -168,9 +196,11 @@ internal static class Program
         catch (Exception error) { Console.Error.WriteLine(error); return 1; }
     }
 
-    private static async Task<int> FakeRunner(int port, string modePath)
+    private static async Task<int> FakeRunner(int port, string modePath, bool gpu)
     {
         if (File.ReadAllText(modePath) == "exit") return 1;
+        if (File.ReadAllText(modePath) == "out-of-memory") { Console.Error.WriteLine("ggml_vulkan: ErrorOutOfDeviceMemory; failed to allocate compute buffers"); return 1; }
+        if (gpu && File.ReadAllText(modePath) == "gpu-fail") { Console.Error.WriteLine("ggml_vulkan: ErrorDeviceLost"); return 1; }
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
         listener.Start();
@@ -180,12 +210,16 @@ internal static class Program
             string mode = File.ReadAllText(modePath);
             if (mode == "hang") { await Task.Delay(Timeout.InfiniteTimeSpan); continue; }
             bool health = context.Request.Url!.AbsolutePath == "/health";
+            bool template = context.Request.Url!.AbsolutePath == "/apply-template";
+            bool prefill = context.Request.Url!.AbsolutePath == "/completion";
             bool failed = health ? mode is "loading" or "unhealthy" : mode == "bad-generation";
             context.Response.StatusCode = failed ? 503 : 200;
             string response = failed ? "{\"error\":\"loading failure fixture\"}" : health ? "{\"status\":\"ok\"}"
+                : template ? "{\"prompt\":\"fixture template without production prefix\"}"
+                : prefill ? "{\"content\":\"\"}"
                 : "data: {\"choices\":[{\"delta\":{\"content\":\"主人，小女仆来给你加油啦～\"}}]}\n\ndata: [DONE]\n\n";
             var bytes = Encoding.UTF8.GetBytes(response);
-            context.Response.ContentType = health || failed ? "application/json" : "text/event-stream";
+            context.Response.ContentType = health || failed || template || prefill ? "application/json" : "text/event-stream";
             await context.Response.OutputStream.WriteAsync(bytes);
             context.Response.Close();
         }

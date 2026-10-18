@@ -167,10 +167,13 @@ public partial class MainWindow
     }
     private void CompanionClosing(object? sender, CancelEventArgs e)
     {
-        if (PuppetActive || exitReady || !companionReady || companionClosed) return;
+        if (companionClosed) return;
+        if (PuppetActive || exitReady || !companionReady) { modelInstaller?.RequestClose(); updateWindow?.RequestClose(); return; }
         e.Cancel = true;
         if (exitAnimation) return;
         exitAnimation = true; CancelMovement();
+        modelInstaller?.RequestClose();
+        updateWindow?.RequestClose();
         speechRequestVersion++;
         dragging = false; ReleaseMouseCapture();
         companionSettings?.Close();

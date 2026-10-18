@@ -104,6 +104,7 @@ internal static class Checks
     {
         try
         {
+            if (args.Length == 2 && args[0] == "--download-interrupt-worker") return DeploymentVerification.InterruptWorker(args[1]);
             if (args.Length == 2 && args[0] == "--entry-only")
             {
                 VerifyUninstallerEntry(Path.GetFullPath(args[1]), explicitArguments: false);
@@ -223,6 +224,17 @@ internal static class Checks
                 createShortcut.Invoke(null, [ownShortcut, target, "BigBlueFish.exe", ""]);
                 createShortcut.Invoke(null, [unrelatedShortcut, target + "-other", "BigBlueFish.exe", ""]);
                 createShortcut.Invoke(null, [uninstallShortcut, target, "Uninstall.exe", $"--uninstall \"{target}\""]);
+                dynamic shortcutShell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell")!)!;
+                foreach (var pair in new[] { (ownShortcut, "BigBlueFish.exe"), (uninstallShortcut, "Uninstall.exe") })
+                {
+                    dynamic shortcut = shortcutShell.CreateShortcut(pair.Item1);
+                    Check(((string)shortcut.IconLocation).Equals(Path.Combine(target, pair.Item2) + ",0", StringComparison.OrdinalIgnoreCase),
+                        "shortcut uses embedded executable icon: " + pair.Item2);
+                    System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut);
+                    using var icon = System.Drawing.Icon.ExtractAssociatedIcon(Path.Combine(target, pair.Item2));
+                    Check(icon != null && icon.Width > 0, "Windows extracts embedded shortcut icon: " + pair.Item2);
+                }
+                System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcutShell);
                 string startupName = "BigBlueFish-Verification-" + Guid.NewGuid().ToString("N");
                 using (var startup = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
                     startup.SetValue(startupName, $"\"{legacyPath}\" --example");

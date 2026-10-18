@@ -19,6 +19,7 @@ internal sealed class UpdateWindow : ModernWindow
     private readonly ProgressBar progress = new();
     private readonly Button start;
     private CancellationTokenSource? download;
+    private bool closeRequested, closed;
     internal bool InstallerStarted { get; private set; }
 
     internal UpdateWindow(AvailableUpdate update, string directory) : base("更新蓝色大肥鱼", "鱼鱼有新版本啦", "可更新到 " + update.Version, 630, 480)
@@ -27,11 +28,13 @@ internal sealed class UpdateWindow : ModernWindow
         Body.Children.Add(ModernUI.Text(update.Notes)); Body.Children.Add(progress); Body.Children.Add(status);
         Actions.Children.Add(ModernUI.Button("稍后", () => { if (download != null) download.Cancel(); else Close(); }));
         start = ModernUI.Button("下载并更新", async () => await Install(), true); Actions.Children.Add(start);
-        Closing += (_, e) => { if (download != null) { download.Cancel(); e.Cancel = true; } };
+        Closing += (_, e) => { if (download != null) { closeRequested = true; download.Cancel(); e.Cancel = true; } };
+        Closed += (_, _) => { closed = true; download?.Cancel(); };
     }
+    internal void RequestClose() { if (closed) return; closeRequested = true; download?.Cancel(); Close(); }
     private async Task Install()
     {
-        if (download != null) return;
+        if (download != null || closed || closeRequested) return;
         download = new CancellationTokenSource(); start.IsEnabled = false;
         try
         {
@@ -46,8 +49,8 @@ internal sealed class UpdateWindow : ModernWindow
             Process.Start(process); InstallerStarted = true;
         }
         catch (OperationCanceledException) { status.Text = "下载已暂停，可以稍后继续。"; }
-        catch (Exception error) { ModernUI.Error(this, "更新未完成", error); }
+        catch (Exception error) { if (!closed && !closeRequested) ModernUI.Error(this, "更新未完成", error); }
         finally { download.Dispose(); download = null; start.IsEnabled = true; }
-        if (InstallerStarted) Close();
+        if (InstallerStarted || closeRequested) Close();
     }
 }

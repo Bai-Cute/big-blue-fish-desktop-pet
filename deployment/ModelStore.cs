@@ -80,6 +80,13 @@ internal static class ModelStore
 
     internal static bool Expected(string hash) => Sources.Any(s => hash.Equals(s.Sha256, StringComparison.OrdinalIgnoreCase));
 
+    internal static void DiscardPartial(string directory, ModelSource source)
+    {
+        if (Path.GetFileName(source.FileName) != source.FileName || string.IsNullOrWhiteSpace(source.FileName))
+            throw new InvalidDataException("模型文件名无效。");
+        File.Delete(Path.Combine(Path.GetFullPath(directory), "models", source.FileName) + ".partial");
+    }
+
     internal static async Task Import(string directory, string sourcePath, string hash, CancellationToken token = default)
     {
         if (!IsGguf(sourcePath)) throw new InvalidDataException("请选择有效的 GGUF 模型文件。");

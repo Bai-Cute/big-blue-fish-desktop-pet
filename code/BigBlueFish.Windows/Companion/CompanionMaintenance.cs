@@ -20,11 +20,14 @@ public partial class MainWindow
         brain.Stop();
         var dialog = modelInstaller = new ModelInstallWindow(Environment.CurrentDirectory);
         if (companionSettings?.IsVisible == true) dialog.Owner = companionSettings;
-        dialog.ShowDialog();
-        modelInstaller = null;
-        brain.RefreshModelAvailability();
-        nextWarmup = DateTime.MinValue;
-        nextSpeech = DateTime.UtcNow.AddSeconds(20);
+        dialog.Closed += (_, _) => {
+            if (modelInstaller == dialog) modelInstaller = null;
+            if (companionClosed || exitAnimation || exitReady) return;
+            brain.RefreshModelAvailability();
+            nextWarmup = DateTime.MinValue;
+            nextSpeech = DateTime.UtcNow.AddSeconds(20);
+        };
+        dialog.Show();
     }
 
     private async Task CheckForUpdates(bool interactive)
@@ -58,8 +61,10 @@ public partial class MainWindow
         if (updateWindow != null) { updateWindow.Activate(); return; }
         var dialog = updateWindow = new UpdateWindow(availableUpdate, Environment.CurrentDirectory);
         if (companionSettings?.IsVisible == true) dialog.Owner = companionSettings;
-        dialog.ShowDialog();
-        updateWindow = null;
-        if (dialog.InstallerStarted) base.Close();
+        dialog.Closed += (_, _) => {
+            if (updateWindow == dialog) updateWindow = null;
+            if (dialog.InstallerStarted && !companionClosed && !exitAnimation && !exitReady) base.Close();
+        };
+        dialog.Show();
     }
 }

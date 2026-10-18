@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$SdkPath,
     [string]$Distribution = 'BigBlueFish-Verification',
     [ValidateSet('Standard','Safe')][string]$Edition = 'Standard',

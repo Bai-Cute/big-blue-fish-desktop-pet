@@ -16,7 +16,7 @@ using CheckBox = System.Windows.Controls.CheckBox;
 using Button = System.Windows.Controls.Button;
 using Size = System.Windows.Size;
 
-internal static class DeploymentVerification
+internal static partial class DeploymentVerification
 {
     static int count;
     static void Check(bool value, string message) { if (!value) throw new Exception(message); count++; Console.WriteLine("PASS " + message); }
@@ -92,6 +92,7 @@ internal static class DeploymentVerification
         Check(File.ReadAllText(Path.Combine(transaction, "preferences.json")) == "user settings" && File.ReadAllText(Path.Combine(transaction, "model-selection.json")) == "manual choice" && File.ReadAllText(Path.Combine(transaction, "models", "user.gguf")) == "user model", "failed update preserves settings, model and selected source");
         UpdateTransaction.Apply(transaction, archive, () => archive.ExtractToDirectory(transaction, true));
         Check(File.ReadAllText(Path.Combine(transaction, "main.bin")) == "new program" && !Directory.Exists(Path.Combine(transaction, ".update-previous")), "successful transaction installs new program and cleans temporary previous files");
+        await InterruptionRules(root);
         Console.WriteLine($"RESULT {count} deployment rules and fault checks passed; transport bytes are fixtures"); return 0;
     }
     internal static async Task<int> LiveDownload(string path)
@@ -182,6 +183,7 @@ internal static class DeploymentVerification
         var limit = System.Diagnostics.Stopwatch.StartNew(); while (!import.IsCompleted && limit.Elapsed.TotalSeconds < 10) Pump();
         consentTimer.Stop(); import.GetAwaiter().GetResult();
         Check(consent && manual.Completed && ModelStore.Resolve(manualTarget)?.EndsWith("my-model.gguf") == true, "manual model continues after consent and preserves actual filename");
+        DownloadUi(root);
         Console.WriteLine($"RESULT {count} real WPF model-install interactions passed; HTTP payload is a fixture"); return 0;
     }
     internal static int Ui(string root)

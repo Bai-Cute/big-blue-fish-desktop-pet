@@ -27,6 +27,8 @@ internal sealed class CompanionBrain : IDisposable
     private Process? runner;
     private bool runnerReady;
     private readonly Func<ProcessStartInfo, Process?> startRunner;
+    private readonly Func<CancellationToken, Task<string>> gpuDevices;
+    private bool usingCpuFallback;
     private readonly TimeSpan runnerLoadTimeout;
     private readonly CompanionJob job = new();
     private int port;
@@ -77,13 +79,56 @@ internal sealed class CompanionBrain : IDisposable
         TimeSpan.FromSeconds(60)) { }
 
     // The verification harness substitutes a real child process, not model output in the app.
-    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null, Func<double>? newsRoll = null)
+    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null, Func<double>? newsRoll = null, Func<CancellationToken, Task<string>>? gpuDevices = null)
     {
         this.startRunner = startRunner;
+        this.gpuDevices = gpuDevices ?? ReadGpuDevices;
         this.runnerLoadTimeout = runnerLoadTimeout;
         this.newsRoll = newsRoll ?? Random.Shared.NextDouble;
         weather = new CompanionWeather(weatherClient ?? publicWeb, weatherCachePath ?? (weatherClient == null ? "cache/weather.json" : null));
     }
+
+    private static MatchCollection DeviceMemory(string devices) => Regex.Matches(devices, @"\((\d+)\s+MiB,\s*(\d+)\s+MiB free\)");
+    internal static int GpuMicroBatch(string devices)
+    {
+        var memory = DeviceMemory(devices).Cast<Match>().Select(m => long.Parse(m.Groups[2].Value)).ToArray();
+        long available = memory.Length == 0 ? 0 : memory.Min();
+        return available >= 8192 ? 2048 : available >= 4096 ? 512 : 128;
+    }
+    internal JsonElement? LastTimings { get; private set; }
+    private string ReadyStatus(string text) => usingCpuFallback ? text + "（CPU兼容模式）" : text;
+
+    private async Task<string> ReadGpuDevices(CancellationToken token)
+    {
+        string path = OperatingSystem.IsWindows() ? Path.GetFullPath("runtime/llama-server.exe")
+            : Path.Combine(AppContext.BaseDirectory, "runtime", "llama-server");
+        var start = new ProcessStartInfo(path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+        start.ArgumentList.Add("--list-devices");
+        Process? probe = null;
+        try
+        {
+#if COMPANION_LINUX
+            probe = LinuxProcesses.Start(start);
+#else
+            probe = Process.Start(start);
+#endif
+            if (probe == null || !job.Attach(probe)) return "";
+            var output = probe.StandardOutput.ReadToEndAsync();
+            var errors = probe.StandardError.ReadToEndAsync();
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
+            limit.CancelAfter(TimeSpan.FromSeconds(10));
+            await probe.WaitForExitAsync(limit.Token);
+            return probe.ExitCode == 0 ? await output + "\n" + await errors : "";
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
+        catch { return ""; }
+        finally
+        {
+            if (probe != null) { try { if (!probe.HasExited) { probe.Kill(true); await probe.WaitForExitAsync(); } } finally { probe.Dispose(); } }
+        }
+    }
+
+    private sealed class GpuStartupException(string message) : IOException(message);
 
     internal const string WeatherPersona = CompanionDialogue.WeatherPersona;
     internal static string WeatherRequest(string context) => "本轮天气资料：\n" + context;
@@ -99,11 +144,12 @@ internal sealed class CompanionBrain : IDisposable
         + "\n【新闻资料结束】\n请直接对主人说两小句：先说这条新闻最重要的事，再说一点自己的感受或对主人的关切。合起来约30–60字。";
 
     internal sealed record ChatMessage(string role, object content);
+    internal static string FixedSpeechInstructions(string persona) => persona
+        + "\n本次只说鱼鱼最想说的那一小句，一个自然可爱的小反应就好。\n";
     internal static ChatMessage[] BuildMessages(string persona, string request, CompanionWindowImage? image = null)
     {
         if (persona == Persona || persona == OcrPersona)
-            persona += "\n" + CompanionDialogue.ReactionHint()
-                + "\n本次只说鱼鱼最想说的那一小句，一个自然可爱的小反应就好。";
+            persona = FixedSpeechInstructions(persona) + CompanionDialogue.ReactionHint();
         object content = image == null ? request : new object[]
         {
             new { type = "image_url", image_url = new { url = image.DataUrl } },
@@ -146,7 +192,21 @@ internal sealed class CompanionBrain : IDisposable
         token.ThrowIfCancellationRequested();
         try
         {
-            await StartRunner(token);
+            bool gpu = UseGpu;
+            int microBatch = 512;
+            if (gpu)
+            {
+                string devices = await gpuDevices(token);
+                gpu = DeviceMemory(devices).Count > 0;
+                microBatch = GpuMicroBatch(devices);
+            }
+            try { await StartRunner(token, gpu, microBatch); }
+            catch (GpuStartupException) when (gpu)
+            {
+                StopRunner();
+                token.ThrowIfCancellationRequested();
+                await StartRunner(token, false, 512);
+            }
         }
         catch
         {
@@ -155,7 +215,7 @@ internal sealed class CompanionBrain : IDisposable
         }
     }
 
-    private async Task StartRunner(CancellationToken token)
+    private async Task StartRunner(CancellationToken token, bool gpu, int microBatch)
     {
         var path = OperatingSystem.IsWindows() ? Path.GetFullPath("runtime/llama-server.exe")
             : Path.Combine(AppContext.BaseDirectory, "runtime", "llama-server");
@@ -173,9 +233,9 @@ internal sealed class CompanionBrain : IDisposable
             RedirectStandardError = true,
             RedirectStandardOutput = true
         };
-        // Text and multimodal prefill have each been tested with this Intel Vulkan/Qwen build.
-        // Intermediate ubatches and auto Flash Attention can corrupt output; GPU ubatch 2048
-        // with FA off keeps coherent output and improves first-token latency in both routes.
+        // Preserve the verified high-memory Intel profile; smaller budgets use a smaller
+        // compute buffer, while llama.cpp fits layer placement to current device memory.
+        usingCpuFallback = UseGpu && !gpu;
         var arguments = new List<string>
         {
             "-m",
@@ -191,9 +251,11 @@ internal sealed class CompanionBrain : IDisposable
             VisionAvailable ? "8192" : "2048",
 #endif
             "-ngl",
-            UseGpu ? "99" : "0",
+            gpu ? "auto" : "0",
+            "--fit",
+            gpu ? "on" : "off",
             "-ub",
-            UseGpu ? "2048" : "512",
+            (gpu ? microBatch : 512).ToString(),
             "-b",
             "2048",
             "-fa",
@@ -203,11 +265,16 @@ internal sealed class CompanionBrain : IDisposable
             "--parallel",
             "1",
             "--no-webui",
-            "--log-disable",
+            "--log-verbosity",
+            "1",
             "--jinja",
             "--reasoning",
-            "off"
+            "off",
+            "--cache-ram",
+            "512"
         };
+        if (gpu) { arguments.Add("--fit-target"); arguments.Add(microBatch >= 2048 ? "1024" : microBatch >= 512 ? "768" : "384"); }
+        if (!gpu) { arguments.Add("--device"); arguments.Add("none"); }
         if (VisionAvailable)
         {
             arguments.Add("--mmproj");
@@ -223,15 +290,22 @@ internal sealed class CompanionBrain : IDisposable
             throw new IOException("无法建立模型退出保障");
         }
 
-        runner.OutputDataReceived += (_, _) =>
+        // Keep only a bounded startup error tail in memory; no prompt or screen content is logged.
+        var startupErrors = new Queue<string>();
+        int startupComplete = 0;
+        runner.OutputDataReceived += (_, _) => { };
+        runner.ErrorDataReceived += (_, e) =>
         {
-        };
-        runner.ErrorDataReceived += (_, _) =>
-        {
+            if (string.IsNullOrWhiteSpace(e.Data) || Volatile.Read(ref startupComplete) != 0) return;
+            lock (startupErrors)
+            {
+                startupErrors.Enqueue(e.Data.Length > 500 ? e.Data[..500] : e.Data);
+                while (startupErrors.Count > 8) startupErrors.Dequeue();
+            }
         };
         runner.BeginOutputReadLine();
         runner.BeginErrorReadLine();
-        Status = "正在加载本地模型";
+        Status = ReadyStatus("正在加载本地模型");
         using var loading = CancellationTokenSource.CreateLinkedTokenSource(token);
         loading.CancelAfter(runnerLoadTimeout);
         var loadingToken = loading.Token;
@@ -243,12 +317,27 @@ internal sealed class CompanionBrain : IDisposable
                 if (!CanRunOnCurrentPower)
                     throw new OperationCanceledException();
                 if (runner.HasExited)
-                    throw new IOException("本地模型启动失败");
+                {
+                    runner.WaitForExit();
+                    string details;
+                    lock (startupErrors) details = string.Join(" ", startupErrors);
+                    if (details.Contains("OutOfDeviceMemory", StringComparison.OrdinalIgnoreCase)
+                        || details.Contains("failed to allocate", StringComparison.OrdinalIgnoreCase))
+                        throw gpu ? new GpuStartupException("本地模型加载失败：可用内存或显存不足")
+                            : new IOException("本地模型加载失败：可用内存或显存不足");
+                    string suffix = details.Length == 0 ? "" : "：" + details[^Math.Min(details.Length, 280)..];
+                    string message = $"本地模型启动失败（退出码 0x{unchecked((uint)runner.ExitCode):X8}）" + suffix;
+                    if (gpu && Regex.IsMatch(details, "Vulkan|ggml_cuda|CUDA error|ErrorDeviceLost|VK_ERROR", RegexOptions.IgnoreCase))
+                        throw new GpuStartupException(message);
+                    throw new IOException(message);
+                }
                 try
                 {
                     using var r = await local.GetAsync($"http://127.0.0.1:{port}/health", loadingToken);
                     if (r.IsSuccessStatusCode)
                     {
+                        Interlocked.Exchange(ref startupComplete, 1);
+                        await PrimeSpeechPrefix(loadingToken);
                         runnerReady = true;
                         return;
                     }
@@ -261,6 +350,39 @@ internal sealed class CompanionBrain : IDisposable
         {
             throw new TimeoutException("模型加载超时");
         }
+    }
+
+    private async Task PrimeSpeechPrefix(CancellationToken token)
+    {
+        // Qwen's recurrent state can only rewind to a saved checkpoint. A short
+        // fixed-prefix prefill creates one before the variable reaction and OCR,
+        // without storing any user's screen data or generating a visible reply.
+        string prefix = FixedSpeechInstructions(InputMode == "OCR" ? OcrPersona : Persona);
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(token);
+        limit.CancelAfter(TimeSpan.FromSeconds(8));
+        var prefillToken = limit.Token;
+        try
+        {
+            using var template = await local.PostAsJsonAsync($"http://127.0.0.1:{port}/apply-template", new
+            {
+                messages = new[] { new ChatMessage("system", prefix + CompanionDialogue.ReactionHint()), new ChatMessage("user", "") },
+                chat_template_kwargs = new { enable_thinking = false }
+            }, prefillToken);
+            template.EnsureSuccessStatusCode();
+            using var document = JsonDocument.Parse(await template.Content.ReadAsStringAsync(prefillToken));
+            string formatted = document.RootElement.GetProperty("prompt").GetString()!;
+            int end = formatted.IndexOf(prefix, StringComparison.Ordinal);
+            if (end < 0) return; // A user-supplied model may use a different template.
+            using var prefill = await local.PostAsJsonAsync($"http://127.0.0.1:{port}/completion", new
+            {
+                prompt = formatted[..(end + prefix.Length)], n_predict = 0, cache_prompt = true
+            }, prefillToken);
+            prefill.EnsureSuccessStatusCode();
+        }
+        catch (HttpRequestException) { } // Optional optimization; ordinary completion remains available.
+        catch (JsonException) { }
+        catch (KeyNotFoundException) { }
+        catch (OperationCanceledException) when (!token.IsCancellationRequested) { }
     }
 
     internal void RefreshWeather() => _ = weather.RefreshIfDue(WeatherRegionCode);
@@ -281,7 +403,7 @@ internal sealed class CompanionBrain : IDisposable
             await EnsureRunner(token);
             Status = "正在生成天气播报";
             var text = await Complete(WeatherPersona, WeatherRequest(context), CompanionDialogue.Temperature, token, onPartial: onPartial);
-            Status = "本地模型就绪";
+            Status = ReadyStatus("本地模型就绪");
             return CanRunOnCurrentPower ? text : "";
         }
         catch (OperationCanceledException) { Status = "天气播报已取消"; return ""; }
@@ -315,6 +437,7 @@ internal sealed class CompanionBrain : IDisposable
     private async Task<string> CompleteRequest(string persona, string request, double temperature, CancellationToken token, CompanionWindowImage? image = null, Action<string>? onPartial = null)
     {
         var messages = BuildMessages(persona, request, image);
+        LastTimings = null;
         var payload = new
         {
             model = "local",
@@ -323,6 +446,8 @@ internal sealed class CompanionBrain : IDisposable
             top_p = .9,
             max_tokens = persona == NewsPersona ? 160 : persona == WeatherPersona ? 220 : 180,
             stream = StreamingResponses,
+            cache_prompt = true,
+            stream_options = new { include_usage = true },
             chat_template_kwargs = new { enable_thinking = false }
         };
         if (App.Args.Contains("--test-mode"))
@@ -339,6 +464,7 @@ internal sealed class CompanionBrain : IDisposable
         if (!StreamingResponses)
         {
             using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
+            if (document.RootElement.TryGetProperty("timings", out var timings)) LastTimings = timings.Clone();
             return Clean(document.RootElement.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "");
         }
 
@@ -355,6 +481,7 @@ internal sealed class CompanionBrain : IDisposable
             try
             {
                 using var chunk = JsonDocument.Parse(data);
+                if (chunk.RootElement.TryGetProperty("timings", out var timings)) LastTimings = timings.Clone();
                 if (!chunk.RootElement.TryGetProperty("choices", out var choices) || choices.GetArrayLength() == 0)
                     continue;
                 var choice = choices[0];
@@ -496,7 +623,7 @@ internal sealed class CompanionBrain : IDisposable
 #endif
             if (news != null && text.Length > 0)
                 lastNewsTitle = news.Title;
-            Status = "本地模型就绪";
+            Status = ReadyStatus("本地模型就绪");
             return CanRunOnCurrentPower ? text : "";
         }
         catch (OperationCanceledException)
@@ -578,6 +705,7 @@ internal sealed class CompanionBrain : IDisposable
     private void StopRunner()
     {
         runnerReady = false;
+        usingCpuFallback = false;
         try
         {
             if (runner is { HasExited: false })
@@ -610,12 +738,13 @@ internal sealed class CompanionBrain : IDisposable
         try
         {
             await EnsureRunner(active.Token);
-            Status = "本地模型已驻留";
+            Status = ReadyStatus("本地模型已驻留");
         }
-        catch (Exception)
+        catch (Exception error)
         {
             StopRunner();
-            Status = "模型未就绪，稍后重试";
+            Status = error is IOException ? error.Message
+                : error is TimeoutException ? "模型加载超时，稍后重试" : "模型未就绪，稍后重试";
         }
         finally
         {

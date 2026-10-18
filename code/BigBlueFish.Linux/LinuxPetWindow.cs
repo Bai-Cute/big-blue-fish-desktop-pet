@@ -110,6 +110,7 @@ internal sealed partial class LinuxPetWindow : Window
         PointerCaptureLost += (_, _) => { if (dragging) { dragging = false; if (dragged) PublishInteraction("drag_end", new { Position.X, Position.Y, cancelled = true }); if (!Puppet) Idle(); } };
         Closing += (_, e) => {
             Save();
+            CloseModelInstaller();
             if (exitReady || closed || Puppet) return;
             e.Cancel = true; if (phase == "Exit") return;
             speechVersion++; brain.Stop(); moveRule = null; settings?.Close(); hidden = false; fullscreenHidden = false; Show(); player.Paused = false;

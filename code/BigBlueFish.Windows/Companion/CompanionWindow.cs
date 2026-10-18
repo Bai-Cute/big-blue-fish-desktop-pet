@@ -200,6 +200,7 @@ public partial class MainWindow
             if (dragging) { dragging = false; if (dragged) PublishMcpInteraction("drag_end", new { Left, Top, cancelled = true }); FinishDragAnimation(); }
         };
         Closing += CompanionClosing;
+        Closed += (_, _) => ShutdownCompanion();
         BuildCompanionTray();
         SystemEvents.PowerModeChanged += CompanionPowerChanged;
         SystemEvents.DisplaySettingsChanged += CompanionDisplayChanged;
@@ -686,19 +687,21 @@ public partial class MainWindow
         menu.Items.Add("关闭桌宠", null, (_, _) => Dispatcher.Invoke(() => base.Close()));
         string[] icons = ["\uE7F4", "\uE713", "\uE706", "\uE8F2", "\uE8BB"];
         for (int index = 0; index < menu.Items.Count; index++) menu.Items[index].Tag = icons[index];
-        notifyIcon = new Forms.NotifyIcon
+        using var sourceIcon = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.ico"));
+        notifyIcon = new CompanionTrayIcon
         {
-            Icon = new System.Drawing.Icon("BigBlueFish.ico"),
+            Icon = new System.Drawing.Icon(sourceIcon, new System.Drawing.Size(32, 32)),
             Text = "蓝色大肥鱼",
-            Visible = true,
             ContextMenuStrip = menu
         };
         notifyIcon.DoubleClick += (_, _) => Dispatcher.Invoke(RestoreCompanion);
         notifyIcon.BalloonTipClicked += (_, _) => Dispatcher.Invoke(OpenUpdateWindow);
+        notifyIcon.Visible = true;
     }
 
     private void RestoreCompanion()
     {
+        if (companionClosed || exitAnimation || exitReady) return;
         hiddenByUser = false;
         Show();
         ClampCompanion();
@@ -707,6 +710,7 @@ public partial class MainWindow
 
     private void HideCompanion()
     {
+        if (companionClosed || exitAnimation || exitReady) return;
         hiddenByUser = true;
         speech.Cancel();
         if (brain.CanRunOnCurrentPower)
@@ -739,6 +743,8 @@ public partial class MainWindow
         if (companionClosed)
             return;
         companionClosed = true;
+        modelInstaller?.RequestClose();
+        updateWindow?.RequestClose();
         StopMcp();
         companionContextMenu.IsOpen = false;
         companionMenuDismissal?.Dispose();
@@ -751,7 +757,7 @@ public partial class MainWindow
         companionSettings?.Close();
         SystemEvents.PowerModeChanged -= CompanionPowerChanged;
         SystemEvents.DisplaySettingsChanged -= CompanionDisplayChanged;
-        notifyIcon?.Dispose();
+        if (notifyIcon != null) { notifyIcon.Visible = false; notifyIcon.Dispose(); }
         instanceLock?.Dispose();
         singleInstance?.Dispose();
         System.Windows.Application.Current.Shutdown();

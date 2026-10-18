@@ -279,7 +279,7 @@ internal sealed class InstallerForm : ModernWindow
             shortcut.TargetPath = Path.Combine(target, executableName);
             shortcut.Arguments = arguments;
             shortcut.WorkingDirectory = target;
-            shortcut.IconLocation = Path.Combine(target, "BigBlueFish.ico") + ",0";
+            shortcut.IconLocation = Path.Combine(target, executableName) + ",0";
             shortcut.Description = "蓝色大肥鱼桌宠";
             shortcut.Save();
         }

@@ -13,7 +13,7 @@ public partial class MainWindow
     private Action? disposeCompanionSettingsContent;
     private void OpenCompanionSettings()
     {
-        if (exitAnimation) return;
+        if (exitAnimation || companionClosed || exitReady) return;
         if (companionSettings != null)
         {
             ActivateCompanionSettings(companionSettings);

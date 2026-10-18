@@ -61,6 +61,8 @@ internal static class ArtifactDownload
                 received += read; progress?.Report(new Progress(received, total));
             }
         }
+        if (total > 0 && new FileInfo(partial).Length < total)
+            throw new IOException("下载连接提前结束，已有进度已保留，请重试。");
         if (await ModelStore.Hash(partial, token) != expectedHash)
         {
             File.Delete(partial);

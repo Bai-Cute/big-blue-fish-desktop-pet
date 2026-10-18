@@ -30,6 +30,7 @@ internal static class Program
     [DllImport("user32.dll")] static extern bool SetCursorPos(int x, int y);
     [DllImport("user32.dll")] static extern bool GetCursorPos(out System.Drawing.Point point);
     [DllImport("user32.dll")] static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [DllImport("user32.dll")] static extern void keybd_event(byte key, byte scan, uint flags, UIntPtr extra);
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern IntPtr FindWindow(string? className, string title);
@@ -237,14 +238,39 @@ internal static class Program
                 Wait(() => pet.GetType().GetField("mcpInput", Access)!.GetValue(pet) != null, 4, "Actual double-click opens input with connected enabled MCP chat");
                 var inputWindow = (Window)Read("mcpInput"); Pump(150);
                 var input = Descendants<TextBox>(inputWindow).Single();
+                const string hint = "通过鱼鱼和已连接的Agent说话";
+                var placeholder = Descendants<TextBlock>(inputWindow).Single(t => t.Text == hint);
+                Check(inputWindow.WindowStyle == System.Windows.WindowStyle.None && !inputWindow.ShowInTaskbar && inputWindow.Owner == pet && inputWindow.Topmost, "Input is a frameless pet attachment, without independent title bar or taskbar button");
+                Check(inputWindow.Width <= 354 && inputWindow.Height <= 120 && placeholder.IsVisible && placeholder.Foreground == Brushes.Gray, "Compact input shows the exact gray placeholder while empty");
+                Check(GetForegroundWindow() == Handle(inputWindow) && input.IsKeyboardFocused, "Explicit double-click gives only the editor keyboard focus");
+                Render((Visual)inputWindow.Content, "mcp-input-empty.png", (int)inputWindow.ActualWidth, (int)inputWindow.ActualHeight);
+                var area = CompanionEdgeLayout.WorkArea(pet);
+                foreach (var scale in new[] { .5, 1d, 2d })
+                    foreach (var corner in new[] { (area.Left, area.Top), (area.Right, area.Top), (area.Left, area.Bottom), (area.Right, area.Bottom) }) {
+                        client.Data("update_settings", new { settings = new { Scale = scale, Left = corner.Item1, Top = corner.Item2 } }); Pump(100);
+                        area = CompanionEdgeLayout.WorkArea(pet);
+                        Check(inputWindow.Left >= area.Left && inputWindow.Top >= area.Top && inputWindow.Left+inputWindow.Width <= area.Right+1 && inputWindow.Top+inputWindow.Height <= area.Bottom+1, "Attached input fits work area at scale=" + scale + " corner=" + corner);
+                    }
+                client.Data("update_settings", new { settings = new { Scale = 1d, Left = area.Right-800, Top = area.Bottom-450 } }); Pump(100);
+                double beforeX = inputWindow.Left, beforeY = inputWindow.Top;
+                DragPetByMouse(); Pump(100);
+                Check(Math.Abs(inputWindow.Left-beforeX)+Math.Abs(inputWindow.Top-beforeY)>5, "Input follows the actual dragged pet");
+                input.Text = "暂存草稿"; pet.Hide(); Pump(100);
+                Check(!inputWindow.IsVisible && input.Text == "暂存草稿", "Pet hiding hides the attached input and retains draft");
+                pet.Show(); Pump(150); inputWindow.Activate(); input.Focus();
+                Check(inputWindow.IsVisible && input.Text == "暂存草稿", "Showing the pet restores the same attached input");
                 const string submitted = "主人输入的原文\n第二行：ABC <> &，都原样传递~";
                 input.Text = submitted;
                 Pump(50);
+                Check(!placeholder.IsVisible, "Placeholder disappears while typing");
                 Render((Visual)inputWindow.Content, "mcp-input.png", (int)inputWindow.ActualWidth, (int)inputWindow.ActualHeight);
-                Descendants<Button>(inputWindow).Single(b => b.Content?.ToString() == "发送 · Ctrl+Enter").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                keybd_event(0x11,0,0,UIntPtr.Zero); keybd_event(0x0D,0,0,UIntPtr.Zero); Pump(30); keybd_event(0x0D,0,2,UIntPtr.Zero); keybd_event(0x11,0,2,UIntPtr.Zero); Pump(100);
                 client.Data("get_settings");
                 Check(client.Events.Any(e => e.TryGetProperty("method", out var method) && method.GetString() == "notifications/message" && e.GetProperty("params").GetProperty("data").GetProperty("kind").GetString() == "user_message" && e.GetProperty("params").GetProperty("data").GetProperty("detail").GetProperty("text").GetString() == submitted), "User message pushed through actual MCP unchanged");
-                Check(input.Text.Length == 0, "Successful send clears input"); inputWindow.Close();
+                Check(input.Text.Length == 0 && placeholder.IsVisible, "Actual Ctrl+Enter sends, clears input and restores placeholder");
+                Check(pet.Topmost && !pet.ShowActivated && (WindowStyle(Handle(pet),-20).ToInt64() & 0x08000008) == 0x08000008, "Typing preserves pet topmost non-activating policy");
+                keybd_event(0x1B,0,0,UIntPtr.Zero); keybd_event(0x1B,0,2,UIntPtr.Zero); Pump(100);
+                Check(pet.GetType().GetField("mcpInput",Access)!.GetValue(pet) == null, "Escape closes the attached editor");
                 if (args.Contains("--input-only")) { Field("exitReady", true); pet.Close(); Console.WriteLine($"Input UI: {checks} checks passed."); return 0; }
                 var denied = client.Call("update_settings", new { settings = new { McpEnabled = false, Scale = 2 } });
                 Check(denied.GetProperty("isError").GetBoolean(), "Agent cannot disable MCP");
@@ -304,7 +330,7 @@ internal static class Program
             }
             Pump(600);
             var disconnectedInput = (Window)Read("mcpInput");
-            Check(!Descendants<Button>(disconnectedInput).Single(b => b.Content?.ToString() == "发送 · Ctrl+Enter").IsEnabled, "Disconnect disables sending in the already-open input");
+            Check(!Descendants<Button>(disconnectedInput).Single(b => b.Content?.ToString() == "发送").IsEnabled, "Disconnect disables sending in the already-open input");
             Check(Descendants<TextBox>(disconnectedInput).Single().Text == "断线时保留这条草稿", "Disconnect preserves unsent draft");
             Check(!(bool)Invoke("TryOpenMcpInput")!, "Disconnected double-click cannot open chat");
             Check((bool)pet.GetType().GetProperty("PuppetActive", Access)!.GetValue(pet)! && (string)Read("currentAction") == "待机呼吸休闲", "Disconnect keeps puppet mode and fixed idle");

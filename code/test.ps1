@@ -2,6 +2,7 @@
 $ErrorActionPreference='Stop'
 Push-Location $PSScriptRoot
 try {
+    & "$PSScriptRoot/tests/PowerShellEncodingVerification.ps1"
     if(Get-CimInstance Win32_Process -Filter "Name='BigBlueFish.exe' OR Name='VPet-Simulator.Windows.exe'"){throw '请先从托盘菜单退出桌宠，再执行实窗测试。'}
     $sdk=& "$PSScriptRoot/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
     $sandbox=Join-Path $PSScriptRoot '.verification'

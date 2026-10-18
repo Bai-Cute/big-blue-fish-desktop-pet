@@ -156,7 +156,7 @@ internal static class Program
         menu.IsOpen=true;Pump();items[3].RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));Pump();
         Check(!w.IsVisible&&(bool)Read(w,"hiddenByUser"),"styled hide action uses existing hide lifecycle");
         Invoke(w,"RestoreCompanion");Pump();Check(w.IsVisible&&!(bool)Read(w,"hiddenByUser"),"existing restore still works");
-        var tray=(System.Windows.Forms.ContextMenuStrip)((System.Windows.Forms.NotifyIcon)Read(w,"notifyIcon")).ContextMenuStrip!;
+        var tray=(System.Windows.Forms.ContextMenuStrip)((CompanionTrayIcon)Read(w,"notifyIcon")).ContextMenuStrip!;
         Check(tray.Renderer.GetType().Name=="CompanionTrayMenuRenderer"&&!tray.ShowImageMargin,"tray uses matching palette without obsolete image gutter");
         Check(tray.Items.Cast<System.Windows.Forms.ToolStripItem>().Select(i=>i.Text).SequenceEqual(new[]{"显示桌宠","设置","天气","吐字测试","关闭桌宠"}),"tray retains all original actions");
         tray.Show(new System.Drawing.Point(500,300));System.Windows.Forms.Application.DoEvents();
@@ -211,6 +211,13 @@ internal static class Program
             string sandbox=Path.GetFullPath(args[0]);Directory.CreateDirectory(sandbox);
             var app=new App();app.InitializeComponent();typeof(Application).GetField("_startupUri",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(app,null);app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
             Directory.SetCurrentDirectory(sandbox);
+            if(args.Contains("--menus"))
+            {
+                // Exercise the installed-but-disabled path; no inference uses this header fixture.
+                Directory.CreateDirectory("models");
+                using var fixture = new System.IO.BinaryWriter(File.Create("models/Qwen3.5-4B-heretic-Q4_K_M.gguf"));
+                fixture.Write(0x46554747u);fixture.Write(3u);fixture.Write(1ul);fixture.Write(1ul);
+            }
             File.Copy(Path.Combine(AppContext.BaseDirectory,"BigBlueFish.ico"),"BigBlueFish.ico",true);
             File.WriteAllText("preferences.json","{\"ModelEnabled\":false,\"PublicInfo\":false,\"ForegroundEnabled\":false,\"Scale\":1,\"Left\":400,\"Top\":250,\"WeatherRegionCode\":\"340104\",\"BubbleDurationIndex\":5,\"AnimationIntervalSeconds\":40}");
             var native=typeof(App).Assembly.GetType("BigBlueFish.Windows.CompanionNative")!;

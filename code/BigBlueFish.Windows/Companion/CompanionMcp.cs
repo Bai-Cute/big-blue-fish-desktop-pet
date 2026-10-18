@@ -283,31 +283,83 @@ public partial class MainWindow
     private bool TryOpenMcpInput()
     {
         if (!McpInputAvailable || exitAnimation || companionClosed) return false;
-        if (mcpInput != null) { ActivateCompanionSettings(mcpInput); return true; }
-        var window = new ModernWindow("与鱼鱼对话", "想和鱼鱼说些什么？", "通过已连接的 Agent 与鱼鱼说话。", 570, 480);
-        var text = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxLength = 4000, Height = 130, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalContentAlignment = VerticalAlignment.Top, Padding = new Thickness(12) };
-        var status = new TextBlock { Foreground = Brushes.SlateGray, Margin = new Thickness(0, 12, 0, 0) };
-        window.Body.Children.Add(text); window.Body.Children.Add(status);
+        if (mcpInput != null) { mcpInput.Show(); mcpInput.Activate(); return true; }
+        const string hint = "通过鱼鱼和已连接的Agent说话";
+        var blue = new SolidColorBrush(global::BigBlueFish.Windows.CompanionBubble.HairBlue);
+        var text = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MaxLength = 4000,
+            Height = 56, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalContentAlignment = VerticalAlignment.Top,
+            FontSize = 14, Foreground = blue, Background = Brushes.Transparent, BorderThickness = new Thickness(0), Padding = new Thickness(0, 2, 22, 0) };
+        System.Windows.Automation.AutomationProperties.SetName(text, hint);
+        var placeholder = new TextBlock { Text = hint, Foreground = Brushes.Gray, FontSize = 14,
+            Margin = new Thickness(2, 4, 22, 0), IsHitTestVisible = false, TextWrapping = TextWrapping.Wrap };
+        var editor = new Grid(); editor.Children.Add(text); editor.Children.Add(placeholder);
+        var status = new TextBlock { Text = "Ctrl+Enter 发送", Foreground = Brushes.SlateGray, FontSize = 11,
+            VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 8, 0) };
+        var content = new StackPanel(); content.Children.Add(editor);
+        var frame = new Border { Background = new SolidColorBrush(Color.FromRgb(255, 251, 244)), BorderBrush = blue,
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), Child = content };
+        var window = new Window { Title = "蓝色大肥鱼 · 输入", Width = 354, Height = 120, WindowStyle = WindowStyle.None,
+            AllowsTransparency = true, Background = Brushes.Transparent, ResizeMode = ResizeMode.NoResize,
+            ShowInTaskbar = false, ShowActivated = false, Topmost = true, Owner = this, Content = frame, FontFamily = new FontFamily("Microsoft YaHei UI") };
+        using (var theme = typeof(ModernWindow).Assembly.GetManifestResourceStream("BigBlueFish.ModernTheme.xaml")!)
+        {
+            var resources = (ResourceDictionary)System.Windows.Markup.XamlReader.Load(theme);
+            window.Resources[typeof(Button)] = resources[typeof(Button)];
+        }
+        var close = new Button { Content = "×", Width = 20, Height = 20, Padding = new Thickness(0), FontSize = 16,
+            MinHeight = 0, Margin = new Thickness(0),
+            HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top,
+            Foreground = blue, Background = Brushes.Transparent, BorderThickness = new Thickness(0), ToolTip = "收起输入框" };
+        close.Click += (_, _) => window.Close(); editor.Children.Add(close);
         void Send()
         {
             if (!McpInputAvailable || string.IsNullOrWhiteSpace(text.Text)) return;
             PublishMcpInteraction("user_message", new { text = text.Text });
             text.Clear(); status.Text = "已发送给 Agent"; text.Focus();
         }
-        var send = ModernUI.Button("发送 · Ctrl+Enter", Send, true); window.Actions.Children.Add(send); window.Actions.Children.Add(ModernUI.Button("关闭", window.Close));
-        text.TextChanged += (_, _) => send.IsEnabled = McpInputAvailable && !string.IsNullOrWhiteSpace(text.Text);
-        text.PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control) { e.Handled = true; Send(); } };
+        var send = ModernUI.Button("发送", Send, true); send.MinWidth = 58; send.MinHeight = 0; send.Margin = new Thickness(0); send.Padding = new Thickness(12, 5, 12, 5); send.FontSize = 12;
+        var actions = new Grid { Margin = new Thickness(0, 4, 0, 0) };
+        actions.ColumnDefinitions.Add(new ColumnDefinition()); actions.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        actions.Children.Add(status); actions.Children.Add(send); Grid.SetColumn(send, 1); content.Children.Add(actions);
+        text.TextChanged += (_, _) => { placeholder.Visibility = text.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed; send.IsEnabled = McpInputAvailable && !string.IsNullOrWhiteSpace(text.Text); };
+        window.PreviewKeyDown += (_, e) => {
+            if (e.Key == System.Windows.Input.Key.Escape) { e.Handled = true; window.Close(); }
+            else if (e.Key == System.Windows.Input.Key.Enter && System.Windows.Input.Keyboard.Modifiers == System.Windows.Input.ModifierKeys.Control) { e.Handled = true; Send(); }
+        };
+        bool positioning = false;
+        void Follow()
+        {
+            if (positioning || mcpInput != window) return;
+            positioning = true;
+            try {
+                if (!IsVisible) { window.Hide(); return; }
+                var area = CompanionEdgeLayout.WorkArea(this); var body = CompanionEdgeLayout.PetBounds(this);
+                window.Width = Math.Min(354, Math.Max(160, area.Width - 16));
+                double x = Left + body.Left - window.Width - 8;
+                if (x < area.Left + 8) x = Left + body.Right + 8;
+                double y = Top + body.Bottom - window.Height;
+                window.Left = Math.Clamp(x, area.Left + 8, Math.Max(area.Left + 8, area.Right - window.Width - 8));
+                window.Top = Math.Clamp(y, area.Top + 8, Math.Max(area.Top + 8, area.Bottom - window.Height - 8));
+                if (!window.IsVisible) window.Show();
+            } finally { positioning = false; }
+        }
+        EventHandler moved = (_, _) => Follow();
+        SizeChangedEventHandler resized = (_, _) => Follow();
+        DependencyPropertyChangedEventHandler visibility = (_, _) => Follow();
+        DpiChangedEventHandler dpiChanged = (_, _) => Follow();
+        LocationChanged += moved; SizeChanged += resized; IsVisibleChanged += visibility; DpiChanged += dpiChanged;
         var clock = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         clock.Tick += (_, _) => {
             if (!preferences.McpEnabled || !preferences.McpChatEnabled) { window.Close(); return; }
+            Follow();
             send.IsEnabled = McpInputAvailable && !string.IsNullOrWhiteSpace(text.Text);
             if (!McpInputAvailable) status.Text = "Agent 已断开，重新连接后可发送。";
-            else if (status.Text.StartsWith("Agent 已断开")) status.Text = "Agent 已连接";
+            else if (status.Text.StartsWith("Agent 已断开")) status.Text = "Ctrl+Enter 发送";
         };
         clock.Start(); mcpInput = window;
-        window.Closed += (_, _) => { clock.Stop(); mcpInput = null; };
+        window.Closed += (_, _) => { clock.Stop(); LocationChanged -= moved; SizeChanged -= resized; IsVisibleChanged -= visibility; DpiChanged -= dpiChanged; mcpInput = null; };
         window.Loaded += (_, _) => { text.Focus(); send.IsEnabled = false; };
-        window.Show(); return true;
+        Follow(); window.Activate(); return true;
     }
 #endif
 }

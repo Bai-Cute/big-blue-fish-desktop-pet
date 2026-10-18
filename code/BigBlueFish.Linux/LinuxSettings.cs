@@ -43,7 +43,7 @@ internal sealed partial class LinuxPetWindow
         FontFamily = new FontFamily("Noto Sans CJK SC"), FontSize = 14,
         WindowStartupLocation = WindowStartupLocation.CenterScreen, Background = new SolidColorBrush(Color.FromRgb(247, 248, 251)),
         Content = new Border { Padding = new Thickness(28), Child = content } };
-    async Task<bool> Confirm(string title, string message, string accept = "确定", CancellationToken token = default)
+    async Task<bool> Confirm(string title, string message, string accept = "确定", CancellationToken token = default, string reject = "取消")
     {
         if (consentOpen) throw new InvalidOperationException("请先处理已打开的提示窗口。");
         consentOpen = true; bool accepted = false;
@@ -51,7 +51,7 @@ internal sealed partial class LinuxPetWindow
             var panel = new StackPanel { Spacing = 15 };
             panel.Children.Add(new TextBlock { Text = title, FontSize = 23, FontWeight = FontWeight.SemiBold }); panel.Children.Add(Paragraph(message));
             var dialog = Dialog(title, panel); var buttons = new WrapPanel();
-            buttons.Children.Add(ActionButton(accept, () => { accepted = true; dialog.Close(); })); buttons.Children.Add(ActionButton("取消", dialog.Close)); panel.Children.Add(buttons);
+            buttons.Children.Add(ActionButton(accept, () => { accepted = true; dialog.Close(); })); buttons.Children.Add(ActionButton(reject, dialog.Close)); panel.Children.Add(buttons);
             using var registration = token.Register(() => Dispatcher.UIThread.Post(() => { accepted = false; dialog.Close(); }));
             var finished = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             dialog.Closed += (_, _) => finished.TrySetResult(accepted && !token.IsCancellationRequested);

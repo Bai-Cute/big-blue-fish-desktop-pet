@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Run against an actual published Linux app under an isolated X11 desktop."""
-import base64, json, os, pathlib, queue, subprocess, sys, threading, time
+import base64, json, os, pathlib, queue, subprocess, sys, threading, time, xml.etree.ElementTree as ET
 
 payload = pathlib.Path(sys.argv[1]).resolve()
 data = pathlib.Path(sys.argv[2]).resolve()
@@ -65,7 +65,8 @@ try:
     def content(name, **arguments): return json.loads(tool(name,**arguments)['content'][0]['text'])
     init=request('initialize',dict(protocolVersion='2025-11-25',capabilities={},clientInfo=dict(name='Linux verification',version='1')))
     bridge.stdin.write('{"jsonrpc":"2.0","method":"notifications/initialized"}\n'); bridge.stdin.flush()
-    check(init['serverInfo']['version']=='1.0.0','real stdio bridge negotiates version')
+    version=ET.parse(pathlib.Path(__file__).resolve().parents[3]/'Version.props').findtext('.//Version')
+    check(init['serverInfo']['version']==version,'real stdio bridge negotiates current version')
     check(len(request('tools/list')['tools'])==9,'all MCP tools available')
     check(len(content('list_actions'))==106,'same 106 production actions')
     text='主人，Linux 端收到的原文呀~ ABC 123'
@@ -100,14 +101,31 @@ try:
         for window in search.stdout.splitlines():
             geometry=subprocess.run(['xdotool','getwindowgeometry','--shell',window],env=env,text=True,capture_output=True)
             values=dict(line.split('=',1) for line in geometry.stdout.splitlines() if '=' in line)
-            if int(values.get('WIDTH',0))>=500 and int(values.get('HEIGHT',0))>=400:return window
+            if 300<=int(values.get('WIDTH',0))<=354 and 100<=int(values.get('HEIGHT',0))<=120:return window
         return None
     entry=wait(input_window,5)
     check(bool(entry),'actual double-click opens input only after enabling connected MCP chat')
+    command('render-input'); wait(lambda:(data/'input.png').exists())
+    (data/'input-empty.png').write_bytes((data/'input.png').read_bytes())
+    geometry=subprocess.check_output(['xdotool','getwindowgeometry','--shell',entry],env=env,text=True)
+    dimensions=dict(line.split('=',1) for line in geometry.splitlines() if '=' in line)
+    check(int(dimensions['WIDTH'])<=354 and int(dimensions['HEIGHT'])<=120,'input is a compact pet attachment')
+    content('update_settings',settings={'Left':500,'Top':300})
+    time.sleep(.5)
+    moved_geometry=subprocess.check_output(['xdotool','getwindowgeometry','--shell',entry],env=env,text=True)
+    check(moved_geometry!=geometry,'attached input follows MCP pet movement')
+    command('hide'); wait(lambda:state()['hidden'])
+    def input_hidden():
+        result=subprocess.run(['xdotool','search','--onlyvisible','--pid',str(app.pid)],env=env,text=True,capture_output=True)
+        return entry not in result.stdout.splitlines()
+    check(wait(input_hidden,3),'hiding pet hides its attached editor')
+    command('show'); wait(lambda:state()['visible'] and not state()['hidden'])
+    wait(lambda:input_window()==entry,3)
+    check(True,'restoring pet restores the same attached editor')
     subprocess.run(['xdotool','windowactivate','--sync',entry],check=True,env=env)
     message='Hello fish from Linux 123 & <>'
     subprocess.run(['xdotool','type','--clearmodifiers','--delay','3',message],check=True,env=env)
-    command('render-input');wait(lambda:(data/'input.png').exists())
+    (data/'input.png').unlink(); command('render-input');wait(lambda:(data/'input.png').exists())
     subprocess.run(['xdotool','key','ctrl+Return'],check=True,env=env);time.sleep(.4)
     content('get_settings')
     submitted=[e['params']['data']['detail']['text'] for e in events if e.get('params',{}).get('data',{}).get('kind')=='user_message']
@@ -141,6 +159,10 @@ try:
     content('update_settings',settings={'PuppetMode':False,'BubbleScale':1.2})
     wait(lambda:not state()['Puppet'])
     check(json.loads((data/'preferences.json').read_text())['BubbleScale']==1.2,'settings saved and puppet disabled explicitly')
+    # Keep the physical drag target outside the centered consent window and fixture.
+    # An obscured point belongs to the window covering it, not the pet beneath it.
+    content('update_settings',settings={'Left':900,'Top':450})
+    wait(lambda:abs(state()['X']-900)<2 and abs(state()['Y']-450)<2)
     prior_windows=set(subprocess.check_output(['xdotool','search','--onlyvisible','--pid',str(app.pid)],env=env,text=True).splitlines())
     request_id+=1; consent_id=request_id
     bridge.stdin.write(json.dumps(dict(jsonrpc='2.0',id=consent_id,method='tools/call',params=dict(name='update_settings',arguments=dict(settings={'PuppetMode':True}))))+'\n');bridge.stdin.flush()
@@ -149,6 +171,9 @@ try:
         extra=windows-prior_windows
         return next(iter(extra)) if extra else None
     notice=wait(consent_window,6); before_drag=state(); x,y=before_drag['X']+250,before_drag['Y']+130
+    capture=tool('capture_screen',max_dimension=1280)
+    (data/'pending-consent.png').write_bytes(base64.b64decode(capture['content'][1]['data']))
+    print('Pending consent pointer target:',x,y,'action:',before_drag['currentAction'],flush=True)
     subprocess.run(['xdotool','mousemove',str(x),str(y),'mousedown','1','mousemove',str(x-40),str(y-20),'sleep','.2','mouseup','1'],check=True,env=env)
     # Status is written once a second; wait for the moved window to appear in it.
     def moved_during_consent():
