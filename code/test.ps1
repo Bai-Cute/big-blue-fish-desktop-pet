@@ -22,4 +22,6 @@ try {
         if($LASTEXITCODE -ne 0){throw '前台窗口验证失败'}
         & $sdk run --project "$PSScriptRoot/tests/AnimationUiVerification/AnimationUiVerification.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -- $sandbox
         if($LASTEXITCODE -ne 0){throw '动画与设置实窗验证失败'}
+        & $sdk run --project "$PSScriptRoot/tests/InstallerVerification/InstallerVerification.csproj" -c Release -p:Platform=x64 "-p:CompanionInputMode=$InputMode" -- --update-notes (Join-Path $sandbox "update-notes-$InputMode")
+        if($LASTEXITCODE -ne 0){throw '更新页 Markdown 验证失败'}
 } finally {Pop-Location}

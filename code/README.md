@@ -70,7 +70,7 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 ../tools/Build-Installer.ps1 -InputMode Ocr -RuntimeDirectory "已核对的运行时目录"
 ```
 
-默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout <目录>` 检查安装、卸载、模型与更新窗口布局；`--deployment <目录>` 检查模型选择、下载恢复、更新元数据与失败恢复；`--model-ui <目录>` 验证下载失败出口与手动安装确认。
+默认测试包含 Runner 故障恢复与当前提示词验证、动画权重和日期规则、真实前台窗口捕获、WPF 动画与设置界面验证。实窗测试使用 `.verification/` 的独立设置，复用参考安装目录的模型和运行时。安装器验证项目的 `--lifecycle` 检查普通用户写入权限、Windows 注册、快捷方式和两种数据保留方式的卸载；`--ui-layout <目录>` 检查安装、卸载、模型与更新窗口布局；`--deployment <目录>` 检查模型选择、下载恢复、更新元数据与失败恢复；`--model-ui <目录>` 验证下载失败出口与手动安装确认；`--update-notes <目录>` 用离线固定的 Release 元数据检查更新页的 Markdown 渲染，不需要真实发布新版本。
 
 发布脚本生成 `BigBlueFish-v1.0.1-OCR-Setup.exe` 一键安装器；Vision 构建入口仍保留用于历史维护，不随当前公开 Release 同步发布。安装器携带包含 .NET 运行时的 Windows x64 程序，以及已核对的 llama.cpp `b10809` Vulkan 运行时；模型可从 Hugging Face 或 ModelScope 固定来源下载并校验，也支持手动安装或无模型启动。模型选择记录在安装目录的 model-selection.json。
 
