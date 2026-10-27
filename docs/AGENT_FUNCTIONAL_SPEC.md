@@ -1,4 +1,4 @@
-# 蓝色大肥鱼 1.0.2 行为规格
+# 蓝色大肥鱼 1.0.5 行为规格
 
 ## 运行平台与发行类型
 
@@ -240,13 +240,13 @@ Windows 独立 Uninstall.exe 打开卸载界面，“保留模型和设置”默
 
 Windows 更新检查读取项目最新正式 Release，按标准版/无MCP版选择对应 OCR 安装器及校验信息，下载并核验后直接启动更新安装器。安装器等待当前应用退出并在同目录更新，复用模型和用户设置。取消或失败不会当作更新成功。
 
-更新窗口显示该 Release 的发布说明；说明按 GitHub 风格 Markdown 渲染标题、段落、粗体、斜体、删除线、行内与围栏代码、链接、引用、无序/有序/任务列表和分隔线。链接只接受 HTTP、HTTPS 与 mailto，其他目标按原文显示；没有说明时显示占位文案。
+Windows 更新窗口显示该 Release 的发布说明；说明按 GitHub 风格 Markdown 渲染标题、段落、粗体、斜体、删除线、行内与围栏代码、链接、引用、无序/有序/任务列表和分隔线。链接只接受 HTTP、HTTPS 与 mailto，其他目标按原文显示；没有说明时显示占位文案。
 
 Linux 通过标准或无MCP版 .deb 安装到 /opt/bigbluefish，注册 bigbluefish 启动命令、图标与桌面菜单。依赖由系统包管理器提供，.NET 随包。两种包声明互斥并替换同一程序目录；用户数据在个人目录中，系统卸载不删除该个人目录。Linux 更新检查选择对应 .deb，核验下载后通过 pkexec 和 apt-get 安装，成功后等待旧进程结束再启动新进程。
 
 ## 版本与构建工具行为
 
-根目录 Version.props 指定产品版本1.0.2，文件版本与程序集版本为1.0.2.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
+根目录 Version.props 指定产品版本1.0.5，文件版本与程序集版本为1.0.5.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
 
 PowerShell 构建与测试脚本以带 BOM 的 UTF-8 保存，兼容 Windows PowerShell 对中文脚本的读取。PowerShellEncodingVerification.ps1 枚举 Git 已跟踪及未忽略的 .ps1 文件，检查 UTF-8 BOM 并通过 PowerShell 语法解析器读取；检查失败抛出错误。code/test.ps1 在其他检查前调用此脚本。
 
