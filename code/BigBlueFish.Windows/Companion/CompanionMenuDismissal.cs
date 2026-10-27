@@ -31,7 +31,7 @@ internal sealed class CompanionMenuDismissal : IDisposable
         if (disposed || IsListening) return;
         session++;
         hook = SetWindowsHookEx(14, callback, GetModuleHandle(null), 0); // WH_MOUSE_LL
-        if (hook == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error());
+        // Failure of the optional outside-click hook must never disable commands.
     }
 
     private void Closed(object sender, RoutedEventArgs args) => Stop();
@@ -50,11 +50,9 @@ internal sealed class CompanionMenuDismissal : IDisposable
         {
             var position = Marshal.PtrToStructure<MouseData>(data).Position;
             long capturedSession = session;
-            // Release menu capture before Windows routes this button-down. Only
-            // bounds checks/closing run here; never perform layout, IO or model work.
-            if (menu.Dispatcher.CheckAccess())
-                DismissOutside(new Point(position.X, position.Y));
-            else if (!menu.Dispatcher.HasShutdownStarted)
+            // Never re-enter WPF input processing from a native hook. In particular,
+            // closing a popup here can invalidate the menu item about to be clicked.
+            if (!menu.Dispatcher.HasShutdownStarted)
                 menu.Dispatcher.BeginInvoke(DispatcherPriority.Input, (Action)(() =>
                 {
                     if (!disposed && capturedSession == session)
@@ -70,6 +68,12 @@ internal sealed class CompanionMenuDismissal : IDisposable
         var first = menu.PointToScreen(new Point(0, 0));
         var last = menu.PointToScreen(new Point(menu.ActualWidth, menu.ActualHeight));
         if (!new Rect(first, last).Contains(physicalPoint)) menu.IsOpen = false;
+    }
+
+    internal void Reset()
+    {
+        menu.IsOpen = false;
+        Stop();
     }
 
     public void Dispose()

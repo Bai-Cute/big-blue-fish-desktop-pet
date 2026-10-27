@@ -38,8 +38,9 @@ internal static class MaintenanceVerification
         MainWindow? window = null;
         try
         {
-            var app = new App(); app.InitializeComponent();
-            typeof(Application).GetField("_startupUri", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(app, null);
+            // The fixture supplies its own data directory and MainWindow; production
+            // App.OnStartup migration is exercised by installer/startup verification.
+            var app = new Application();
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             root = Path.GetFullPath(root); Directory.CreateDirectory(root); Environment.CurrentDirectory = root;
             File.Copy(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.ico"), "BigBlueFish.ico", true);
@@ -73,7 +74,10 @@ internal static class MaintenanceVerification
                 shared = true; close.Stop();
                 dialog.Actions.Children.OfType<Button>().Single(b => (string?)b.Content == "先无模型启动").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             };
-            close.Start(); install.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); close.Stop(); Pump();
+            close.Start(); install.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            var openedAt = System.Diagnostics.Stopwatch.StartNew();
+            while (!shared && openedAt.Elapsed.TotalSeconds < 5) Pump();
+            close.Stop(); Pump();
             Check(shared && ModelStore.ReadSelection(root)?.Source == "none", "settings invokes same real model installer and persists no-model selection");
             Set(window, "fullscreenHidden", false);
             Invoke(window, "RestoreCompanion"); Pump();

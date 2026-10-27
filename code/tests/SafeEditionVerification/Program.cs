@@ -21,7 +21,7 @@ static class Program
             string path=Path.GetFullPath(args[0]);Directory.CreateDirectory(path);
             File.Copy(Path.Combine(AppContext.BaseDirectory,"BigBlueFish.ico"),Path.Combine(path,"BigBlueFish.ico"),true);
             File.WriteAllText(Path.Combine(path,"preferences.json"),"{\"ModelEnabled\":false,\"PublicInfo\":false,\"CheckUpdatesOnStartup\":false,\"McpEnabled\":true,\"PuppetMode\":true}");
-            App.Args=["--test-mode"];var app=new App {ShutdownMode=ShutdownMode.OnExplicitShutdown};Environment.CurrentDirectory=path;
+            App.Args=["--test-mode"];var app=new System.Windows.Application {ShutdownMode=ShutdownMode.OnExplicitShutdown};Environment.CurrentDirectory=path;
             pet=new MainWindow();pet.Show();Pump(500);
             object Read(string name)=>pet.GetType().GetField(name,Access)!.GetValue(pet)!;
             object? Invoke(string name,params object[] values)=>pet.GetType().GetMethod(name,Access)!.Invoke(pet,values);

@@ -77,3 +77,4 @@ server.Dispose();
 await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
 Check(second.HasExited, "Disabling service disconnects bridge");
 Console.WriteLine($"MCP protocol: {checks} checks passed.");
+Console.WriteLine($"MCP sampling: {await SamplingVerification.Run()} checks passed.");

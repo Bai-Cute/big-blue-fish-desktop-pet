@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Diagnostics;
 using System.Windows.Automation;
 using System.Security.Cryptography;
@@ -63,7 +63,7 @@ internal static class Checks
                 new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Button),
                 new PropertyCondition(AutomationElement.NameProperty, "卸载"))) != null, "actual window offers uninstall button");
             Check(process.CloseMainWindow() && process.WaitForExit(5000), "cancel closes actual uninstaller without executing removal");
-            Check(File.Exists(executable) && File.Exists(Path.Combine(target, "preferences.json")), "cancelling uninstall preserves application and settings");
+            Check(File.Exists(executable) && File.Exists(Path.Combine(target, "data", "preferences.json")), "cancelling uninstall preserves application and settings");
         }
         finally { if (!process.HasExited) { process.Kill(); process.WaitForExit(5000); } }
     }
@@ -177,6 +177,12 @@ internal static class Checks
             Check(!names.Any(n => n.StartsWith("assets/pet/")), "old PNG animation pack is absent");
             Check(names.Contains("WinRT.Runtime.dll") == !InstallerForm.RequiresVision, "OCR projections match input mode");
             InstallerForm.ExtractApplication(archive, target);
+            BigBlueFish.Deployment.ApplicationData.Prepare(target);
+            settings = Path.Combine(target, "data", "preferences.json");
+            retained = Path.Combine(target, "data", "models", "retention-fixture.txt");
+            weatherCache = Path.Combine(target, "data", "cache", "weather.json");
+            BigBlueFish.Deployment.ApplicationData.Prepare(target);
+            Check(!Directory.Exists(Path.Combine(target, "models")) && !File.Exists(Path.Combine(target, "preferences.json")), "legacy data moves to data child and repeated prepare is idempotent");
             foreach (var legacy in legacyFiles) Check(!File.Exists(Path.Combine(target, legacy)), "upgrade removes old application file " + legacy);
             Check(File.ReadAllBytes(settings).SequenceEqual(before), "existing settings preserved");
             Check(File.ReadAllText(retained) == "retained-model-marker", "existing model directory preserved");
@@ -212,6 +218,7 @@ internal static class Checks
                     acl.AddAccessRule(new FileSystemAccessRule(sid, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
                 acl.AddAccessRule(new FileSystemAccessRule(users, FileSystemRights.ReadAndExecute, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow));
                 folder.SetAccessControl(acl);
+                var rootAcl = folder.GetAccessControl().GetSecurityDescriptorBinaryForm();
                 var protectedData = new FileSecurity();
                 protectedData.SetAccessRuleProtection(true, false);
                 protectedData.AddAccessRule(new FileSystemAccessRule(admins, FileSystemRights.FullControl, AccessControlType.Allow));
@@ -228,8 +235,8 @@ internal static class Checks
                 foreach (var pair in new[] { (ownShortcut, "BigBlueFish.exe"), (uninstallShortcut, "Uninstall.exe") })
                 {
                     dynamic shortcut = shortcutShell.CreateShortcut(pair.Item1);
-                    Check(((string)shortcut.IconLocation).Equals(Path.Combine(target, pair.Item2) + ",0", StringComparison.OrdinalIgnoreCase),
-                        "shortcut uses embedded executable icon: " + pair.Item2);
+                    Check(((string)shortcut.IconLocation).Replace("\"", "").Equals(Path.Combine(target, "BigBlueFish.ico") + ",0", StringComparison.OrdinalIgnoreCase),
+                        "shortcut uses standalone character icon: " + pair.Item2);
                     System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut);
                     using var icon = System.Drawing.Icon.ExtractAssociatedIcon(Path.Combine(target, pair.Item2));
                     Check(icon != null && icon.Width > 0, "Windows extracts embedded shortcut icon: " + pair.Item2);
@@ -242,8 +249,11 @@ internal static class Checks
                 using (var startup = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Run"))
                     Check(startup?.GetValue(startupName) as string == $"\"{newPath}\" --example", "registration migrates real Windows startup entry");
                 InstallationLifecycle.GrantUserAccess(target);
-                Check(RestrictedUserProbe.Run(target) == 0, "ordinary token creates modifies renames and deletes data after installer ACL grant");
-                Check(folder.Parent.GetAccessControl().GetSecurityDescriptorBinaryForm().SequenceEqual(parentAcl), "installer leaves parent directory ACL unchanged");
+                Check(RestrictedUserProbe.Run(Path.Combine(target, "data")) == 0, "ordinary token creates modifies renames and deletes data after installer ACL grant");
+                Check(RestrictedUserProbe.Run(target) == 23, "ordinary token cannot write installation root after data ACL grant");
+                InstallationLifecycle.GrantUserAccess(target);
+                Check(folder.GetAccessControl().GetSecurityDescriptorBinaryForm().SequenceEqual(rootAcl), "repeated data ACL grant leaves install root ACL byte-identical");
+                Check(folder.Parent!.GetAccessControl().GetSecurityDescriptorBinaryForm().SequenceEqual(parentAcl), "installer leaves parent directory ACL unchanged");
                 using var machine = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Registry64);
                 using (var application = machine.OpenSubKey(InstallationLifecycle.ApplicationPathKey))
                     Check(application?.GetValue("") as string == Path.Combine(target, "BigBlueFish.exe"), "application registered in Windows App Paths");

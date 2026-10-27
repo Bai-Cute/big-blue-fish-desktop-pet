@@ -9,6 +9,7 @@
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionAnimationPolicy.cs" Link="Shared/CompanionAnimationPolicy.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionDialogue.cs" Link="Shared/CompanionDialogue.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionBrain.cs" Link="Shared/CompanionBrain.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionInferenceDevices.cs" Link="Shared/CompanionInferenceDevices.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionWeather.cs" Link="Shared/CompanionWeather.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionNews.cs" Link="Shared/CompanionNews.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionRegions.cs" Link="Shared/CompanionRegions.cs" />

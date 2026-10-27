@@ -52,7 +52,7 @@ New-Item -ItemType Directory -Path (Join-Path $payload 'licenses') | Out-Null
 Get-ChildItem -LiteralPath "$root/code/licenses" | Where-Object Name -NE 'linux' | Copy-Item -Destination (Join-Path $payload 'licenses') -Recurse
 Copy-Item -LiteralPath "$root/code/LICENSE", "$root/code/THIRD-PARTY.md" -Destination $payload
 Copy-Item -LiteralPath "$root/release/README.md" -Destination (Join-Path $payload 'INSTALL-README.md')
-New-Item -ItemType Directory -Force -Path (Join-Path $payload 'models') | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $payload 'data/models') | Out-Null
 & $sdk publish "$root/uninstaller/BigBlueFish.Uninstall.csproj" -c Release -r win-x64 --self-contained true "-p:CompanionEdition=$Edition" -p:RestoreLockedMode=true "-p:Version=$Version" -o $uninstaller --nologo
 if ($LASTEXITCODE -ne 0) { throw '卸载器编译失败。' }
 Copy-Item -LiteralPath (Join-Path $uninstaller 'Uninstall.exe') -Destination $payload

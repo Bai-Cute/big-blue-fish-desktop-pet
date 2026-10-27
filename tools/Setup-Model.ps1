@@ -7,6 +7,7 @@
 $ErrorActionPreference='Stop'
 . "$PSScriptRoot/Model-Helpers.ps1"
 $DestinationDirectory=$ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($DestinationDirectory)
+$DestinationDirectory=Join-Path $DestinationDirectory 'data'
 if($ModelFile -and !$PSBoundParameters.ContainsKey('Source')){$Source='Manual'}
 if($ModelFile -and $Source -ne 'Manual'){throw '-ModelFile 仅用于手动安装，请使用 -Source Manual。'}
 if($Source -eq 'None'){

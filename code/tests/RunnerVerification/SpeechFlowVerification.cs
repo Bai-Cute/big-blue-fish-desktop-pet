@@ -56,8 +56,7 @@ internal static class SpeechFlowVerification
         try
         {
             root = Path.GetFullPath(root);
-            var app = new App(); app.InitializeComponent();
-            typeof(Application).GetField("_startupUri", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(app, null);
+            var app = new Application();
             app.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Directory.SetCurrentDirectory(Path.GetFullPath(root));
             File.Copy(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.ico"), "BigBlueFish.ico", true);

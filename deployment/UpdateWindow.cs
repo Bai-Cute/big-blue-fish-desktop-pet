@@ -15,6 +15,7 @@ internal sealed class UpdateWindow : ModernWindow
 {
     private readonly AvailableUpdate update;
     private readonly string directory;
+    private readonly string dataDirectory;
     private readonly TextBlock status = ModernUI.Text("");
     private readonly ProgressBar progress = new();
     private readonly Button start;
@@ -22,9 +23,10 @@ internal sealed class UpdateWindow : ModernWindow
     private bool closeRequested, closed;
     internal bool InstallerStarted { get; private set; }
 
-    internal UpdateWindow(AvailableUpdate update, string directory) : base("更新蓝色大肥鱼", "鱼鱼有新版本啦", "可更新到 " + update.Version, 630, 480)
+    internal UpdateWindow(AvailableUpdate update, string directory, string? dataDirectory = null) : base("更新蓝色大肥鱼", "鱼鱼有新版本啦", "可更新到 " + update.Version, 630, 480)
     {
         this.update = update; this.directory = Path.GetFullPath(directory);
+        this.dataDirectory = dataDirectory ?? ApplicationData.DirectoryFor(directory);
         Body.Children.Add(ModernUI.Text(update.Notes)); Body.Children.Add(progress); Body.Children.Add(status);
         Actions.Children.Add(ModernUI.Button("稍后", () => { if (download != null) download.Cancel(); else Close(); }));
         start = ModernUI.Button("下载并更新", async () => await Install(), true); Actions.Children.Add(start);
@@ -38,7 +40,7 @@ internal sealed class UpdateWindow : ModernWindow
         download = new CancellationTokenSource(); start.IsEnabled = false;
         try
         {
-            var installer = Path.Combine(directory, "cache", "updates", update.Name);
+            var installer = Path.Combine(dataDirectory, "cache", "updates", update.Name);
             status.Text = "正在下载更新…";
             await ArtifactDownload.Download(update.Url, installer, update.Sha256,
                 new Progress<ArtifactDownload.Progress>(p => { progress.Value = p.Percent; status.Text = p.ToString(); }), download.Token);

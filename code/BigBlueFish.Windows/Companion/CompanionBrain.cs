@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
@@ -26,10 +26,15 @@ internal sealed class CompanionBrain : IDisposable
     };
     private Process? runner;
     private bool runnerReady;
+    private bool disposed;
     private readonly Func<ProcessStartInfo, Process?> startRunner;
     private readonly Func<CancellationToken, Task<string>> gpuDevices;
     private bool usingCpuFallback;
+    private CompanionInferenceDevices? inferenceDevices;
+    internal string ExecutionDevice => runner is { HasExited: false }
+        ? inferenceDevices?.Describe(runnerReady) ?? "正在确认运行设备" : "未运行";
     private readonly TimeSpan runnerLoadTimeout;
+    private readonly string runtimeDirectory;
     private readonly CompanionJob job = new();
     private int port;
     private CancellationTokenSource? active;
@@ -79,9 +84,10 @@ internal sealed class CompanionBrain : IDisposable
         TimeSpan.FromSeconds(60)) { }
 
     // The verification harness substitutes a real child process, not model output in the app.
-    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null, Func<double>? newsRoll = null, Func<CancellationToken, Task<string>>? gpuDevices = null)
+    internal CompanionBrain(Func<ProcessStartInfo, Process?> startRunner, TimeSpan runnerLoadTimeout, HttpClient? weatherClient = null, string? weatherCachePath = null, Func<double>? newsRoll = null, Func<CancellationToken, Task<string>>? gpuDevices = null, string? runtimeDirectory = null)
     {
         this.startRunner = startRunner;
+        this.runtimeDirectory = runtimeDirectory ?? Path.Combine(AppContext.BaseDirectory, "runtime");
         this.gpuDevices = gpuDevices ?? ReadGpuDevices;
         this.runnerLoadTimeout = runnerLoadTimeout;
         this.newsRoll = newsRoll ?? Random.Shared.NextDouble;
@@ -100,8 +106,8 @@ internal sealed class CompanionBrain : IDisposable
 
     private async Task<string> ReadGpuDevices(CancellationToken token)
     {
-        string path = OperatingSystem.IsWindows() ? Path.GetFullPath("runtime/llama-server.exe")
-            : Path.Combine(AppContext.BaseDirectory, "runtime", "llama-server");
+        string path = OperatingSystem.IsWindows() ? Path.Combine(runtimeDirectory, "llama-server.exe")
+            : Path.Combine(runtimeDirectory, "llama-server");
         var start = new ProcessStartInfo(path) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
         start.ArgumentList.Add("--list-devices");
         Process? probe = null;
@@ -124,7 +130,7 @@ internal sealed class CompanionBrain : IDisposable
         catch { return ""; }
         finally
         {
-            if (probe != null) { try { if (!probe.HasExited) { probe.Kill(true); await probe.WaitForExitAsync(); } } finally { probe.Dispose(); } }
+            if (probe != null) await RetireProcess(probe);
         }
     }
 
@@ -201,8 +207,10 @@ internal sealed class CompanionBrain : IDisposable
                 microBatch = GpuMicroBatch(devices);
             }
             try { await StartRunner(token, gpu, microBatch); }
-            catch (GpuStartupException) when (gpu)
+            catch (Exception error) when (gpu && !token.IsCancellationRequested && CanRunOnCurrentPower
+                && error is IOException or TimeoutException)
             {
+                RecordFailure("GPU启动，改用CPU", error);
                 StopRunner();
                 token.ThrowIfCancellationRequested();
                 await StartRunner(token, false, 512);
@@ -217,8 +225,8 @@ internal sealed class CompanionBrain : IDisposable
 
     private async Task StartRunner(CancellationToken token, bool gpu, int microBatch)
     {
-        var path = OperatingSystem.IsWindows() ? Path.GetFullPath("runtime/llama-server.exe")
-            : Path.Combine(AppContext.BaseDirectory, "runtime", "llama-server");
+        var path = OperatingSystem.IsWindows() ? Path.Combine(runtimeDirectory, "llama-server.exe")
+            : Path.Combine(runtimeDirectory, "llama-server");
         var model = BigBlueFish.Deployment.ModelStore.Resolve(Environment.CurrentDirectory);
         if (!File.Exists(path)) throw new IOException("未找到本地推理程序：" + path);
         if (model == null) throw new IOException("尚未安装可用模型，可以在设置中安装模型。");
@@ -266,7 +274,7 @@ internal sealed class CompanionBrain : IDisposable
             "1",
             "--no-webui",
             "--log-verbosity",
-            "1",
+            "4",
             "--jinja",
             "--reasoning",
             "off",
@@ -284,8 +292,10 @@ internal sealed class CompanionBrain : IDisposable
         }
         foreach (var arg in arguments)
             psi.ArgumentList.Add(arg);
-        runner = startRunner(psi) ?? throw new IOException("无法启动本地模型");
-        if (!job.Attach(runner))
+        token.ThrowIfCancellationRequested();
+        var process = startRunner(psi) ?? throw new IOException("无法启动本地模型");
+        runner = process;
+        if (!job.Attach(process))
         {
             throw new IOException("无法建立模型退出保障");
         }
@@ -293,18 +303,26 @@ internal sealed class CompanionBrain : IDisposable
         // Keep only a bounded startup error tail in memory; no prompt or screen content is logged.
         var startupErrors = new Queue<string>();
         int startupComplete = 0;
-        runner.OutputDataReceived += (_, _) => { };
-        runner.ErrorDataReceived += (_, e) =>
+        var devices = new CompanionInferenceDevices();
+        inferenceDevices = devices;
+        // Library INFO uses verbosity 4 in this runtime; it includes real buffer
+        // placement. Consume both streams and retain only startup device facts.
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (Volatile.Read(ref startupComplete) == 0) devices.Observe(e.Data);
+        };
+        process.ErrorDataReceived += (_, e) =>
         {
             if (string.IsNullOrWhiteSpace(e.Data) || Volatile.Read(ref startupComplete) != 0) return;
+            devices.Observe(e.Data);
             lock (startupErrors)
             {
                 startupErrors.Enqueue(e.Data.Length > 500 ? e.Data[..500] : e.Data);
                 while (startupErrors.Count > 8) startupErrors.Dequeue();
             }
         };
-        runner.BeginOutputReadLine();
-        runner.BeginErrorReadLine();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         Status = ReadyStatus("正在加载本地模型");
         using var loading = CancellationTokenSource.CreateLinkedTokenSource(token);
         loading.CancelAfter(runnerLoadTimeout);
@@ -314,11 +332,12 @@ internal sealed class CompanionBrain : IDisposable
             while (true)
             {
                 loadingToken.ThrowIfCancellationRequested();
+                if (!ReferenceEquals(runner, process)) throw new OperationCanceledException(token);
                 if (!CanRunOnCurrentPower)
                     throw new OperationCanceledException();
-                if (runner.HasExited)
+                if (process.HasExited)
                 {
-                    runner.WaitForExit();
+                    await process.WaitForExitAsync(loadingToken);
                     string details;
                     lock (startupErrors) details = string.Join(" ", startupErrors);
                     if (details.Contains("OutOfDeviceMemory", StringComparison.OrdinalIgnoreCase)
@@ -326,7 +345,7 @@ internal sealed class CompanionBrain : IDisposable
                         throw gpu ? new GpuStartupException("本地模型加载失败：可用内存或显存不足")
                             : new IOException("本地模型加载失败：可用内存或显存不足");
                     string suffix = details.Length == 0 ? "" : "：" + details[^Math.Min(details.Length, 280)..];
-                    string message = $"本地模型启动失败（退出码 0x{unchecked((uint)runner.ExitCode):X8}）" + suffix;
+                    string message = $"本地模型启动失败（退出码 0x{unchecked((uint)process.ExitCode):X8}）" + suffix;
                     if (gpu && Regex.IsMatch(details, "Vulkan|ggml_cuda|CUDA error|ErrorDeviceLost|VK_ERROR", RegexOptions.IgnoreCase))
                         throw new GpuStartupException(message);
                     throw new IOException(message);
@@ -338,6 +357,8 @@ internal sealed class CompanionBrain : IDisposable
                     {
                         Interlocked.Exchange(ref startupComplete, 1);
                         await PrimeSpeechPrefix(loadingToken);
+                        loadingToken.ThrowIfCancellationRequested();
+                        if (!ReferenceEquals(runner, process)) throw new OperationCanceledException(token);
                         runnerReady = true;
                         return;
                     }
@@ -391,7 +412,7 @@ internal sealed class CompanionBrain : IDisposable
 
     internal async Task<string> GenerateWeather(Action<string>? onPartial = null)
     {
-        if (Busy || !CanRunOnCurrentPower)
+        if (disposed || Busy || !CanRunOnCurrentPower)
             return "";
         Busy = true;
         active = new CancellationTokenSource(TimeSpan.FromSeconds(100));
@@ -406,9 +427,10 @@ internal sealed class CompanionBrain : IDisposable
             Status = ReadyStatus("本地模型就绪");
             return CanRunOnCurrentPower ? text : "";
         }
-        catch (OperationCanceledException) { Status = "天气播报已取消"; return ""; }
+        catch (OperationCanceledException) { StopRunner(); Status = "天气播报已取消"; return ""; }
         catch (Exception e)
         {
+            StopRunner(); RecordFailure("生成", e);
             Status = e is IOException ? e.Message : "暂时无法获取或播报天气，请稍后重试";
             return "";
         }
@@ -452,7 +474,7 @@ internal sealed class CompanionBrain : IDisposable
         };
         if (App.Args.Contains("--test-mode"))
         {
-            try { File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "model-request.json"), JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true })); }
+            try { File.WriteAllText(Path.GetFullPath("model-request.json"), JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true })); }
             catch { }
         }
         using var requestMessage = new HttpRequestMessage(HttpMethod.Post, $"http://127.0.0.1:{port}/v1/chat/completions")
@@ -533,7 +555,7 @@ internal sealed class CompanionBrain : IDisposable
 
     internal async Task<string> Generate(bool usePublic, bool useForeground, IntPtr foregroundHandle = default, Action<string>? onPartial = null)
     {
-        if (Busy || !CanRunOnCurrentPower)
+        if (disposed || Busy || !CanRunOnCurrentPower)
             return "";
         Busy = true;
         active = new CancellationTokenSource(TimeSpan.FromSeconds(100));
@@ -628,11 +650,13 @@ internal sealed class CompanionBrain : IDisposable
         }
         catch (OperationCanceledException)
         {
+            StopRunner();
             Status = "模型已暂停";
             return "";
         }
         catch (Exception e)
         {
+            StopRunner(); RecordFailure("生成", e);
             Status = e is IOException ? e.Message : "暂时无法生成，稍后重试";
             return "";
         }
@@ -666,7 +690,7 @@ internal sealed class CompanionBrain : IDisposable
                 modelToFirstContentMs = firstContentMs - runnerReadyMs,
                 requestCompleted = completed, request, response, words = ocr.Words
             };
-            File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "ocr-status.json"),
+            File.WriteAllText(Path.GetFullPath("ocr-status.json"),
                 JsonSerializer.Serialize(status, new JsonSerializerOptions { WriteIndented = true }));
         }
         catch { }
@@ -680,7 +704,7 @@ internal sealed class CompanionBrain : IDisposable
             return;
         try
         {
-            var baseDirectory = AppContext.BaseDirectory;
+            var baseDirectory = Environment.CurrentDirectory;
             image.SaveJpeg(Path.Combine(baseDirectory, "vision-input.jpg"));
             var status = new
             {
@@ -706,20 +730,34 @@ internal sealed class CompanionBrain : IDisposable
     {
         runnerReady = false;
         usingCpuFallback = false;
+        inferenceDevices = null;
+        var previous = runner;
+        runner = null;
+        if (previous != null) _ = RetireProcess(previous);
+    }
+
+    private static async Task RetireProcess(Process process)
+    {
         try
         {
-            if (runner is { HasExited: false })
-            {
-                runner.Kill(true);
-                runner.WaitForExit(5000);
-            }
+            if (!process.HasExited) process.Kill(true);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
         }
-        catch
-        {
-        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception or OperationCanceledException) { }
+        finally { process.Dispose(); }
+    }
 
-        runner?.Dispose();
-        runner = null;
+    private static void RecordFailure(string stage, Exception error)
+    {
+        // Diagnostics contain process/transport failures only, never OCR, prompts or replies.
+        try
+        {
+            const string path = "companion-errors.log";
+            if (File.Exists(path) && new FileInfo(path).Length > 1024 * 1024) File.WriteAllText(path, "");
+            File.AppendAllText(path, $"{DateTimeOffset.Now:O} {stage}: {error.GetType().Name}: {error.Message}\n");
+        }
+        catch { }
     }
 
     internal void Stop()
@@ -731,7 +769,7 @@ internal sealed class CompanionBrain : IDisposable
 
     internal async Task WarmUp()
     {
-        if (Busy || RunnerPid != null || !CanRunOnCurrentPower)
+        if (disposed || Busy || RunnerPid != null || !CanRunOnCurrentPower)
             return;
         Busy = true;
         active = new CancellationTokenSource(TimeSpan.FromSeconds(90));
@@ -743,6 +781,7 @@ internal sealed class CompanionBrain : IDisposable
         catch (Exception error)
         {
             StopRunner();
+            if (error is not OperationCanceledException) RecordFailure("加载", error);
             Status = error is IOException ? error.Message
                 : error is TimeoutException ? "模型加载超时，稍后重试" : "模型未就绪，稍后重试";
         }
@@ -761,6 +800,8 @@ internal sealed class CompanionBrain : IDisposable
 
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
         Stop();
         job.Dispose();
         local.Dispose();

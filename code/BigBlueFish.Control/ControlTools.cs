@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 
@@ -17,7 +17,7 @@ public static class ControlTools
         new { type = "image", mimeType = dataUrl[5..dataUrl.IndexOf(';')], data = dataUrl[(dataUrl.IndexOf(',') + 1)..] } } };
     public static readonly string[] SettingNames = ["ModelEnabled", "GpuEnabled", "PublicInfo", "ForegroundEnabled", "StopModelOnBattery",
         "HideOnFullscreen", "CheckUpdatesOnStartup", "WeatherRegionCode", "Scale", "BubbleScale", "SpeechMinMinutes",
-        "BubbleDurationIndex", "AnimationIntervalSeconds", "BreakfastHour", "LunchHour", "DinnerHour", "Left", "Top", "LastBrushDate", "StartupEnabled", "PuppetMode", "McpChatEnabled"];
+        "BubbleDurationIndex", "AnimationIntervalSeconds", "BreakfastHour", "LunchHour", "DinnerHour", "Left", "Top", "LastBrushDate", "StartupEnabled", "PuppetMode", "McpChatEnabled", "McpWakeEnabled", "McpWakeOnText", "McpWakeOnClick", "McpWakeOnDrag"];
     private const string SettingsInput = """
         {"settings":{"type":"object","additionalProperties":false,"description":"按需提供字段；省略的字段保留。字段名区分大小写。McpEnabled 只读。成功后读取实际值；位置可能因工作区限制调整。","properties":{
           "ModelEnabled":{"type":"boolean","description":"启用内置模型；不限制外部 say。"},
@@ -41,6 +41,10 @@ public static class ControlTools
           "LastBrushDate":{"type":["string","null"],"pattern":"^[0-9]{4}-[0-9]{2}-[0-9]{2}$","description":"有效本地日期yyyy-MM-dd或null，用于每日刷牙动作去重；通常无需修改。"},
           "StartupEnabled":{"type":"boolean","description":"当前用户的系统开机启动设置。"},
           "PuppetMode":{"type":"boolean","description":"完全外部接管。每次从false改true须等待用户在桌面确认；窗口等待期间桌宠仍可拖动。断开不会自动退出该模式。"},
+          "McpWakeEnabled":{"type":"boolean","description":"允许交互触发客户端sampling，默认false；仅支持sampling的客户端可响应。关闭会取消待处理采样。"},
+          "McpWakeOnText":{"type":"boolean","description":"总开关开启后，输入文字触发sampling，默认true。"},
+          "McpWakeOnClick":{"type":"boolean","description":"总开关开启后，点击触发sampling，默认false。"},
+          "McpWakeOnDrag":{"type":"boolean","description":"总开关开启后，拖拽结束触发sampling，默认false；起始事件仍照常通知。"},
           "McpChatEnabled":{"type":"boolean","description":"允许双击打开输入框；还必须有完成初始化的真实MCP连接。文字通过user_message交给客户端。"}
         }}}
         """;

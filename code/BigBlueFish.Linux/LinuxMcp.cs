@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text.Json;
 using Avalonia.Threading;
 using Avalonia;
@@ -14,7 +14,7 @@ internal sealed partial class LinuxPetWindow
 {
 #if COMPANION_SAFE
     static bool McpAvailable => false;
-    void InitializeMcp() { Preferences.McpEnabled = false; Preferences.PuppetMode = false; }
+    void InitializeMcp() { Preferences.McpEnabled = false; Preferences.PuppetMode = false; Preferences.McpWakeEnabled = false; }
     void StopMcp() { }
     void PublishInteraction(string kind, object detail) { }
     bool TryOpenMcpInput() => false;
@@ -26,10 +26,13 @@ internal sealed partial class LinuxPetWindow
     void InitializeMcp()
     {
         if (Preferences.McpEnabled) mcpServer ??= new ControlServer(ExecuteMcp);
+        mcpServer?.SetWakeEnabled(Preferences.McpWakeEnabled);
         if (Puppet) brain.Stop();
     }
     void StopMcp() { consentWindow?.Close(); mcpInput?.Close(); mcpServer?.Dispose(); mcpServer = null; externalActions.Clear(); nextExternalText = null; }
-    void PublishInteraction(string kind, object detail) => mcpServer?.Publish(kind, detail);
+    void PublishInteraction(string kind, object detail) => mcpServer?.Publish(kind, detail,
+        Preferences.McpWakeEnabled && (kind == "user_message" && Preferences.McpWakeOnText
+            || kind == "click" && Preferences.McpWakeOnClick || kind == "drag_end" && Preferences.McpWakeOnDrag));
     void SetPuppet(bool enabled)
     {
         if (Preferences.PuppetMode == enabled) return;
@@ -50,7 +53,7 @@ internal sealed partial class LinuxPetWindow
             if (closed || phase == "Exit" || !Preferences.McpEnabled) throw new InvalidOperationException("MCP 接口已关闭或桌宠正在退出。");
             switch (name)
             {
-                case "get_settings": return ControlTools.Text(new { settings = CurrentSettings(), state = new { visible = IsVisible, hiddenByUser = hidden, fullscreenHidden, action = currentAction, animationPhase = phase, queuedActions = externalActions.ToArray(), queuedSpeech = nextExternalText, connections = mcpServer?.Connections ?? 0, inputOpen = mcpInput?.IsVisible == true, inputAvailable = McpInputAvailable, modelAvailable = brain.ModelAvailable, modelBusy = brain.Busy, modelStatus = brain.Status } });
+                case "get_settings": return ControlTools.Text(new { settings = CurrentSettings(), state = new { visible = IsVisible, hiddenByUser = hidden, fullscreenHidden, action = currentAction, animationPhase = phase, queuedActions = externalActions.ToArray(), queuedSpeech = nextExternalText, connections = mcpServer?.Connections ?? 0, inputOpen = mcpInput?.IsVisible == true, inputAvailable = McpInputAvailable, samplingConnections = mcpServer?.SamplingConnections ?? 0, wakeStatus = mcpServer?.WakeStatus, modelAvailable = brain.ModelAvailable, modelBusy = brain.Busy, modelStatus = brain.Status } });
                 case "update_settings": await UpdateSettings(args, token); return ControlTools.Text(new { settings = CurrentSettings() });
                 case "list_actions": return ControlTools.Text(policy.Rules.Select(r => new { action = r.Id, pool = r.Pool, weight = r.Weight, duration_seconds = r.Pool == "Greeting" ? 10 / 1.5 : 10 }));
                 case "capture_foreground": case "capture_screen":
@@ -108,6 +111,8 @@ internal sealed partial class LinuxPetWindow
         if (values.TryGetValue("Left", out var left) && left is double x) position = new((int)x, position.Y);
         if (values.TryGetValue("Top", out var top) && top is double y) position = new(position.X, (int)y);
         ApplySettings(position);
+        mcpServer?.SetWakeEnabled(Preferences.McpWakeEnabled);
+        if (!Preferences.McpChatEnabled) mcpInput?.Close();
         refreshLinuxSettings?.Invoke();
     }
     bool TryOpenMcpInput()

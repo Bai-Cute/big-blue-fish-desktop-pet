@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net;
@@ -36,6 +36,8 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2], args.Length < 4 || args[3] == "gpu");
         try
         {
+            if (args[0] == "--device-live") return await InferenceDeviceVerification.Live(args[1]);
+            InferenceDeviceVerification.Rules();
             if (args[0] == "--performance-export") return PerformanceVerification.Export(args[1]);
             if (args[0] == "--latency-screen") return await LatencyVerification.Run(args[1]);
             if (args[0] == "--latency-fixture") return await LatencyVerification.Fixture(args[1]);
@@ -103,7 +105,7 @@ internal static class Program
                 return process;
             }
             using var weatherClient = new HttpClient(new WeatherFixture());
-            using var brain = new CompanionBrain(Start, TimeSpan.FromSeconds(5), weatherClient, gpuDevices: _ => Task.FromResult("Vulkan0: verification GPU (16384 MiB, 15000 MiB free)")) { StopOnBattery = false };
+            using var brain = new CompanionBrain(Start, TimeSpan.FromSeconds(5), weatherClient, gpuDevices: _ => Task.FromResult("Vulkan0: verification GPU (16384 MiB, 15000 MiB free)"), runtimeDirectory: Path.Combine(root, "runtime")) { StopOnBattery = false };
             async Task Ensure(CancellationToken token = default) =>
                 await (Task)typeof(CompanionBrain).GetMethod("EnsureRunner", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(brain, [token])!;
             static bool Exited(int pid)
@@ -161,17 +163,24 @@ internal static class Program
             brain.Stop();
             Check(children.All(Exited), "no injected child remains alive after stop");
             Check(launches.Where(a => a[Array.IndexOf(a, "-ngl") + 1] != "0").All(a => a[Array.IndexOf(a, "-ngl") + 1] == "auto" && a[Array.IndexOf(a, "--fit") + 1] == "on"), "GPU startup lets llama.cpp fit layers to available device memory");
-            Check(launches.All(a => !a.Contains("--log-disable") && a[Array.IndexOf(a, "--log-verbosity") + 1] == "1"), "startup errors remain available without verbose model request logging");
+            Check(launches.All(a => !a.Contains("--log-disable") && a[Array.IndexOf(a, "--log-verbosity") + 1] == "4"), "runtime library INFO device placement is available without DEBUG token logging");
+            Check(launches.Where(a => a[Array.IndexOf(a, "-ngl") + 1] != "0").All(a => !a.Contains("--device") && !a.Contains("--main-gpu") && !a.Contains("--tensor-split") && !a.Contains("--split-mode")), "GPU auto allocation has no pinned device or fixed split");
+            Check(brain.ExecutionDevice == "未运行", "stopped runner clears device status");
             brain.UseGpu = false; File.WriteAllText(modePath, "ready"); await brain.WarmUp();
             var cpu = launches[^1];
+            Check(brain.ExecutionDevice == "CPU", "CPU model allocation reports CPU");
             Check(cpu[Array.IndexOf(cpu, "-ngl") + 1] == "0" && cpu[Array.IndexOf(cpu, "--fit") + 1] == "off" && cpu[Array.IndexOf(cpu, "-ub") + 1] == "512", "CPU mode keeps explicit CPU layers and its microbatch");
             brain.Stop(); Check(children.All(Exited), "CPU verification leaves no injected process alive");
             brain.UseGpu = true; File.WriteAllText(modePath, "gpu-fail"); await brain.WarmUp();
             Console.WriteLine("Fallback fixture state: pid=" + brain.RunnerPid + ", status=" + brain.Status + ", launch=" + string.Join(" ", launches[^1]));
             Check(brain.RunnerPid != null && brain.Status.Contains("CPU兼容模式") && launches[^1][Array.IndexOf(launches[^1], "--device") + 1] == "none", "GPU initialization failure retries once on CPU and reports actual compatibility mode");
             int fallback = brain.RunnerPid!.Value;
+            Check(brain.ExecutionDevice == "CPU", "GPU failure clears previous device allocation and reports actual CPU fallback");
             Check((await brain.Generate(false, false)).Length > 0 && brain.RunnerPid == fallback && brain.Status.Contains("CPU兼容模式"), "healthy CPU compatibility runner is reused without repeated failing GPU launches");
             brain.Stop(); Check(children.All(Exited), "GPU fallback verification leaves no child process alive");
+            File.WriteAllText(modePath, "gpu-access-violation"); await brain.WarmUp();
+            Check(brain.RunnerPid != null && brain.Status.Contains("CPU兼容模式"), "bare GPU access violation without stderr falls back to CPU");
+            brain.Stop(); Check(children.All(Exited), "bare crash fallback leaves no processes");
             Check(CompanionBrain.GpuMicroBatch("Vulkan0: Arc (18409 MiB, 17000 MiB free)") == 2048, "high-memory GPU preserves verified microbatch");
             Check(CompanionBrain.GpuMicroBatch("Vulkan0: AMD (8886 MiB, 8441 MiB free)\nVulkan1: RTX3050 (3979 MiB, 3382 MiB free)") == 128, "smallest reported device budget protects mixed laptop GPUs");
             Check(CompanionBrain.GpuMicroBatch("Vulkan0: GPU (8192 MiB, 6000 MiB free)") == 512, "medium free-memory budget uses intermediate compute buffer");
@@ -200,7 +209,14 @@ internal static class Program
     {
         if (File.ReadAllText(modePath) == "exit") return 1;
         if (File.ReadAllText(modePath) == "out-of-memory") { Console.Error.WriteLine("ggml_vulkan: ErrorOutOfDeviceMemory; failed to allocate compute buffers"); return 1; }
+        if (gpu && File.ReadAllText(modePath) == "gpu-access-violation") return unchecked((int)0xC0000005);
         if (gpu && File.ReadAllText(modePath) == "gpu-fail") { Console.Error.WriteLine("ggml_vulkan: ErrorDeviceLost"); return 1; }
+        if (gpu)
+        {
+            Console.WriteLine("llama_prepare_model_devices: using device Vulkan0 (verification GPU) (unknown id) - 15000 MiB free");
+            Console.WriteLine("load_tensors: Vulkan0 model buffer size = 2572.86 MiB");
+        }
+        else Console.WriteLine("load_tensors: CPU_Mapped model buffer size = 2572.86 MiB");
         using var listener = new HttpListener();
         listener.Prefixes.Add($"http://127.0.0.1:{port}/");
         listener.Start();

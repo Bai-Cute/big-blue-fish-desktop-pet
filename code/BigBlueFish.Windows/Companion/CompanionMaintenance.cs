@@ -17,7 +17,7 @@ public partial class MainWindow
     {
         if (exitAnimation || companionClosed) return;
         if (modelInstaller != null) { modelInstaller.Activate(); return; }
-        brain.Stop();
+        InvalidateSpeechRequests(true);
         var dialog = modelInstaller = new ModelInstallWindow(Environment.CurrentDirectory);
         if (companionSettings?.IsVisible == true) dialog.Owner = companionSettings;
         dialog.Closed += (_, _) => {
@@ -59,7 +59,7 @@ public partial class MainWindow
     {
         if (availableUpdate == null || companionClosed || exitAnimation) return;
         if (updateWindow != null) { updateWindow.Activate(); return; }
-        var dialog = updateWindow = new UpdateWindow(availableUpdate, Environment.CurrentDirectory);
+        var dialog = updateWindow = new UpdateWindow(availableUpdate, AppContext.BaseDirectory, Environment.CurrentDirectory);
         if (companionSettings?.IsVisible == true) dialog.Owner = companionSettings;
         dialog.Closed += (_, _) => {
             if (updateWindow == dialog) updateWindow = null;

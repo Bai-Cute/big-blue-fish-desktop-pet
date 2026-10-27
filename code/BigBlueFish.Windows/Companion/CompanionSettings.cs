@@ -1,4 +1,4 @@
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Linq;
 using System.Windows;
@@ -121,7 +121,7 @@ public partial class MainWindow
         {
             preferences.ModelEnabled = v;
             if (!v)
-                brain.Stop();
+                InvalidateSpeechRequests(true);
             else
             {
                 nextWarmup = DateTime.MinValue;
@@ -136,7 +136,7 @@ public partial class MainWindow
         Toggle("使用显卡加速（关闭则使用 CPU）", preferences.GpuEnabled, v =>
         {
             preferences.GpuEnabled = v;
-            brain.Stop();
+            InvalidateSpeechRequests(true);
             brain.UseGpu = v;
             nextWarmup = DateTime.MinValue;
         });
@@ -144,11 +144,7 @@ public partial class MainWindow
         Toggle("全屏时自动隐藏桌宠", preferences.HideOnFullscreen, v =>
         {
             preferences.HideOnFullscreen = v;
-            if (!v && fullscreenHidden)
-            {
-                fullscreenHidden = false;
-                if (!hiddenByUser) { Show(); ClampCompanion(); }
-            }
+            UpdateCompanionVisibility();
         });
         Toggle("开机自动启动", StartupEnabled(), SetCompanionStartup);
         Toggle("启动时检查更新", preferences.CheckUpdatesOnStartup, v => preferences.CheckUpdatesOnStartup = v);
@@ -292,7 +288,8 @@ public partial class MainWindow
             installModel.Visibility = available ? Visibility.Collapsed : Visibility.Visible;
             status.Text = (CompanionNative.OnAC ? "已插电" :
                 preferences.StopModelOnBattery ? "电池供电 · 已按设置暂停模型" : "电池供电 · 允许模型运行")
-                + "\n" + (available ? brain.Status : "尚未安装模型");
+                + "\n" + (available ? brain.Status : "尚未安装模型")
+                + "\n推理设备：" + brain.ExecutionDevice;
         }
         timer.Tick += (_, _) => UpdateStatus();
         UpdateStatus();

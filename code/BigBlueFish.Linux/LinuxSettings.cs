@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -90,6 +90,12 @@ internal sealed partial class LinuxPetWindow
         void Model() {
             Title("模型与信息"); Toggle("启用本地大模型", Preferences.ModelEnabled, value => { Preferences.ModelEnabled = value; ApplySettings(); });
             Toggle("使用 GPU 加速", Preferences.GpuEnabled, value => { Preferences.GpuEnabled = value; ApplySettings(); });
+            var deviceStatus = Paragraph(""); body.Children.Add(deviceStatus);
+            var deviceClock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            void UpdateDevice() => deviceStatus.Text = "推理设备：" + brain.ExecutionDevice;
+            deviceClock.Tick += (_, _) => UpdateDevice();
+            deviceStatus.AttachedToVisualTree += (_, _) => { UpdateDevice(); deviceClock.Start(); };
+            deviceStatus.DetachedFromVisualTree += (_, _) => deviceClock.Stop();
             Toggle("笔记本离电时暂停模型", Preferences.StopModelOnBattery, value => { Preferences.StopModelOnBattery = value; ApplySettings(); });
             Toggle("联网获取天气和科技新闻", Preferences.PublicInfo, value => Preferences.PublicInfo = value);
             Toggle("感知当前前台应用", Preferences.ForegroundEnabled, value => Preferences.ForegroundEnabled = value);
@@ -132,6 +138,17 @@ internal sealed partial class LinuxPetWindow
             var chat = new CheckBox { Content = "双击与鱼鱼对话", IsChecked = Preferences.McpChatEnabled };
             chat.Click += (_,_) => { Preferences.McpChatEnabled = chat.IsChecked == true; if (!Preferences.McpChatEnabled) mcpInput?.Close(); Save(); };
             extra.Children.Add(chat); extra.Children.Add(Paragraph("仅在 MCP 客户端已连接时生效，输入内容通过 MCP 发送给已连接的 Agent。"));
+            var wake = new CheckBox { Content = "允许鱼鱼通过 MCP 触发 Agent", IsChecked = Preferences.McpWakeEnabled };
+            wake.Click += (_,_) => { Preferences.McpWakeEnabled = wake.IsChecked == true; mcpServer?.SetWakeEnabled(Preferences.McpWakeEnabled); Save(); };
+            extra.Children.Add(wake); extra.Children.Add(Paragraph("通过客户端 sampling 请求响应，由客户端决定是否接受。"));
+            var wakeFlags = Paragraph(""); extra.Children.Add(wakeFlags);
+            var wakeClock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+            void WakeStatus() {
+                string Flag(bool on) => on ? "唤起" : "不唤起";
+                wakeFlags.Text = $"文字：{Flag(Preferences.McpWakeOnText)}；点击：{Flag(Preferences.McpWakeOnClick)}；拖动：{Flag(Preferences.McpWakeOnDrag)}。三项由 Agent 调整。支持触发的连接：{mcpServer?.SamplingConnections ?? 0}；{mcpServer?.WakeStatus ?? "尚未请求"}";
+            }
+            WakeStatus(); wakeClock.Tick += (_,_) => WakeStatus(); wakeClock.Start();
+            extra.DetachedFromVisualTree += (_,_) => wakeClock.Stop();
             var config = ActionButton("复制 MCP 连接配置", async () => {
                 if (settings?.Clipboard != null) await settings.Clipboard.SetTextAsync(System.Text.Json.JsonSerializer.Serialize(new { mcpServers = new Dictionary<string, object> { ["big-blue-fish"] = new { command = Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), args = Array.Empty<string>() } } }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
             }); extra.Children.Add(config); body.Children.Add(extra);

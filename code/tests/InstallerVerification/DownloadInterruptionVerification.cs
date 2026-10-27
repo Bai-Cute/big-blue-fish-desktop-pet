@@ -88,7 +88,9 @@ internal static partial class DeploymentVerification
             var watch = Stopwatch.StartNew();
             while (!child.HasExited && (!File.Exists(killed + ".partial") || new FileInfo(killed + ".partial").Length == 0) && watch.Elapsed.TotalSeconds < 10) await Task.Delay(30);
             Check(!child.HasExited && File.Exists(killed + ".partial") && new FileInfo(killed + ".partial").Length > 0, "real download subprocess writes progress before abrupt termination");
+            Console.WriteLine($"Download interruption worker pid={child.Id} image={start.FileName}");
             child.Kill(); await child.WaitForExitAsync();
+            Console.WriteLine($"Download worker exited code={child.ExitCode}");
         }
         finally { if (!child.HasExited) { child.Kill(); await child.WaitForExitAsync(); } }
         await Resume(killed, "Abrupt process termination");

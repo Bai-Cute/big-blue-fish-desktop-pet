@@ -76,7 +76,11 @@ public partial class MainWindow
             startSeconds: suspendedDrag ? 1.5 : 0, endSeconds: suspendedDrag ? 6 : null,
             playbackRate: rule.Pool == "Greeting" ? 1.5 : 1);
     }
-    private void PlayIdle() => PlayAnimation(animationPolicy.Choose("Idle", AnimationContext(), companionRandom), "Idle");
+    private void PlayIdle()
+    {
+        if (PuppetActive) PlayAnimation(animationPolicy.Find("待机呼吸休闲"), "PuppetIdle");
+        else PlayAnimation(animationPolicy.Choose("Idle", AnimationContext(), companionRandom), "Idle");
+    }
     private void AnimationFinished()
     {
         if (companionClosed) return;

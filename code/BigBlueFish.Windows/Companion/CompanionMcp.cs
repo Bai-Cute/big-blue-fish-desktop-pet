@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -19,9 +19,10 @@ public partial class MainWindow
 {
     private bool externalBubble { get; set; }
 #if COMPANION_SAFE
+    private bool McpInputAvailable => false;
     private bool PuppetActive => false;
     private bool HasScheduledMcpSpeech => false;
-    private void InitializeMcp() { preferences.McpEnabled = false; preferences.PuppetMode = false; }
+    private void InitializeMcp() { preferences.McpEnabled = false; preferences.PuppetMode = false; preferences.McpWakeEnabled = false; }
     private void StopMcp() { }
     private bool PlayQueuedMcpAction() => false;
     private void PublishMcpInteraction(string kind, object detail) { }
@@ -42,6 +43,7 @@ public partial class MainWindow
     private void InitializeMcp()
     {
         if (preferences.McpEnabled) mcpServer ??= new ControlServer(ExecuteMcp);
+        mcpServer?.SetWakeEnabled(preferences.McpWakeEnabled);
         if (PuppetActive) brain.Stop();
     }
     private void StopMcp()
@@ -55,7 +57,7 @@ public partial class MainWindow
     {
         if (preferences.PuppetMode == enabled) return;
         preferences.PuppetMode = enabled;
-        speechRequestVersion++; brain.Stop(); EndModelSpeech(); EndGreetingNotice();
+        InvalidateSpeechRequests(true); EndGreetingNotice();
         if (!externalBubble) { speech.Cancel(); bubble.Visibility = Visibility.Collapsed; }
         CancelMovement();
         if (enabled && companionReady) PlayAnimation(animationPolicy.Find("待机呼吸休闲"), "PuppetIdle");
@@ -68,7 +70,9 @@ public partial class MainWindow
             PlayIdle();
         }
     }
-    private void PublishMcpInteraction(string kind, object detail) => mcpServer?.Publish(kind, detail);
+    private void PublishMcpInteraction(string kind, object detail) => mcpServer?.Publish(kind, detail,
+        preferences.McpWakeEnabled && (kind == "user_message" && preferences.McpWakeOnText
+            || kind == "click" && preferences.McpWakeOnClick || kind == "drag_end" && preferences.McpWakeOnDrag));
     private bool PlayQueuedMcpAction()
     {
         if (mcpActions.Count == 0) return false;
@@ -83,7 +87,7 @@ public partial class MainWindow
     }
     private void ShowMcpSpeech(string text)
     {
-        speechRequestVersion++; brain.CancelGeneration(); EndModelSpeech(); EndGreetingNotice();
+        InvalidateSpeechRequests(); EndGreetingNotice();
         externalBubble = true;
         bubbleIsModelReply = false;
         bubbleUntil = DateTime.MaxValue;
@@ -110,6 +114,7 @@ public partial class MainWindow
                     return ControlTools.Text(new { settings = CurrentMcpSettings(), state = new {
                         visible = IsVisible, hiddenByUser, fullscreenHidden, action = currentAction, animationPhase,
                         queuedActions = mcpActions.ToArray(), queuedSpeech = mcpNextSpeech, connections = mcpServer?.Connections ?? 0, inputOpen = mcpInput?.IsVisible == true, inputAvailable = McpInputAvailable,
+                        samplingConnections = mcpServer?.SamplingConnections ?? 0, wakeStatus = mcpServer?.WakeStatus,
                         modelAvailable = brain.ModelAvailable, modelBusy = brain.Busy, modelStatus = brain.Status } });
                 case "update_settings":
                     await UpdateMcpSettings(args, token); return ControlTools.Text(new { settings = CurrentMcpSettings() });
@@ -195,9 +200,9 @@ public partial class MainWindow
             else if (item.Key != "PuppetMode") typeof(CompanionPreferences).GetProperty(item.Key)!.SetValue(preferences, item.Value);
         }
         if (values.TryGetValue("PuppetMode", out puppet)) SetPuppetMode((bool)puppet!);
-        if (oldGpu != preferences.GpuEnabled || oldModel && !preferences.ModelEnabled) { speechRequestVersion++; brain.Stop(); }
+        if (oldGpu != preferences.GpuEnabled || oldModel && !preferences.ModelEnabled) InvalidateSpeechRequests(true);
         brain.UseGpu = preferences.GpuEnabled; brain.WeatherRegionCode = preferences.WeatherRegionCode;
-        if (oldRegion != preferences.WeatherRegionCode) { speechRequestVersion++; brain.CancelGeneration(); }
+        if (oldRegion != preferences.WeatherRegionCode) InvalidateSpeechRequests();
         ApplyCompanionPowerPolicy(); ApplyCompanionScale(false); ApplyCompanionBubbleScale(false);
         if (values.TryGetValue("Left", out var left) && left is double x) Left = x;
         if (values.TryGetValue("Top", out var top) && top is double y) Top = y;
@@ -206,6 +211,9 @@ public partial class MainWindow
         if (values.ContainsKey("SpeechMinMinutes")) nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
         if (values.ContainsKey("AnimationIntervalSeconds")) nextAction = DateTime.UtcNow.AddSeconds(preferences.AnimationIntervalSeconds);
         if (values.ContainsKey("BubbleDurationIndex") && bubble.Visibility == Visibility.Visible) ResetBubbleDeadline();
+        mcpServer?.SetWakeEnabled(preferences.McpWakeEnabled);
+        if (!preferences.McpChatEnabled) mcpInput?.Close();
+        UpdateCompanionVisibility();
         SaveCompanion();
         refreshCompanionSettings?.Invoke();
     }
@@ -222,6 +230,12 @@ public partial class MainWindow
         chat.Click += (_, _) => { preferences.McpChatEnabled = chat.IsChecked == true; if (!preferences.McpChatEnabled) mcpInput?.Close(); SaveCompanion(); };
         extra.Children.Add(chat);
         extra.Children.Add(new TextBlock { Text = "仅在 MCP 客户端已连接时生效，输入内容通过 MCP 发送给已连接的 Agent。", Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap });
+        var wake = new CheckBox { Content = "允许鱼鱼通过 MCP 触发 Agent", IsChecked = preferences.McpWakeEnabled, Margin = new(0, 16, 0, 4) };
+        wake.Click += (_, _) => { preferences.McpWakeEnabled = wake.IsChecked == true; mcpServer?.SetWakeEnabled(preferences.McpWakeEnabled); SaveCompanion(); };
+        extra.Children.Add(wake);
+        extra.Children.Add(new TextBlock { Text = "通过客户端的 sampling 能力请求响应，由客户端决定是否接受。", Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap });
+        var wakeFlags = new TextBlock { Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap };
+        extra.Children.Add(wakeFlags);
         var config = new Button { Content = "复制 MCP 连接配置", Margin = new(0, 12, 0, 8) };
         config.Click += (_, _) => {
             var command = Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe");
@@ -232,7 +246,13 @@ public partial class MainWindow
         var status = new TextBlock { Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap };
         extra.Children.Add(status);
         var clock = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-        clock.Tick += (_, _) => status.Text = $"已连接 {mcpServer?.Connections ?? 0} 个 MCP 客户端";
+        void RefreshStatus() {
+            status.Text = $"已连接 {mcpServer?.Connections ?? 0} 个 MCP 客户端，其中 {mcpServer?.SamplingConnections ?? 0} 个支持触发。最近请求：{mcpServer?.WakeStatus ?? "尚未请求"}";
+            string Flag(bool value) => value ? "唤起" : "不唤起";
+            wakeFlags.Text = $"文字：{Flag(preferences.McpWakeOnText)}；点击：{Flag(preferences.McpWakeOnClick)}；拖动：{Flag(preferences.McpWakeOnDrag)}。这三项由已连接的 Agent 调整。";
+        }
+        clock.Tick += (_, _) => RefreshStatus();
+        RefreshStatus();
         clock.Start();
         panel.Children.Add(extra);
         enabled.Click += async (_, _) => {

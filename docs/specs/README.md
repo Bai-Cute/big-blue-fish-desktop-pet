@@ -15,4 +15,5 @@
 
 - [0.5.0](0.5.0.md)
 - [1.0.0](1.0.0.md)
-- [1.0.1（当前）](../AGENT_FUNCTIONAL_SPEC.md)
+- [1.0.1](1.0.1.md)
+- [1.0.2（当前）](../AGENT_FUNCTIONAL_SPEC.md)

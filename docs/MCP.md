@@ -1,4 +1,4 @@
-# 蓝色大肥鱼 1.0.0 MCP 接入参考
+# 蓝色大肥鱼 1.0.2 MCP 接入参考
 
 本文面向连接蓝色大肥鱼的桌面 Agent 与客户端开发者，说明当前实现的参数、返回值、调度关系、权限和错误处理。程序完整行为见[当前功能规格](AGENT_FUNCTIONAL_SPEC.md)。接口名称、设置名称和动作名称均区分大小写。工具的 `inputSchema` 同时向客户端提供字段类型与范围。
 
@@ -23,7 +23,7 @@ Linux 的 `command` 为 `/opt/bigbluefish/BigBlueFish.Mcp`，`args` 同样为空
 
 连接链路为“Agent — stdio 桥接程序 — 同一用户的本机命名管道 — 已运行的桌宠”。桥接程序不会自行启动桌宠，也不会替用户开启 MCP；等待本机服务约5秒后连接失败，提示写到 stderr，并以非零状态退出。stdout 只用于协议数据。请让桥接程序与桌宠在同一操作系统用户身份下运行。默认管道由用户主目录派生，不按安装目录隔离；同一用户安装多份程序不意味着能够同时获得多个互相隔离的鱼鱼控制端。
 
-客户端完成 `initialize` 并发送 `notifications/initialized` 后，设置中的连接数才计入该客户端。仅启动桥接进程或建立管道不算初始化完成。客户端可协商 `2025-03-26` 或 `2025-11-25`；请求其他版本时服务器返回其支持的 `2025-11-25`，客户端须确认自己能接受返回版本。支持工具、日志、资源读取与订阅；不提供 prompts、sampling、roots、HTTP/SSE 传输或工具流式进度。
+客户端完成 `initialize` 并发送 `notifications/initialized` 后，设置中的连接数才计入该客户端。仅启动桥接进程或建立管道不算初始化完成。客户端可协商 `2025-03-26` 或 `2025-11-25`；请求其他版本时服务器返回其支持的 `2025-11-25`，客户端须确认自己能接受返回版本。支持工具、日志、资源读取与订阅，以及可选的客户端 sampling 请求；不提供 prompts、roots、HTTP/SSE 传输或工具流式进度。
 
 MCP 开启期间，连接者可以取得屏幕截图、读取和修改允许的设置、控制文字和动作，以及接收交互与输入事件。这些权限是整个接口的权限，不按客户端或工具分别授权。`ForegroundEnabled=false` 只停止内置模型的自主读屏，**不会禁止 MCP 截图**；`ModelEnabled=false` 或离电暂停也不会禁止外部 `say`。连接者可能把获得的资料发给自己的云端服务或保存到自己的记录中。用户关闭 MCP 后所有连接终止；客户端不能通过工具更改这个开关。
 
@@ -55,6 +55,8 @@ MCP 开启期间，连接者可以取得屏幕截图、读取和修改允许的�
 | queuedActions | 尚未取出的外部动作队列；不包含当前已经播放的动作 |
 | queuedSpeech | 唯一一条待说原文；没有时为 null |
 | connections | 完成初始化且未关闭的客户端数量 |
+| samplingConnections | 已初始化且声明支持 sampling 的客户端数量 |
+| wakeStatus | 最近一次交互触发请求的状态文字，不是固定枚举；多个客户端共享该状态 |
 | inputOpen | 双击输入窗口当前是否显示 |
 | inputAvailable | MCP 和双击开关开启且至少有一个初始化完成的连接 |
 | modelAvailable | 本地模型文件是否可用；不是推理服务已加载或健康检查通过的保证 |
@@ -90,6 +92,10 @@ MCP 开启期间，连接者可以取得屏幕截图、读取和修改允许的�
 | StartupEnabled | boolean | 当前用户系统开机启动设置，不在 preferences.json 中 |
 | PuppetMode | boolean | 每次从false切为true都等待用户在桌面确认；断开不自动关闭，详见提线木偶一节 |
 | McpChatEnabled | boolean | 双击输入开关；仍须至少一个真实连接才打开输入框 |
+| McpWakeEnabled | boolean | 允许交互触发客户端 sampling，默认false；关闭时取消当前采样并清空等待队列 |
+| McpWakeOnText | boolean | 总开关开启后，提交输入文字时触发采样，默认true |
+| McpWakeOnClick | boolean | 总开关开启后，点击角色时触发采样，默认false |
+| McpWakeOnDrag | boolean | 总开关开启后，拖拽结束时触发采样，默认false；拖拽开始仍只通知 |
 
 气泡驻留时间通常从完整吐字结束计时；修改驻留设置时，已经显示的气泡会按新设置重排驻留时间。餐时、日期按桌宠所在电脑的本地时间解释，不由 Agent 的时区解释。数值必须有限，不能用 NaN 或 Infinity。
 
@@ -221,7 +227,21 @@ Windows 位置字段是 `Left`、`Top`，Linux 为 `X`、`Y`；它们描述角�
 
 最后一个客户端断开时，发送按钮会在界面刷新后置灰，未发送草稿保留；发送动作本身也重新检查连接。重新连接可继续发送。关闭 MCP、关闭双击开关或退出程序会关闭输入窗口，不保存未发送草稿。单纯断开不会自动关输入框，也不会恢复自主行为。
 
-**收到通知不等于宿主自动启动一次大模型推理。** MCP 定义消息传输，Agent 宿主决定怎样把日志、资源和用户输入接入自己的任务。只会调用工具、忽略通知的宿主，可以控制鱼鱼，但不会因此自动回复输入框。大肥鱼不会直接读写微信或QQ，也没有发送聊天消息、配置云端模型API或编辑自定义系统提示词的工具；这些扩展逻辑由接入端自行提供。
+默认通过日志和资源发送交互，由 Agent 宿主决定怎样处理。用户还可以开启下节的 sampling 功能，由鱼鱼向支持该能力的连接者请求处理交互。大肥鱼没有直接读写微信或QQ、发送聊天消息、配置云端模型API或编辑自定义系统提示词的工具；这些扩展逻辑由接入端自行提供。
+
+## 可选的交互触发与客户端采样
+
+设置中的“允许鱼鱼通过 MCP 触发 Agent”默认关闭，对应 `McpWakeEnabled`。开启后，默认仅提交输入文字触发；点击和拖拽结束默认不触发。三项事件偏好由 Agent 使用 `update_settings` 修改，设置界面只显示当前值、支持触发的连接数和最近请求状态。普通日志与资源通知始终按原规则发送，采样不会替代这些事件。
+
+客户端在 `initialize.params.capabilities` 中声明 `{"sampling":{}}` 后，可以接收鱼鱼主动发出的 `sampling/createMessage` 请求。支持 MCP 2025-11-25 工具采样的客户端可声明 `{"sampling":{"tools":{}}}`，并按该版协议处理 `tool_use` 和 `tool_result` 内容。客户端只应声明自己实际支持的能力；未声明 sampling 的连接仍可正常调用九个工具和接收普通事件。
+
+鱼鱼把交互事件及其 `sequence`、`kind`、`detail` 编入请求的用户消息，要求处理该交互，并告知最终文字将显示为气泡。请求使用 `maxTokens:1024`，不会把内置模型的人设提示词作为外部 Agent 的人设。接入端负责自己的模型、语气、批准策略及数据处理。客户端可以拒绝采样；这项能力请求的是客户端模型采样，不能保证启动宿主完整的 Agent 任务或唤醒已经退出的进程。
+
+每个支持 sampling 的已初始化连接都会独立收到符合偏好的交互。每连接串行处理，最多等待16条事件；队列已满时跳过本次采样并更新状态，普通事件通知仍照常发送。多个连接可能各自回复并覆盖同一个气泡，客户端应自行安排控制权。普通事件和采样消息中的同一 `sequence` 代表同一次交互，接入端应避免自行重复触发。
+
+没有协商工具能力时，采样返回的非空文本通过现有 `say` 显示，最多保留前4000个 UTF-16 单元。协商 `sampling.tools` 后，请求附带与 `tools/list` 相同的九个工具及 `toolChoice:{"mode":"auto"}`；服务器执行返回的工具调用，再把结果加入下一轮消息。每次交互最多8轮采样、每轮最多16次工具调用，参数和权限沿用普通工具调用规则。已执行过 `say` 时，不再把本次采样最后的普通文本重复显示；`say_next` 不占用该去重标记。客户端应读取工具结果中的 `isError`，而非将返回结果一概当成成功。
+
+每次采样请求最多等待60秒，服务器请求 id 使用 `fish-sampling-` 前缀。响应与普通工具返回、日志通知可能交错，接入端必须持续读取消息并按 id 路由，不能只处理客户端主动请求的响应。超时或取消时发送 `notifications/cancelled`；迟到响应不再用于显示。关闭总开关会取消正在等待的采样并清空队列；断开连接会取消该连接的采样。取消不能撤回已经执行的工具、已显示的文字或已取得的截图。一次请求失败后仍可以处理后续事件，状态中显示最近错误。
 
 ## 并发、取消、断开和失败恢复
 
@@ -252,4 +272,4 @@ Windows 位置字段是 `Left`、`Top`，Linux 为 `X`、`Y`；它们描述角�
 
 共享工具定义与范围在 [ControlTools.cs](../code/BigBlueFish.Control/ControlTools.cs)，协议、通知和资源在 [ControlServer.cs](../code/BigBlueFish.Control/ControlServer.cs)，桥接入口在 [Program.cs](../code/BigBlueFish.Mcp/Program.cs)。平台执行器分别为 [Windows CompanionMcp.cs](../code/BigBlueFish.Windows/Companion/CompanionMcp.cs) 与 [Linux LinuxMcp.cs](../code/BigBlueFish.Linux/LinuxMcp.cs)。
 
-标准消息形式参考 MCP 官方的[工具](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[日志](https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging)和[资源](https://modelcontextprotocol.io/specification/2025-11-25/server/resources)规格。本文的平台限制、调度与状态字段以本项目当前实现为准。
+标准消息形式参考 MCP 官方的[工具](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[日志](https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging)、[资源](https://modelcontextprotocol.io/specification/2025-11-25/server/resources)和[客户端采样](https://modelcontextprotocol.io/specification/2025-11-25/client/sampling)规格。本文的平台限制、调度与状态字段以本项目当前实现为准。

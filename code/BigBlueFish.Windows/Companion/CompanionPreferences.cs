@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Text.Json;
 
@@ -15,6 +15,10 @@ internal sealed class CompanionPreferences
     public bool McpEnabled { get; set; }
     public bool PuppetMode { get; set; }
     public bool McpChatEnabled { get; set; }
+    public bool McpWakeEnabled { get; set; }
+    public bool McpWakeOnText { get; set; } = true;
+    public bool McpWakeOnClick { get; set; }
+    public bool McpWakeOnDrag { get; set; }
     public string WeatherRegionCode { get; set; } = CompanionRegions.DefaultCode;
     public double Scale { get; set; } = 1;
     public double BubbleScale { get; set; } = 1;
@@ -86,9 +90,12 @@ internal sealed class CompanionPreferences
                     s.McpEnabled = false;
                     s.PuppetMode = false;
                     s.McpChatEnabled = false;
+                    s.McpWakeEnabled = false;
 #endif
                     if (!s.McpEnabled) s.PuppetMode = false;
-                    s.Scale = Math.Clamp(s.Scale, .5, 2.0);
+                    s.Scale = double.IsFinite(s.Scale) ? Math.Clamp(s.Scale, .5, 2.0) : 1;
+                    if (s.Left.HasValue && !double.IsFinite(s.Left.Value)) s.Left = null;
+                    if (s.Top.HasValue && !double.IsFinite(s.Top.Value)) s.Top = null;
                     s.BubbleScale = double.IsFinite(s.BubbleScale) ? Math.Clamp(s.BubbleScale, .5, 2.0) : 1;
                     s.AnimationIntervalSeconds = Math.Clamp(s.AnimationIntervalSeconds, 30, 300);
                     s.BreakfastHour = Math.Clamp(s.BreakfastHour, 0, 23);

@@ -39,7 +39,9 @@ internal static class InstallationLifecycle
 
     internal static void GrantUserAccess(string directory)
     {
-        var target = ValidateDirectory(directory);
+        var target = BigBlueFish.Deployment.ApplicationData.DirectoryFor(ValidateDirectory(directory));
+        Directory.CreateDirectory(target);
+        if ((File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0) throw new IOException("数据目录不能使用链接。");
         var users = new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null);
         var rule = new FileSystemAccessRule(users, FileSystemRights.FullControl,
             InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AccessControlType.Allow);
@@ -188,7 +190,7 @@ internal static class InstallationLifecycle
         foreach (var path in Directory.EnumerateFiles(target, ".update-state.json*")) File.Delete(path);
         if (removeData)
         {
-            foreach (var name in new[] { "models", "cache" })
+            foreach (var name in new[] { "data", "models", "cache" })
             {
                 var path = Path.Combine(target, name);
                 if (Directory.Exists(path)) Directory.Delete(path, recursive: true);

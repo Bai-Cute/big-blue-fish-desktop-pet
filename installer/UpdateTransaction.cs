@@ -21,14 +21,7 @@ internal static class UpdateTransaction
             throw new InvalidDataException("更新文件路径无效。");
         return path;
     }
-    private static bool Preserved(string relative)
-    {
-        var p = relative.Replace('\\', '/');
-        return p.StartsWith("models/", StringComparison.OrdinalIgnoreCase) || p.StartsWith("cache/", StringComparison.OrdinalIgnoreCase)
-            || p.StartsWith("preferences.json", StringComparison.OrdinalIgnoreCase) || p.StartsWith("model-selection.json", StringComparison.OrdinalIgnoreCase)
-            || p is "companion.lock" or "ready.status" or "news-last-day.txt" or "companion-errors.log"
-            || p.StartsWith("test-") || p is "ocr-status.json" or "vision-status.json" or "vision-input.jpg" or "model-request.json";
-    }
+    private static bool Preserved(string relative) => BigBlueFish.Deployment.ApplicationData.IsDataFile(relative);
     private static void Write(string target, Journal journal)
     {
         var path = Path.Combine(target, JournalName);

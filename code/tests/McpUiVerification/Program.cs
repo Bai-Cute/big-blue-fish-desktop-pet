@@ -203,7 +203,7 @@ internal static class Program
         string sandbox = Path.GetFullPath(args[0]); Directory.CreateDirectory(sandbox); Environment.CurrentDirectory = sandbox;
         File.Copy(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.ico"), Path.Combine(sandbox, "BigBlueFish.ico"), true);
         File.WriteAllText("preferences.json", "{\"ModelEnabled\":false,\"CheckUpdatesOnStartup\":false,\"PublicInfo\":false}");
-        App.Args = ["--test-mode"]; var app = new App { ShutdownMode = ShutdownMode.OnExplicitShutdown }; Environment.CurrentDirectory = sandbox;
+        App.Args = ["--test-mode"]; var app = new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }; Environment.CurrentDirectory = sandbox;
         try
         {
             pet = new MainWindow(); pet.Show(); Wait(() => (bool)Read("companionReady"), 8, "Actual video initialized");
@@ -255,9 +255,9 @@ internal static class Program
                 double beforeX = inputWindow.Left, beforeY = inputWindow.Top;
                 DragPetByMouse(); Pump(100);
                 Check(Math.Abs(inputWindow.Left-beforeX)+Math.Abs(inputWindow.Top-beforeY)>5, "Input follows the actual dragged pet");
-                input.Text = "暂存草稿"; pet.Hide(); Pump(100);
+                input.Text = "暂存草稿"; Invoke("HideCompanion"); Pump(100);
                 Check(!inputWindow.IsVisible && input.Text == "暂存草稿", "Pet hiding hides the attached input and retains draft");
-                pet.Show(); Pump(150); inputWindow.Activate(); input.Focus();
+                Invoke("RestoreCompanion"); Pump(150); inputWindow.Activate(); input.Focus();
                 Check(inputWindow.IsVisible && input.Text == "暂存草稿", "Showing the pet restores the same attached input");
                 const string submitted = "主人输入的原文\n第二行：ABC <> &，都原样传递~";
                 input.Text = submitted;
@@ -288,6 +288,16 @@ internal static class Program
                 Check(unconfirmed.GetProperty("isError").GetBoolean(), "Agent-enabled puppet shows warning; cancellation leaves mode off");
                 answer = AnswerPuppet(true); client.Data("update_settings", new { settings = new { PuppetMode = true } }); answer.Stop();
                 Check((string)Read("currentAction") == "待机呼吸休闲", "Puppet starts fixed idle");
+                Field("speechRequestPending", true); Field("weatherRequestPending", true);
+                Field("dragging", true); Field("lastClickAt", DateTime.UtcNow);
+                var beforeRecovery = (long)Read("speechRequestVersion");
+                Invoke("RecoverCompanionSession"); Pump(100);
+                Check(!(bool)Read("speechRequestPending") && !(bool)Read("weatherRequestPending") && !(bool)Read("dragging") && !pet.IsMouseCaptured,
+                    "Resume recovery clears abandoned speech, weather and drag state");
+                Check((long)Read("speechRequestVersion") > beforeRecovery && (DateTime)Read("lastClickAt") == DateTime.MinValue,
+                    "Resume recovery invalidates stale completions and double-click state");
+                Check((string)Read("currentAction") == "待机呼吸休闲" && pet.IsVisible,
+                    "Resume recovery preserves fixed puppet idle and visible pet");
                 DragPetByMouse(); Check((string)Read("currentAction") == "待机呼吸休闲","Actual drag preserves puppet idle");
                 Invoke("ClickAnimation"); Check((string)Read("currentAction") == "待机呼吸休闲", "Click cannot switch puppet animation");
                 var context = (ContextMenu)Read("companionContextMenu");

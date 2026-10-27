@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -11,7 +11,6 @@ public partial class App : Application
 
     public App()
     {
-        Environment.CurrentDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location)!;
 #if !DEBUG
         DispatcherUnhandledException += (_, e) => { e.Handled = true; RecordException(e.Exception, false); };
         AppDomain.CurrentDomain.UnhandledException += (_, e) => RecordException((Exception)e.ExceptionObject, true);
@@ -20,6 +19,12 @@ public partial class App : Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        try { Environment.CurrentDirectory = BigBlueFish.Deployment.ApplicationData.Prepare(AppContext.BaseDirectory); }
+        catch (Exception error)
+        {
+            MessageBox.Show("无法准备大肥鱼的数据目录：" + error.Message, "蓝色大肥鱼", MessageBoxButton.OK, MessageBoxImage.Error);
+            Shutdown(1); return;
+        }
         Args = e.Args;
         base.OnStartup(e);
     }

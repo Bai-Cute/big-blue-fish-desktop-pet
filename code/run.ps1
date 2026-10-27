@@ -10,14 +10,24 @@ $directory=Join-Path $PSScriptRoot "BigBlueFish.Windows/bin/x64/Release/$tfm"
 if(!$RuntimeDirectory){$RuntimeDirectory=$env:BLUE_WHALE_RUNTIME}
 if(!$ModelsDirectory){$ModelsDirectory=$env:BLUE_WHALE_MODELS}
 if(!$RuntimeDirectory){$RuntimeDirectory='C:\Program Files\蓝色大肥鱼\runtime'}
-if(!$ModelsDirectory){$ModelsDirectory='C:\Program Files\蓝色大肥鱼\models'}
+if(!$ModelsDirectory){
+    $ModelsDirectory='C:\Program Files\蓝色大肥鱼\data\models'
+    if(!(Test-Path -LiteralPath $ModelsDirectory)){$ModelsDirectory='C:\Program Files\蓝色大肥鱼\models'}
+}
 $ModelsDirectory=$ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($ModelsDirectory)
 $selection=Resolve-DevelopmentModel -ModelsDirectory $ModelsDirectory -NoModel:$NoModel
+$data=Join-Path $directory 'data'
+[IO.Directory]::CreateDirectory($data) | Out-Null
+# Remove only the obsolete development junction, never its target or a real directory.
+$oldModels=Join-Path $directory 'models'
+if((Test-Path -LiteralPath $oldModels) -and ((Get-Item -LiteralPath $oldModels).Attributes -band [IO.FileAttributes]::ReparsePoint)){
+    [IO.Directory]::Delete($oldModels)
+}
 if($selection.Source -ne 'none'){
     if(!(Test-Path -LiteralPath (Join-Path $RuntimeDirectory 'llama-server.exe'))){throw '推理运行时目录缺少 llama-server.exe，请指定 -RuntimeDirectory。'}
     Set-DevelopmentJunction (Join-Path $directory 'runtime') $RuntimeDirectory
-    Set-DevelopmentJunction (Join-Path $directory 'models') $ModelsDirectory
+    Set-DevelopmentJunction (Join-Path $data 'models') $ModelsDirectory
 }
-Save-ModelSelection $directory $selection
+Save-ModelSelection $data $selection
 Write-Host $(if($selection.Source -eq 'none'){'以无模型模式启动。'}else{"使用本地模型：$($selection.FileName)"})
 Start-Process -FilePath (Join-Path $directory 'BigBlueFish.exe') -WorkingDirectory $directory -WindowStyle Hidden

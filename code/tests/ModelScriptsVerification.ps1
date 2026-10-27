@@ -31,8 +31,9 @@ foreach($source in $sources){
 }
 $manual=Join-Path $area '手动来源/自选模型.gguf'
 Fixture $manual
-$dest=Join-Path $area 'manual'
-& "$root/tools/Setup-Model.ps1" -ModelFile $manual -DestinationDirectory $dest -AllowUnverifiedModel
+$install=Join-Path $area 'manual'
+$dest=Join-Path $install 'data'
+& "$root/tools/Setup-Model.ps1" -ModelFile $manual -DestinationDirectory $install -AllowUnverifiedModel
 $selection=Read-ModelSelection $dest
 Assert ($selection.Source -eq 'manual' -and $selection.FileName -eq '自选模型.gguf') 'Actual manual filename lost'
 Assert ((Get-FileHash $manual).Hash -eq (Get-FileHash (Join-Path $dest 'models/自选模型.gguf')).Hash) 'Import changed bytes'
@@ -40,17 +41,17 @@ Assert ((Resolve-DevelopmentModel (Join-Path $dest 'models')).FileName -eq '自�
 Assert ((Resolve-DevelopmentModel ((Join-Path $dest 'models')+'\')).FileName -eq '自选模型.gguf') 'Trailing separator lost selection'
 $before=(Get-FileHash (Join-Path $dest 'model-selection.json')).Hash
 function Read-Host { return 'N' }
-Expect-Failure { & "$root/tools/Setup-Model.ps1" -Source Manual -ModelFile $manual -DestinationDirectory $dest } 'Declined manual import should stop'
+Expect-Failure { & "$root/tools/Setup-Model.ps1" -Source Manual -ModelFile $manual -DestinationDirectory $install } 'Declined manual import should stop'
 Assert ((Get-FileHash (Join-Path $dest 'model-selection.json')).Hash -eq $before) 'Decline altered selection'
 $invalid=Join-Path $area 'invalid.gguf'
 [IO.File]::WriteAllText($invalid,'not a GGUF model')
-Expect-Failure { & "$root/tools/Setup-Model.ps1" -ModelFile $invalid -DestinationDirectory $dest -AllowUnverifiedModel } 'Non-GGUF accepted'
+Expect-Failure { & "$root/tools/Setup-Model.ps1" -ModelFile $invalid -DestinationDirectory $install -AllowUnverifiedModel } 'Non-GGUF accepted'
 Assert ((Get-FileHash (Join-Path $dest 'model-selection.json')).Hash -eq $before) 'Invalid import altered selection'
 # Reimport in place and replace an existing file, exercising atomic paths.
-& "$root/tools/Setup-Model.ps1" -ModelFile (Join-Path $dest 'models/自选模型.gguf') -DestinationDirectory $dest -AllowUnverifiedModel
-& "$root/tools/Setup-Model.ps1" -ModelFile $manual -DestinationDirectory $dest -AllowUnverifiedModel
+& "$root/tools/Setup-Model.ps1" -ModelFile (Join-Path $dest 'models/自选模型.gguf') -DestinationDirectory $install -AllowUnverifiedModel
+& "$root/tools/Setup-Model.ps1" -ModelFile $manual -DestinationDirectory $install -AllowUnverifiedModel
 Assert ((Resolve-DevelopmentModel (Join-Path $dest 'models')).Source -eq 'manual') 'Reimport failed'
-& "$root/tools/Setup-Model.ps1" -Source None -DestinationDirectory $dest
+& "$root/tools/Setup-Model.ps1" -Source None -DestinationDirectory $install
 Assert ((Resolve-DevelopmentModel (Join-Path $dest 'models')).Source -ceq 'none') 'None ignored existing model'
 Assert (Test-Path (Join-Path $dest 'models/自选模型.gguf')) 'None removed model'
 Assert ((Resolve-DevelopmentModel (Join-Path $area 'nonexistent/models') -NoModel).Source -eq 'none') 'NoModel requires files'
@@ -79,20 +80,20 @@ foreach($choice in @('HuggingFace','ModelScope')){
     $download=Join-Path $area ('download-'+$choice)
     & "$root/tools/Setup-Model.ps1" -Source $choice -DestinationDirectory $download
     & "$root/tools/Setup-Model.ps1" -Source $choice -DestinationDirectory $download
-    Assert ((Read-ModelSelection $download).Source -eq $sources[$index].Id) 'Wrong downloaded selection'
-    Assert ((Get-ChildItem (Join-Path $download 'models') -File).Count -eq 1) 'Extra artifact downloaded'
+    Assert ((Read-ModelSelection (Join-Path $download 'data')).Source -eq $sources[$index].Id) 'Wrong downloaded selection'
+    Assert ((Get-ChildItem (Join-Path $download 'data/models') -File).Count -eq 1) 'Extra artifact downloaded'
 }
 Assert ($global:BigBlueFishModelScriptTransport.Requests.Count -eq 2) 'Unexpected download count or cached model redownload'
 Assert ($global:BigBlueFishModelScriptTransport.Requests[0] -eq $sources[0].Url -and $global:BigBlueFishModelScriptTransport.Requests[1] -eq $sources[1].Url) 'Wrong download endpoints'
 function Invoke-WebRequest($Uri,$OutFile){throw 'Injected connection failure'}
 $failedDest=Join-Path $area 'download-failure'
-Save-ModelSelection $failedDest ([ordered]@{Source='none';FileName=$null;Sha256=$null})
+Save-ModelSelection (Join-Path $failedDest 'data') ([ordered]@{Source='none';FileName=$null;Sha256=$null})
 Expect-Failure { & "$root/tools/Setup-Model.ps1" -DestinationDirectory $failedDest } 'Download error swallowed'
-Assert ((Read-ModelSelection $failedDest).Source -eq 'none') 'Failed download altered selection'
+Assert ((Read-ModelSelection (Join-Path $failedDest 'data')).Source -eq 'none') 'Failed download altered selection'
 function Invoke-WebRequest($Uri,$OutFile){Fixture $OutFile}
 $global:BigBlueFishModelScriptTransport.ExpectedHash='0'*64
 Expect-Failure { & "$root/tools/Setup-Model.ps1" -DestinationDirectory $failedDest } 'Wrong download hash accepted'
-Assert ((Read-ModelSelection $failedDest).Source -eq 'none') 'Hash failure altered selection'
+Assert ((Read-ModelSelection (Join-Path $failedDest 'data')).Source -eq 'none') 'Hash failure altered selection'
 # Exercise the actual launcher in an isolated source tree; build, process inventory and launch are substituted.
 $launcher=Join-Path $area 'launcher'
 [IO.Directory]::CreateDirectory((Join-Path $launcher 'code')) | Out-Null
@@ -113,16 +114,16 @@ function Start-Process($FilePath,$WorkingDirectory,$WindowStyle){$global:BigBlue
 $run=Join-Path $launcher 'code/run.ps1'
 $out=Join-Path $launcher 'code/BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.26100.0'
 & $run -NoModel -ModelsDirectory (Join-Path $area 'absent/models') -RuntimeDirectory (Join-Path $area 'absent/runtime')
-Assert ((Read-ModelSelection $out).Source -eq 'none') 'Launcher failed NoModel'
+Assert ((Read-ModelSelection (Join-Path $out 'data')).Source -eq 'none') 'Launcher failed NoModel'
 Assert ($global:BigBlueFishModelScriptTransport.Launched -eq $out) 'Launcher used wrong directory'
 $runtime=Join-Path $area 'runtime'
 [IO.Directory]::CreateDirectory($runtime) | Out-Null
 [IO.File]::WriteAllText((Join-Path $runtime 'llama-server.exe'),'fixture')
 & $run -ModelsDirectory (Join-Path $area 'modelscope/models') -RuntimeDirectory $runtime
-Assert ((Read-ModelSelection $out).FileName -eq $sources[1].FileName) 'Launcher rejected domestic filename'
+Assert ((Read-ModelSelection (Join-Path $out 'data')).FileName -eq $sources[1].FileName) 'Launcher rejected domestic filename'
 Save-ModelSelection $dest ([ordered]@{Source='manual';FileName='自选模型.gguf';Sha256=$null})
 & $run -ModelsDirectory (Join-Path $dest 'models') -RuntimeDirectory $runtime
-Assert ((Read-ModelSelection $out).FileName -eq '自选模型.gguf') 'Launcher rejected actual manual name'
+Assert ((Read-ModelSelection (Join-Path $out 'data')).FileName -eq '自选模型.gguf') 'Launcher rejected actual manual name'
 Assert (Test-Path $manual) 'Launcher modified source model'
 Assert ((Read-ModelSelection $dest).Source -eq 'manual') 'Launcher rewrote source selection'
 $global:BigBlueFishModelScriptTransport.Running=$true

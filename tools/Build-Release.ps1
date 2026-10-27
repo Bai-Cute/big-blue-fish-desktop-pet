@@ -34,8 +34,8 @@ Copy-Item -LiteralPath "$root/code/licenses" -Destination $destination -Recurse
 Copy-Item -LiteralPath "$root/code/LICENSE","$root/code/THIRD-PARTY.md" -Destination $destination
 Copy-Item -LiteralPath "$root/tools/Setup-Model.ps1","$root/tools/Model-Helpers.ps1" -Destination $destination
 Copy-Item -LiteralPath "$root/release/README.md" -Destination (Join-Path $destination 'README.md')
-New-Item -ItemType Directory -Path (Join-Path $destination 'models') | Out-Null
-Set-Content -LiteralPath (Join-Path $destination 'models/README.txt') -Value '运行 Setup-Model.ps1 准备内置 4B 本地模型：-Source HuggingFace（推荐）、-Source ModelScope（国内源）、-Source Manual -ModelFile <GGUF路径>，或 -Source None 选择无模型启动。' -Encoding utf8
+New-Item -ItemType Directory -Path (Join-Path $destination 'data/models') | Out-Null
+Set-Content -LiteralPath (Join-Path $destination 'data/models/README.txt') -Value '运行 Setup-Model.ps1 准备内置 4B 本地模型：-Source HuggingFace（推荐）、-Source ModelScope（国内源）、-Source Manual -ModelFile <GGUF路径>，或 -Source None 选择无模型启动。' -Encoding utf8
 $files=Get-ChildItem -LiteralPath $destination -Recurse -File
 $manifest=foreach($file in $files){
     [ordered]@{path=[IO.Path]::GetRelativePath($destination,$file.FullName).Replace('\','/');size=$file.Length;sha256=(Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}

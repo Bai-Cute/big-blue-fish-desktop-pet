@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -47,7 +47,7 @@ public partial class MainWindow
     {
         if (PuppetActive || weatherRequestPending || companionClosed || exitAnimation) return;
         if (!brain.ModelAvailable) { OpenModelInstaller(); return; }
-        if (hiddenByUser) RestoreCompanion();
+        if (hiddenByUser || fullscreenHidden) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
             ShowCompanionNotice("主人，请先在设置里启用本地大模型，再来查看天气吧～");
@@ -58,8 +58,9 @@ public partial class MainWindow
             ShowCompanionNotice(BatteryPauseNotice, true);
             return;
         }
+        InvalidateSpeechRequests();
         weatherRequestPending = true;
-        long version = ++speechRequestVersion;
+        long version = speechRequestVersion;
         string regionCode = preferences.WeatherRegionCode;
         try
         {
@@ -79,7 +80,7 @@ public partial class MainWindow
             }
             finally
             {
-                EndModelSpeech();
+                if (version == speechRequestVersion) EndModelSpeech();
             }
             if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled
                 && brain.CanRunOnCurrentPower && regionCode == preferences.WeatherRegionCode)
@@ -90,15 +91,17 @@ public partial class MainWindow
         }
         finally
         {
-            weatherRequestPending = false;
-            nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
+            if (version == speechRequestVersion) {
+                weatherRequestPending = false;
+                nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
+            }
         }
     }
 
     private Task SpeakCompanionTest()
     {
         if (PuppetActive || companionClosed || exitAnimation) return Task.CompletedTask;
-        if (hiddenByUser) RestoreCompanion();
+        if (hiddenByUser || fullscreenHidden) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
             ShowCompanionNotice("主人，当前设置暂停了模型，请启用模型并确认供电设置后再测试～");
@@ -146,7 +149,7 @@ public partial class MainWindow
         void SaveRegion()
         {
             if (district.SelectedItem is not CompanionRegion region) return;
-            if (preferences.WeatherRegionCode != region.Code) brain.CancelGeneration();
+            if (preferences.WeatherRegionCode != region.Code) InvalidateSpeechRequests();
             preferences.WeatherRegionCode = region.Code;
             brain.WeatherRegionCode = region.Code;
             SaveCompanion();

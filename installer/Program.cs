@@ -115,11 +115,11 @@ internal sealed class InstallerForm : ModernWindow
                 else { ExtractApplication(archive, target); FinishInstallation(target, Environment.ProcessPath!); }
             });
             progress.IsIndeterminate = false;
-            if (!updating && ModelStore.Resolve(target) == null && ModelStore.ReadSelection(target)?.Source != "none")
+            if (!updating && ModelStore.Resolve(ApplicationData.DirectoryFor(target)) == null && ModelStore.ReadSelection(ApplicationData.DirectoryFor(target))?.Source != "none")
             {
-                var model = new ModelInstallWindow(target) { Owner = this };
+                var model = new ModelInstallWindow(ApplicationData.DirectoryFor(target)) { Owner = this };
                 model.ShowDialog();
-                if (!model.Completed) ModelStore.Save(target, new ModelStore.Selection("none", null, null));
+                if (!model.Completed) ModelStore.Save(ApplicationData.DirectoryFor(target), new ModelStore.Selection("none", null, null));
             }
             status.Text = "安装完成，正在启动蓝色大肥鱼…"; progress.Value = 100;
             if (!applicationStarted) Launch(target);
@@ -147,7 +147,7 @@ internal sealed class InstallerForm : ModernWindow
 
     internal static void LaunchAndVerify(string target)
     {
-        var ready = Path.Combine(target, "ready.status");
+        var ready = Path.Combine(ApplicationData.DirectoryFor(target), "ready.status");
         if (File.Exists(ready)) File.Delete(ready);
         using var process = Launch(target);
         try
@@ -190,6 +190,7 @@ internal sealed class InstallerForm : ModernWindow
         CreateShortcut(desktop, target);
         CreateShortcut(startMenu, target);
         CreateShortcut(uninstallMenu, target, InstallationLifecycle.UninstallerName, $"--uninstall \"{target}\"");
+        ApplicationData.Prepare(target);
         InstallationLifecycle.GrantUserAccess(target);
     }
 
@@ -207,17 +208,7 @@ internal sealed class InstallerForm : ModernWindow
                 throw new InvalidDataException("安装包包含无效路径。");
             return path;
         }
-        static bool Preserved(string relative)
-        {
-            relative = relative.Replace('\\', '/');
-            return relative.StartsWith("models/", StringComparison.OrdinalIgnoreCase)
-                || relative.StartsWith("cache/", StringComparison.OrdinalIgnoreCase)
-                || relative.StartsWith("preferences.json", StringComparison.OrdinalIgnoreCase)
-                || relative.StartsWith("model-selection.json", StringComparison.OrdinalIgnoreCase)
-                || relative is "news-last-day.txt" or "companion.lock" or "ready.status"
-                    or "companion-errors.log" or "test-command.txt" or "test-status.json"
-                    or "ocr-status.json" or "vision-status.json" or "vision-input.jpg";
-        }
+        static bool Preserved(string relative) => ApplicationData.IsDataFile(relative);
         var manifestPath = Path.Combine(target, ManifestName);
         var previous = File.Exists(manifestPath)
             ? JsonSerializer.Deserialize<InstalledManifest>(File.ReadAllText(manifestPath))?.Files ?? [] : [];
@@ -279,7 +270,7 @@ internal sealed class InstallerForm : ModernWindow
             shortcut.TargetPath = Path.Combine(target, executableName);
             shortcut.Arguments = arguments;
             shortcut.WorkingDirectory = target;
-            shortcut.IconLocation = Path.Combine(target, executableName) + ",0";
+            shortcut.IconLocation = "\"" + Path.Combine(target, "BigBlueFish.ico") + "\",0";
             shortcut.Description = "蓝色大肥鱼桌宠";
             shortcut.Save();
         }
@@ -291,12 +282,13 @@ internal sealed class InstallerForm : ModernWindow
 
     private sealed class LimitedStream(Stream inner, long remaining) : Stream
     {
+        private readonly long length = remaining;
         private long left = remaining;
         public override bool CanRead => true;
         public override bool CanSeek => false;
         public override bool CanWrite => false;
-        public override long Length => remaining;
-        public override long Position { get => remaining - left; set => throw new NotSupportedException(); }
+        public override long Length => length;
+        public override long Position { get => length - left; set => throw new NotSupportedException(); }
         public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
         public override int Read(Span<byte> buffer)
         {
