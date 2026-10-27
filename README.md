@@ -164,6 +164,8 @@ dotnet build ./code/BigBlueFish.Windows/BigBlueFish.Windows.csproj -c Release -p
 
 版本变化记录在 [CHANGELOG.md](CHANGELOG.md) 中。当前版本完整的窗口、动作权重、模型输入、天气新闻、安装更新等行为见[功能规格](docs/AGENT_FUNCTIONAL_SPEC.md)，各已发布版本的行为见[版本规格目录](docs/specs/README.md)，方便其他开发者和 AI 接手维护。欢迎通过 GitHub Issues 提交问题、建议和使用反馈，也感谢来自 B 站的小伙伴们一直以来的关爱和建议。
 
+想让已连接的 Agent 用鱼鱼的口吻陪伴主人，可以参考这张[蓝色大肥鱼人设卡](docs/CHARACTER_CARD.txt)。
+
 ## 开源许可与第三方权利信息
 
 本项目以 [Apache License 2.0](LICENSE) 发布。鱼鱼的形象来自对 DeepSeek 的二创虚拟形象“蓝色大肥鱼”；项目使用的动画、模型、运行时、字体和数据分别来自以下项目，各自遵循其原有许可：
