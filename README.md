@@ -4,7 +4,7 @@
 
 鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。
 
-当前版本为 **1.0.1**，安装包请前往 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载。
+当前版本为 **1.0.5**，安装包请前往 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载。
 
 <p align="center">
   <img src="docs/images/bigbluefish-rest-transparent.png" width="38%" alt="蓝色大肥鱼休息状态" />
@@ -61,15 +61,15 @@
 
 | 平台 | 标准版 | 无MCP版 |
 | --- | --- | --- |
-| Windows x64 | `BigBlueFish-v1.0.1-OCR-Setup.exe` | `BigBlueFish-v1.0.1-Safe-OCR-Setup.exe` |
-| Ubuntu／Debian x64 | `BigBlueFish-v1.0.1-Linux-x64.deb` | `BigBlueFish-v1.0.1-Safe-Linux-x64.deb` |
+| Windows x64 | `BigBlueFish-v1.0.5-OCR-Setup.exe` | `BigBlueFish-v1.0.5-Safe-OCR-Setup.exe` |
+| Ubuntu／Debian x64 | `BigBlueFish-v1.0.5-Linux-x64.deb` | `BigBlueFish-v1.0.5-Safe-Linux-x64.deb` |
 
 在 Windows 上，双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时一并安装好，默认位置是 `Program Files` 下的“蓝色大肥鱼”文件夹，并创建桌面和开始菜单快捷方式。随后安装器会请主人选择模型的准备方式：Hugging Face（推荐）、国内源（稳定）或手动安装。自动下载的模型约 2.7 GB，下载完成后会经过 SHA-256 校验，中途断开也能从已有进度继续。下载时如果想改用手动安装，可以选择“放弃并转为手动安装”；手动安装会显示模型应放入的文件夹，并打开模型来源页面，也可以直接选择已经下载好的 GGUF 文件。卸载时可以在卸载界面勾选“保留模型和设置”。
 
 在 Ubuntu／Debian 上，下载对应的 `.deb` 后，在其所在目录执行：
 
 ```bash
-sudo apt install ./BigBlueFish-v1.0.1-Linux-x64.deb
+sudo apt install ./BigBlueFish-v1.0.5-Linux-x64.deb
 ```
 
 安装无MCP版时换成对应的文件名即可。安装完成后，可以从应用菜单或 `bigbluefish` 命令启动鱼鱼，再到设置的“模型与信息”中点击“安装模型”，为她准备本地模型。
