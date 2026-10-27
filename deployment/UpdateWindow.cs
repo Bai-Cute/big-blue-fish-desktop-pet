@@ -27,7 +27,9 @@ internal sealed class UpdateWindow : ModernWindow
     {
         this.update = update; this.directory = Path.GetFullPath(directory);
         this.dataDirectory = dataDirectory ?? ApplicationData.DirectoryFor(directory);
-        Body.Children.Add(ModernUI.Text(update.Notes)); Body.Children.Add(progress); Body.Children.Add(status);
+        Body.Children.Add(new TextBlock { Text = "更新内容", FontWeight = FontWeights.SemiBold, Foreground = ModernUI.Blue, Margin = new Thickness(0, 0, 0, 10) });
+        Body.Children.Add(string.IsNullOrWhiteSpace(update.Notes) ? ModernUI.Text("本次更新没有提供详细说明。") : MarkdownView.Render(update.Notes));
+        Body.Children.Add(progress); Body.Children.Add(status);
         Actions.Children.Add(ModernUI.Button("稍后", () => { if (download != null) download.Cancel(); else Close(); }));
         start = ModernUI.Button("下载并更新", async () => await Install(), true); Actions.Children.Add(start);
         Closing += (_, e) => { if (download != null) { closeRequested = true; download.Cancel(); e.Cancel = true; } };
@@ -42,6 +44,8 @@ internal sealed class UpdateWindow : ModernWindow
         {
             var installer = Path.Combine(dataDirectory, "cache", "updates", update.Name);
             status.Text = "正在下载更新…";
+            // Release notes can be long, so make sure the download status is in view when work starts.
+            status.BringIntoView();
             await ArtifactDownload.Download(update.Url, installer, update.Sha256,
                 new Progress<ArtifactDownload.Progress>(p => { progress.Value = p.Percent; status.Text = p.ToString(); }), download.Token);
             // The installer waits for this exact app process to finish its normal exit.

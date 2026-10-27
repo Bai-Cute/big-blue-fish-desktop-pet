@@ -115,6 +115,7 @@ internal static class Checks
             if (args.Length >= 2 && args[0] == "--ui-layout") return DeploymentVerification.Ui(args[1]);
             if (args.Length >= 2 && args[0] == "--deployment") return DeploymentVerification.Rules(args[1]).GetAwaiter().GetResult();
             if (args.Length >= 2 && args[0] == "--model-ui") return DeploymentVerification.ModelUi(args[1]);
+            if (args.Length >= 2 && args[0] == "--update-notes") return UpdateNotesVerification.Run(args[1]);
             if (args.Length == 4 && args[0] == "--update-live") return UpdateVerification.Run(args[1], args[2], args[3]);
             if (args.Length == 2 && args[0] == "--model-download-live") return DeploymentVerification.LiveDownload(args[1]).GetAwaiter().GetResult();
             if (args.Length == 2 && args[0] == "--write-probe") return RestrictedUserProbe.WriteProbe(args[1]);
