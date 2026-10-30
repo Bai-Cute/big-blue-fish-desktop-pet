@@ -26,6 +26,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../BigBlueFish.Control/BigBlueFish.Control.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
+    <ProjectReference Include="../BigBlueFish.Agent/BigBlueFish.Agent.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
     <Resource Include="Res/Font/LemiXiaoNaiPaoTi.ttf" />
     <None Update="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="assets/fish/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

@@ -7,7 +7,9 @@ payload="$work/payload"
 mkdir -p "$payload/runtime"
 cp -a "$runtime/llama-server" "$payload/runtime/"
 cp -a "$runtime/"*.so* "$payload/runtime/"
-cp "$runtime/LICENSE" "$payload/runtime/LLAMA-LICENSE"
+license="$runtime/LICENSE"
+if [[ ! -f $license ]]; then license="$runtime/LLAMA-LICENSE"; fi
+cp "$license" "$payload/runtime/LLAMA-LICENSE"
 gcc -O2 -Wall -Wextra -o "$payload/runtime/BigBlueFish.RunnerGuard" "$root/code/BigBlueFish.Linux/runner-guard.c"
 gcc -O2 -Wall -Wextra $(pkg-config --cflags dbus-1) -o "$payload/runtime/BigBlueFish.PortalCapture" "$root/code/BigBlueFish.Linux/portal-capture.c" $(pkg-config --libs dbus-1)
 cp -a "$root/code/licenses" "$payload/"

@@ -26,13 +26,13 @@ static class Program
             object Read(string name)=>pet.GetType().GetField(name,Access)!.GetValue(pet)!;
             object? Invoke(string name,params object[] values)=>pet.GetType().GetMethod(name,Access)!.Invoke(pet,values);
             var assembly=typeof(MainWindow).Assembly;
-            Check(!assembly.GetReferencedAssemblies().Any(a=>a.Name=="BigBlueFish.Control"),"safe executable has no Control assembly reference");
+            Check(!assembly.GetReferencedAssemblies().Any(a=>a.Name is "BigBlueFish.Control" or "BigBlueFish.Agent"),"safe executable has no Control or Agent assembly reference");
             Check(pet.GetType().GetMethod("ExecuteMcp",Access)==null,"safe executable contains no MCP executor");
             var prefs=Read("preferences");
             Check(!(bool)prefs.GetType().GetProperty("McpEnabled")!.GetValue(prefs)! && !(bool)prefs.GetType().GetProperty("PuppetMode")!.GetValue(prefs)!,"old enabled flags cannot start MCP or puppet in Safe");
             Check((string)Read("animationPhase")=="Startup","safe keeps ordinary welcome animation");
             Invoke("OpenCompanionSettings");Pump(150);var settings=(Window)Read("companionSettings");
-            Check(!Descendants<Button>(settings).Any(b=>b.Content?.ToString()=="Agent 与 MCP"),"safe settings have no MCP page");
+            Check(!Descendants<Button>(settings).Any(b=>b.Content?.ToString() is "Agent 与 MCP" or "连接 Agent"),"safe settings have no Agent page");
             settings.Close();Invoke("AnimationBoundary");
             Check((string)Read("animationPhase")=="Idle","safe keeps ordinary idle logic");
             Check(!AppDomain.CurrentDomain.GetAssemblies().Any(a=>a.GetName().Name=="BigBlueFish.Control"),"no MCP assembly loaded in actual process");

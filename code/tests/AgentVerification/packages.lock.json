@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "bigbluefish.agent": {
+        "type": "Project"
+      },
+      "bigbluefish.control": {
+        "type": "Project"
+      }
+    },
+    "net10.0/win-x64": {}
+  }
+}

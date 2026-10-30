@@ -1,275 +1,97 @@
-# 蓝色大肥鱼 1.0.5 MCP 接入参考
+# 蓝色大肥鱼内部工具参考
 
-本文面向连接蓝色大肥鱼的桌面 Agent 与客户端开发者，说明当前实现的参数、返回值、调度关系、权限和错误处理。程序完整行为见[当前功能规格](AGENT_FUNCTIONAL_SPEC.md)。接口名称、设置名称和动作名称均区分大小写。工具的 `inputSchema` 同时向客户端提供字段类型与范围。
+标准版通过 ACP 连接本机 CLI Harness，并在创建或恢复专用会话时自动提供本工具服务。用户操作见 [连接 Agent](ACP.md)。鱼鱼以当前进程随机命名的用户范围管道接收控制，随包 stdio 桥接程序使用 `--pipe <本次管道名>` 连接。管道配置由程序生成，无需手工加入全局 Harness 配置。
 
-## 连接与权限
+## 协议与结果
 
-使用标准版，在设置的“Agent 与 MCP”中开启“开启 MCP 接口”，阅读并确认告知，再点击“复制 MCP 连接配置”。无MCP版没有 MCP 控制代码、桥接程序或设置入口。内置模型可以关闭或尚未安装，MCP 本身仍可工作。
+桥接程序通过 stdin/stdout 传递逐行 UTF-8 JSON-RPC 2.0，诊断只写 stderr。初始化协商支持 `2025-03-26` 和 `2025-11-25`，发送 `notifications/initialized` 后开始工具调用。支持 `ping`、`tools/list`、`tools/call`、日志级别、资源读取与订阅及取消。鱼鱼不通过 sampling 请求模型。
 
-Windows 配置示例中的路径应替换成实际安装路径；设置按钮复制的配置已经包含正确绝对路径：
+普通成功结果是 MCP `content` 数组，首项为 `type:text`，其 `text` 是 JSON 字符串。工具失败使用 `isError:true` 和说明文字；JSON-RPC 方法、资源和初始化错误使用协议 error。调用方先检查错误，再解析首项文本。`displayed`、`started`、`pending`、`queued` 表示提交状态，不能据此判断主人已看见或动作已播放完毕。
+
+截图结果的首项文字包含目标、身份、宽高与截取时间，第二项是 `type:image`、`mimeType:image/png` 和 base64 `data`。图像在内存中取得；Windows 前台遵循鱼鱼已有前台选择规则，全屏包含全部显示器；Linux 由 X11 或 Wayland 门户捕获，门户授权由桌面环境处理。
+
+## 设置
+
+`get_settings` 返回 `settings` 与 `state`。settings 为持久化字段及系统启动项；state 为窗口可见性、隐藏来源、当前动作、播放阶段、动作队列、待说文字、工具连接、输入框、Agent状态和模型状态的快照。`modelAvailable` 表示有模型文件，不等于推理进程已驻留。
+
+`update_settings` 参数为 `{"settings":{...}}`，省略的字段保留，字段名区分大小写，先验证整个补丁。`AgentEnabled`、`AgentHarnessId` 只读，由用户在连接页选择。以下为可写字段：
+
+| 字段 | 类型与范围 | 含义 |
+| --- | --- | --- |
+| ModelEnabled | bool | 启用内置模型 |
+| GpuEnabled | bool | 本地推理启用GPU |
+| PublicInfo | bool | 内置天气、新闻 |
+| ForegroundEnabled | bool | 内置模型读屏；不控制Agent截图工具 |
+| StopModelOnBattery | bool | 离电暂停并卸载内置模型 |
+| HideOnFullscreen | bool | 外部全屏时自动隐藏 |
+| CheckUpdatesOnStartup | bool | 启动检查更新 |
+| WeatherRegionCode | 六位字符串 | 内置地区表存在的区县代码 |
+| Scale / BubbleScale | 0.5–2的有限数 | 角色／独立气泡倍率 |
+| SpeechMinMinutes | 2、3、5、10、15、20之一 | 分别对应2–3、3–5、5–8、10–16、15–23、20–30分钟 |
+| BubbleDurationIndex | 0–7整数 | 5、10、15、30、60、120、180秒，或直到下一句 |
+| AnimationIntervalSeconds | 30–300整数 | 普通随机动作事件等待秒数，等完整片段结束再切换 |
+| BreakfastHour / LunchHour / DinnerHour | 0–23整数 | 本地时间餐时中心小时 |
+| Left / Top | -1000000–1000000有限数或null | Windows逻辑坐标，Linux像素；受工作区约束，null不主动移动 |
+| LastBrushDate | yyyy-MM-dd有效日期或null | 每日刷牙去重日期 |
+| StartupEnabled | bool | 当前用户开机启动 |
+| PuppetMode | bool | 完全外部接管；开启须等待用户确认 |
+| AgentDailySpeech | bool | 日常吐字交给Agent |
+| AgentRespondToClick | bool | 点击事件主动发起ACP轮次，默认关 |
+| AgentRespondToDrag | bool | 拖动结束主动发起ACP轮次，默认关 |
+
+更新设置不打开、激活或置顶设置窗口。窗口已打开时保留页面、滚动、位置和窗口状态并刷新。修改GPU、模型、地区等按现有逻辑取消或重排对应任务；Linux每次应用设置都会停止本地模型并重排计时。开启关心触发与动作接管的确认异步显示，等待时角色仍可拖动；取消则不应用该补丁。IO或系统启动项写入失败可能发生在内存设置已变更后，调用方读取状态再决定下一步。
+
+## 截图、动作与文字
+
+| 工具 | 输入 | 行为 |
+| --- | --- | --- |
+| list_actions | 空对象 | 返回106项精确action、pool、基础weight和名义duration_seconds |
+| capture_foreground | 可选max_dimension | 当前前台截图，默认最长边2560 |
+| capture_screen | 可选max_dimension | 虚拟桌面截图，默认最长边4096 |
+| play_action | action | 加入FIFO队列，最多100项 |
+| interrupt_action | action | 清空未播放队列，立即切换动作 |
+| say | text | 立即原文逐字显示，替换当前气泡并取消旧本地生成 |
+| say_next | text | 覆盖待说原文，在下次符合日常节奏时显示 |
+| request_local_speech | 空对象 | 立即请求真实本地模型按当前情境生成日常关心；需要AgentDailySpeech=false和可用的本地模型 |
+
+max_dimension为256–16384整数。action精确匹配list_actions，最多200字符，Disabled池动作也可指定。重复动作不去重；隐藏或拖动时排队动作等待。外部动作播完后，普通模式恢复自主调度，关心触发与动作接管回到固定待机。立即动作和说话不会自动恢复被隐藏的角色。
+
+text非空白且最多4000个UTF-16单元，按约28个组合字符/秒显示，保留原文，不执行Markdown、不经过本地模型文本清理。外部原文不依赖本地模型、GPU或插电。say不清除say_next；关闭连接或退出清除待说原文。say_next服从正常可见性、设置窗口、倒计时、拖动及空闲门槛，关心触发与动作接管暂停该节奏；立即说话应使用say。
+
+## 操作指南与预约
+
+`get_operation_guide` 无参数，返回工作目录中已安装的技能正文、人设与相应文件路径。文件内容以用户实际保存的版本为准。
+
+`get_wakeups` 无参数，返回当前Harness、会话的预约以及预约机制是否启用。
+
+`schedule_wakeup` 输入：
 
 ```json
 {
-  "mcpServers": {
-    "big-blue-fish": {
-      "command": "C:\\Program Files\\蓝色大肥鱼\\BigBlueFish.Mcp.exe",
-      "args": []
-    }
-  }
+  "purpose": "看看主人是否适合休息一下",
+  "delay_seconds": 600,
+  "repeat_seconds": 600
 }
 ```
 
-Linux 的 `command` 为 `/opt/bigbluefish/BigBlueFish.Mcp`，`args` 同样为空数组。`mcpServers` 是常见宿主配置形式，各 Agent 的配置入口和外层格式由宿主决定。这里填写的是进程路径，不是 HTTP URL；没有可填写的 HTTP 端口。
+purpose为1–1000字符；delay_seconds与可选repeat_seconds为30–604800整数秒。省略或null的repeat_seconds表示一次性。可传最多100字符的既有id修改当前会话的预约，新预约返回自己的id、Harness、会话、用途、到期时间和周期。全局最多32项。
 
-连接链路为“Agent — stdio 桥接程序 — 同一用户的本机命名管道 — 已运行的桌宠”。桥接程序不会自行启动桌宠，也不会替用户开启 MCP；等待本机服务约5秒后连接失败，提示写到 stderr，并以非零状态退出。stdout 只用于协议数据。请让桥接程序与桌宠在同一操作系统用户身份下运行。默认管道由用户主目录派生，不按安装目录隔离；同一用户安装多份程序不意味着能够同时获得多个互相隔离的鱼鱼控制端。
+创建需要连接就绪并开启关心触发与动作接管。切换吐字编写者保留预约；关闭连接、离开关心触发与动作接管或开始新对话会清除当前Harness的预约。预约不要求Agent在一轮内持续等待，当前轮次可以结束。
 
-客户端完成 `initialize` 并发送 `notifications/initialized` 后，设置中的连接数才计入该客户端。仅启动桥接进程或建立管道不算初始化完成。客户端可协商 `2025-03-26` 或 `2025-11-25`；请求其他版本时服务器返回其支持的 `2025-11-25`，客户端须确认自己能接受返回版本。支持工具、日志、资源读取与订阅，以及可选的客户端 sampling 请求；不提供 prompts、roots、HTTP/SSE 传输或工具流式进度。
+AgentDailySpeech=true时，到期通过ACP向同一对话提交wakeup，附预约用途；false时，到期由鱼鱼直接调用本地模型生成日常关心。隐藏、拖动或未连接时推迟；多个到期预约合并。一次预约在提交前移除，重复预约从本次提交时间重新计时。Agent可检查、取消或修改后续预约。
 
-MCP 开启期间，连接者可以取得屏幕截图、读取和修改允许的设置、控制文字和动作，以及接收交互与输入事件。这些权限是整个接口的权限，不按客户端或工具分别授权。`ForegroundEnabled=false` 只停止内置模型的自主读屏，**不会禁止 MCP 截图**；`ModelEnabled=false` 或离电暂停也不会禁止外部 `say`。连接者可能把获得的资料发给自己的云端服务或保存到自己的记录中。用户关闭 MCP 后所有连接终止；客户端不能通过工具更改这个开关。
+`cancel_wakeup` 输入 `{"id":"预约编号"}`，只取消当前Harness会话中的对应项，返回是否取消。
 
-## 请求与返回值约定
+## 事件与输入
 
-通常由客户端 SDK 负责 JSON-RPC 封装。下文的调用示例采用 `tools/call` 的 `params` 对象：
+点击、拖动开始和结束，以及用户输入形成sequence、UTC time、kind、detail事件。最近128项只保存在控制服务内存中，URI为`bigbluefish://interactions`。`resources/read`返回当前数组，不清空；`resources/subscribe`通过`notifications/resources/updated`告知变化，调用方自行读取。
 
-```json
-{"name":"update_settings","arguments":{"settings":{"AnimationIntervalSeconds":60}}}
-```
+info级别的`notifications/message`使用logger `bigbluefish.interaction`，可以通过`logging/setLevel`调整。通知和资源是同一事件的两种获取方式，按服务实例和sequence去重。超过队列容量的旧事件被覆盖，服务关闭释放事件记录。
 
-九个工具为 `get_settings`、`update_settings`、`list_actions`、`capture_foreground`、`capture_screen`、`play_action`、`interrupt_action`、`say`、`say_next`。无参数工具传 `{}`。不要添加未定义的参数。
+双击输入直接通过ACP发起user_message，内容为主人提交的原文。Agent普通文字不进入气泡；回复通过say完成。输入固定可用，连接未就绪时发送按钮置灰并保留草稿。点击和拖动是否另发起Agent轮次由两个响应字段决定。
 
-普通工具数据在 `result.content[0].text` 内，是一个 **JSON 字符串**。SDK 提供文本内容块后，还需要对该文本做一次 JSON 解析。当前工具不返回 `structuredContent`，也没有 `outputSchema`。截图工具额外返回标准 `image` 内容块，详情见截图一节。
+## 生命周期
 
-工具执行失败通常返回 `result.isError=true` 和可读的文本错误。不能只看 JSON-RPC 收到了 `result` 就认定成功；也不能把“已入队”“已提交显示”当成动作完成或用户已读。状态读取是读取时的快照，不是完成事件。
+关闭连接或退出取消工具请求、确认等待和ACP进程，释放内部服务。请求可通过`notifications/cancelled`取消；工具在执行前及异步工作后检查取消。动作和文字已经提交到UI后的副作用不自动回滚。多个工具请求可同时等待，UI中的实际控制由相同调度器执行。
 
-## 读取设置和状态：get_settings
-
-返回两个对象：`settings` 与 `state`。`settings` 包含持久化字段及系统开机启动设置，允许修改的内容见下一节；`state` 只能读取，不可放入修改补丁。
-
-| state 字段 | 含义 |
-| --- | --- |
-| visible | 当前角色窗口是否显示 |
-| hiddenByUser | 是否被用户主动隐藏 |
-| fullscreenHidden | 是否由全屏自动隐藏 |
-| action | 当前动作的精确名称 |
-| animationPhase | 内部播放阶段，如 Startup、Idle、Event、Click、Drag、External、PuppetIdle；Windows 与 Linux 的阶段名称不保证全部相同 |
-| queuedActions | 尚未取出的外部动作队列；不包含当前已经播放的动作 |
-| queuedSpeech | 唯一一条待说原文；没有时为 null |
-| connections | 完成初始化且未关闭的客户端数量 |
-| samplingConnections | 已初始化且声明支持 sampling 的客户端数量 |
-| wakeStatus | 最近一次交互触发请求的状态文字，不是固定枚举；多个客户端共享该状态 |
-| inputOpen | 双击输入窗口当前是否显示 |
-| inputAvailable | MCP 和双击开关开启且至少有一个初始化完成的连接 |
-| modelAvailable | 本地模型文件是否可用；不是推理服务已加载或健康检查通过的保证 |
-| modelBusy | 本地模型是否处于任务占用状态 |
-| modelStatus | 给用户看的模型状态文字，不是固定枚举，不宜用完整句子匹配业务状态 |
-
-`visible=false` 不代表 MCP 断开。隐藏状态下仍可读取状态和请求截图，但文字、动作回执不保证用户此刻能看到角色。`inputAvailable=true` 也不代表输入窗口已经打开，或客户端一定会自动启动一次模型回复。
-
-## 修改设置：update_settings
-
-`arguments.settings` 必须是对象。只提供要修改的字段，省略字段保留原值。名称和类型必须精确匹配，布尔不能用字符串 `"true"`，数值不能用字符串 `"60"`，整数不能使用小数。`McpEnabled` 可读但不可写；未知设置字段会被拒绝。
-
-| 字段 | 类型及范围 | 效果与注意事项 |
-| --- | --- | --- |
-| ModelEnabled | boolean | 控制内置模型；外部文字不受此开关限制 |
-| GpuEnabled | boolean | 本地推理 GPU 开关；切换可能停止模型并按新设置重新加载 |
-| PublicInfo | boolean | 内置天气和科技新闻开关 |
-| ForegroundEnabled | boolean | 内置模型自主读屏开关；不是 MCP 截图权限 |
-| StopModelOnBattery | boolean | 离电暂停并卸载内置模型；不限制外部文字和截图 |
-| HideOnFullscreen | boolean | 外部全屏自动隐藏；关闭后可恢复仅由此条件隐藏的角色 |
-| CheckUpdatesOnStartup | boolean | 启动时检查更新 |
-| WeatherRegionCode | string | 内置地区表中存在的县区代码，例如 `"340104"`；省、市代码或地区名称不能代替县区代码 |
-| Scale | number，0.5–2.0 | 角色尺寸倍率；`1` 为100% |
-| BubbleScale | number，0.5–2.0 | 气泡独立尺寸倍率，不改变角色尺寸 |
-| SpeechMinMinutes | integer，枚举 `2,3,5,10,15,20` | 分别选择2–3、3–5、5–8、10–16、15–23、20–30分钟区间；不是任意分钟数，也不是固定间隔 |
-| BubbleDurationIndex | integer，0–7 | 索引依次代表5秒、10秒、15秒、30秒、1分钟、2分钟、3分钟、直到下一句 |
-| AnimationIntervalSeconds | integer，30–300 | 普通随机动作事件间隔，单位秒，默认40；不是动画帧率、播放速度或说话间隔，正常切换等当前片段播完；提线木偶模式暂停此调度 |
-| BreakfastHour | integer，0–23 | 系统本地时间的早餐小时 |
-| LunchHour | integer，0–23 | 系统本地时间的午餐小时 |
-| DinnerHour | integer，0–23 | 系统本地时间的晚餐小时 |
-| Left、Top | number或null，数值在−1,000,000至1,000,000之间 | 窗口左上坐标；Windows 为逻辑坐标，Linux 为屏幕像素并截取整数。最终位置受可见身体与屏幕工作区约束。null不主动移动到默认位置，保存时仍记下实际位置 |
-| LastBrushDate | 有效日期字符串 `yyyy-MM-dd` 或null | 每日刷牙动作去重日期。修改会影响当天是否再次触发，通常无需修改 |
-| StartupEnabled | boolean | 当前用户系统开机启动设置，不在 preferences.json 中 |
-| PuppetMode | boolean | 每次从false切为true都等待用户在桌面确认；断开不自动关闭，详见提线木偶一节 |
-| McpChatEnabled | boolean | 双击输入开关；仍须至少一个真实连接才打开输入框 |
-| McpWakeEnabled | boolean | 允许交互触发客户端 sampling，默认false；关闭时取消当前采样并清空等待队列 |
-| McpWakeOnText | boolean | 总开关开启后，提交输入文字时触发采样，默认true |
-| McpWakeOnClick | boolean | 总开关开启后，点击角色时触发采样，默认false |
-| McpWakeOnDrag | boolean | 总开关开启后，拖拽结束时触发采样，默认false；拖拽开始仍只通知 |
-
-气泡驻留时间通常从完整吐字结束计时；修改驻留设置时，已经显示的气泡会按新设置重排驻留时间。餐时、日期按桌宠所在电脑的本地时间解释，不由 Agent 的时区解释。数值必须有限，不能用 NaN 或 Infinity。
-
-修改前先验证整个补丁。字段、类型、范围、日期或地区无效时，不应用同一补丁中的其他字段；若开启提线木偶的确认被取消，整个补丁也不应用。成功返回完整 `settings`，读取返回值或再次调用 `get_settings` 确认最终值，不假定坐标、整数位置和控件显示一定与输入字面值完全相同。
-
-这不是跨进程的数据库事务。操作系统开机启动写入、文件保存或窗口操作失败时，不承诺回滚已经执行的副作用；客户端取消或超时也不等于操作从未发生。Windows 保存设置失败可能保留已生效的内存值，因此返回成功不代表任何环境下都能保证磁盘写入。错误或超时后先读回实际状态，再决定是否重试。
-
-普通修改不会打开、关闭、恢复或激活设置窗口；已有窗口原地刷新，保留页面、滚动位置、位置和窗口状态。开启提线木偶的告知窗口仍会显示并等待用户确认，等待期间不会禁用角色或气泡，主人仍可拖动鱼鱼；也可以切到其他应用。关闭告知窗口或点取消等同不接受，不会自动替用户确认。
-
-Windows 主要根据相关字段取消或重配模型任务、重排说话或动作等待时间。Linux 当前每次应用设置都会停止本地模型任务、重排说话与事件等待时间，随后按设置恢复预加载。即使传入空 `settings:{}`，也会走应用设置流程。不要把它当心跳，不要高频写入与现值相同的设置。
-
-## 动作控制
-
-`list_actions` 返回数组，每项含 `action`、`pool`、`weight`、`duration_seconds`。当前共有106个动作，调用时从列表复制完整名称，例如：
-
-```json
-{"name":"play_action","arguments":{"action":"轻快摇摆舞"}}
-```
-
-```json
-{"name":"interrupt_action","arguments":{"action":"蓝鲸现世"}}
-```
-
-`action` 不能为空或全为空白，最多200个 UTF-16 单元，精确匹配动作 Id；不接受翻译名、简称、索引或本地文件路径。`pool` 和 `weight` 描述内置自主选择规则，不限制外部调用；标为 Disabled 的素材也可以由外部指定。动作工具不能增加、删除或重设随机池权重，也不能上传新动作文件。
-
-`duration_seconds` 是当前返回的名义时长：Greeting 为约6.67秒，其余为10秒。它不读取每个视频的真实帧数，不应当作完成信号。外部直接指定 Drag 分类动作时也不是鼠标拖动阶段的自动裁片；播放动作本身不会抓住角色或令其沿内置移动路线移动。
-
-`play_action` 把动作加入最多100项的先进先出队列，重复项保留。当前片段结束、没有拖动且角色未隐藏时，优先取出下一条外部动作。隐藏会暂停播放，拖动也可能推迟队列。普通点击、立即动作、关闭程序等仍可打断安排；需要完全外部控制时使用提线木偶模式。Windows 播放器未就绪时拒绝动作请求；Linux 当前没有相同的就绪检查，成功回执也不能代替观察实际播放状态。
-
-`interrupt_action` 清空尚未播放的外部动作队列、取消当前内置移动安排，并立即发起指定动作的播放。它不自动显示被隐藏的角色。隐藏状态下调度仍可能暂停或延迟可见效果。动作结束后，提线木偶模式回到固定待机；普通模式恢复普通调度。
-
-两个动作工具返回 `{action,started,queued}`。`queued` 是尚在队列内的数量。`interrupt_action` 的 `started=true` 表示已发起播放；`play_action` 通常是false，但 Windows 在同名外部动作已经播放时也可能返回true，不能据此推断这一次新排队项已开始。当前没有逐项队列编号、播放完成通知或外部动作取消专用工具。可用 `get_settings` 查看当前动作与队列；单次动作可能发生在两次轮询之间。
-
-单纯断开 MCP 客户端不会清除服务器中的外部队列。关闭 MCP 或退出桌宠会清除队列。多个客户端共享同一个队列，无独占锁、优先客户端或重试去重；超时后盲目重发 `play_action` 可能排入重复动作。
-
-## 外部文字
-
-```json
-{"name":"say","arguments":{"text":"主人，鱼鱼来给你加油啦~"}}
-```
-
-```json
-{"name":"say_next","arguments":{"text":"主人，忙完这一小段就休息一下呀~"}}
-```
-
-`text` 是连接者指定的原文，不让内置模型续写、改写或生成。不能是空字符串或全为空白，运行时上限为4000个 UTF-16 单元；多数汉字占一个单元，常见 emoji 可能占两个或更多。JSON Schema 的字符计数与 UTF-16 计数可能不同，含大量 emoji 时应按运行时上限控制。文本不是语音播放、Markdown 或 HTML；换行与标点保留。
-
-`say` 取消当前本地生成并替换现有气泡，按约每秒28个组合字符逐字显示。无模型、关闭内置模型或离电暂停时仍可使用。它不会自动恢复用户隐藏或全屏隐藏的角色；`displayed=true` 表示进入显示流程，不是吐字完成或用户已读的回执。气泡按当前尺寸、位置和驻留设置显示，极长文本不等于窗口必然能在屏幕中完整容纳。普通模式之后的自主说话仍可能覆盖外部文字。
-
-`say_next` 只有一个待说槽位，新调用覆盖旧调用。`pending=true` 仅说明已写入槽位，不是定时到某一秒的承诺。到期后要求角色可见、没有拖动、未打开设置或模型安装窗口、没有退出、不是提线木偶模式，并且系统键鼠空闲处于8–600秒区间；空闲条件不满足时会把检查延后30秒。已有外部原文不要求本地模型存在、启用或供电允许。满足节奏时消费一次，再重新抽取下一次说话等待时间。
-
-提线木偶模式暂停 `say_next` 的普通节奏，关闭该模式后才可能消费。吐字测试不消费槽位；`say` 不清除槽位；客户端单纯断开也不清除。关闭 MCP 或退出应用会清除待说内容。文本槽位、当前气泡与动作队列相互独立，没有把“指定动作+指定文字”作为一个原子操作的接口。
-
-## 提线木偶模式
-
-```json
-{"name":"update_settings","arguments":{"settings":{"PuppetMode":true}}}
-```
-
-从关闭切到开启需要主人在真实桌面确认告知。客户端应允许这个请求等待用户操作；不要自动代替主人点击确认，也不要因尚未收到结果而重复请求开启。确认期间其他已连接客户端仍可读取状态或发送其他命令。已有确认尚未处理时，再请求需要确认的操作会返回错误。
-
-生效后停止内置推理与预加载，不自主显示普通文字、天气、吐字测试、欢迎词或告别词，两个菜单中的天气与吐字测试置灰。角色固定循环“待机呼吸休闲”，不按日期、饭点、季节、点击或普通事件间隔自动换动作。鼠标仍可拖动角色、发出交互事件，拖动本身不切换悬空动作，也不在松手时重置外部动作。
-
-外部动作和 `say` 照常有效；队列播完后回到固定待机。客户端退出或桥接进程关闭后模式保持，鱼鱼不会自行恢复自主功能。显式设置 `PuppetMode=false` 或由用户关闭 MCP 才恢复普通调度；模式内退出程序不自动插入行礼或告别。设置会保存，重新启动时若 MCP 和模式均仍开启，就直接按提线木偶行为启动。
-
-## 截图
-
-```json
-{"name":"capture_foreground","arguments":{"max_dimension":1280}}
-```
-
-```json
-{"name":"capture_screen","arguments":{"max_dimension":4096}}
-```
-
-`max_dimension` 为可选整数256–16384，前台默认2560，全屏默认4096。它限制输出图像最长边，保持宽高比，只缩小、不把小图放大；不是先把原始截图限制到这一尺寸再采集。Windows 缩放尺寸取整与 Linux 的取整方式可有一像素差异。
-
-`capture_foreground` 按桌宠已有规则选择当前有效外部窗口。Windows 排除自身、最小化、不可见、被系统 cloaked 的窗口以及任务栏、通知区等；自身窗口或菜单占据前台时可使用最近仍有效的外部窗口，再尝试桌面。当前前台句柄为空时也可能直接失败。窗口可能在目标选择和像素采集之间变化，因此辅助标题与图像不构成原子快照。
-
-Windows 优先用窗口渲染，失败后使用该区域的屏幕复制；后者可能包含遮挡窗口。桌面 Shell 捕获裁到当前鼠标所在显示器，**不等于多显示器全桌面**。Windows 前台捕获拒绝小于32像素的区域，以及底层窗口宽或高超过12000像素的情况。窗口渲染在某些应用中可能返回黑色或缺失内容；成功生成 PNG 不自动证明正文正确。
-
-`capture_screen` 在 Windows 捕获所有显示器组成的虚拟桌面，可能包含鱼鱼、气泡、菜单和其他可见窗口，以及显示器之间的空隙。原始区域无效或超过150,000,000像素时失败；设置较小的 `max_dimension` 不会绕过原始区域限制。锁屏、安全桌面、受保护的视频或权限受限窗口可能失败或产生不完整内容，不能把工具成功当作屏幕内容识别成功。
-
-Linux X11 使用当前根窗口和 Composite，前台目标排除自身与最小化等无效窗口；有效旧外部窗口可作回退。应用截图取可见屏幕范围内的客户端区域，通常不包含窗口管理器装饰；桌面和全屏读取 X11 根窗口。范围无效、超过150,000,000像素或桌面像素格式不受支持时失败。X11 根窗口的范围由桌面服务器配置决定。
-
-Wayland 通过桌面 Screenshot Portal 请求。前台要求门户版本至少3且支持 Active Window 目标，否则报错；全屏范围及授权由门户实际返回决定，旧门户不能保证与 Windows 虚拟桌面完全同义。门户可能弹授权提示，用户可以取消；等待授权有约100秒限制。截图辅助 identity 仍可能来自 X11/XWayland 信息，不应拿它替代门户图像来判断前台。代码读取门户提供的本机临时图像并尝试删除，异常退出或失败路径不保证临时文件一定清理。Wayland 不能被描述为与已验证的 X11 截图效果完全相同。
-
-返回 `content[0]` 为文本 JSON，字段为 `target`、`identity`、`Width`、`Height`、`capturedAt`，其中尺寸首字母大写；`content[1]` 为 `{type:"image",mimeType:"image/png",data:"..."}`。`data` 是不带 data-URL 前缀的 base64 PNG。`capturedAt` 在编码返回附近生成，不是精确的曝光时间。工具只返回图像和辅助身份，不替 Agent 做 OCR 或总结。
-
-截图不要求 `ForegroundEnabled`、`PublicInfo` 或 `ModelEnabled` 开启，提线木偶模式也不禁止截图；MCP 的用户授权是这里的入口。程序没有持续推送屏幕流，只有收到截图命令才返回该次图像。
-
-## 点击、拖动与双击输入事件
-
-事件通过标准日志通知推送：
-
-```json
-{
-  "jsonrpc":"2.0",
-  "method":"notifications/message",
-  "params":{
-    "level":"info",
-    "logger":"bigbluefish.interaction",
-    "data":{
-      "sequence":12,
-      "time":"2026-10-17T12:00:00+00:00",
-      "kind":"user_message",
-      "detail":{"text":"鱼鱼，今天想做什么呀？"}
-    }
-  }
-}
-```
-
-| kind | detail 与语义 |
-| --- | --- |
-| click | `button` 为left或right；双击识别路径可能附 `count:2`，普通点击不保证有count；附当前角色位置 |
-| drag_start | 开始超过拖动阈值，附当时位置 |
-| drag_end | 拖动结束位置及 `cancelled`；鼠标捕获丢失等路径可能标为true |
-| user_message | `text` 为输入框提交的原文 |
-
-Windows 位置字段是 `Left`、`Top`，Linux 为 `X`、`Y`；它们描述角色窗口位置，不是鼠标坐标。Windows 使用逻辑单位，Linux 使用屏幕像素。不是每一帧拖动都推送事件，主要发送开始和结束。双击可能同时出现普通click与带count的click，不保证一个双击只有一条通知，也不应把两个click无条件当成两次完整对话请求。
-
-默认日志门槛为info。`logging/setLevel` 支持 debug、info、notice、warning、error、critical、alert、emergency。设置为notice或更高会过滤这些info交互日志；这不代表连接断开。希望自动接收交互的宿主应保留info日志，并处理 `bigbluefish.interaction`，不要只显示工具返回文本。
-
-同一事件也进入 `bigbluefish://interactions` 资源的内存环形队列，最多保留最近128条。使用 `resources/list` 发现资源；`resources/read` 返回 `contents[0].text` 中的 JSON 数组；`resources/subscribe` 后的新事件触发 `notifications/resources/updated`，客户端再读取资源。订阅不是把完整事件放进更新通知，也不会立即补推历史；可在订阅后主动读一次。`resources/unsubscribe` 取消资源更新通知，不停止默认日志推送。
-
-日志与资源是同一事件的两种获取方式，应按 `sequence` 去重。序号在本次服务实例内递增，服务关闭重开会重新开始；不要跨服务实例仅用同一个sequence判重。资源是共享队列，不是每客户端消费队列；读取不会删除事件。超过128条的旧事件会被覆盖，没有持久化重放、业务确认回执或断线期间不丢消息的保证。即使暂时没有客户端，接口开启时的交互仍可能进入这128条内存队列。
-
-在设置中开启“双击与鱼鱼对话”，且至少一个客户端完成初始化时，双击角色打开贴在鱼鱼身边的紧凑输入框，没有标题栏或任务栏按钮；输入框随角色移动，隐藏角色时同步隐藏。空输入框显示灰字“通过鱼鱼和已连接的Agent说话”，输入后灰字消失。支持多行和最多4000个 UTF-16 单元，Enter换行，点击发送或Ctrl+Enter提交，Esc或关闭按钮收起；全为空白不能发送。发送成功仅表示提交给当前服务连接通道，没有“Agent已接收、已理解或已回复”的回执。发送后清空输入，Agent需自行处理 `user_message.detail.text`，再调用 `say` 等工具回复。
-
-最后一个客户端断开时，发送按钮会在界面刷新后置灰，未发送草稿保留；发送动作本身也重新检查连接。重新连接可继续发送。关闭 MCP、关闭双击开关或退出程序会关闭输入窗口，不保存未发送草稿。单纯断开不会自动关输入框，也不会恢复自主行为。
-
-默认通过日志和资源发送交互，由 Agent 宿主决定怎样处理。用户还可以开启下节的 sampling 功能，由鱼鱼向支持该能力的连接者请求处理交互。大肥鱼没有直接读写微信或QQ、发送聊天消息、配置云端模型API或编辑自定义系统提示词的工具；这些扩展逻辑由接入端自行提供。
-
-## 可选的交互触发与客户端采样
-
-设置中的“允许鱼鱼通过 MCP 触发 Agent”默认关闭，对应 `McpWakeEnabled`。开启后，默认仅提交输入文字触发；点击和拖拽结束默认不触发。三项事件偏好由 Agent 使用 `update_settings` 修改，设置界面只显示当前值、支持触发的连接数和最近请求状态。普通日志与资源通知始终按原规则发送，采样不会替代这些事件。
-
-客户端在 `initialize.params.capabilities` 中声明 `{"sampling":{}}` 后，可以接收鱼鱼主动发出的 `sampling/createMessage` 请求。支持 MCP 2025-11-25 工具采样的客户端可声明 `{"sampling":{"tools":{}}}`，并按该版协议处理 `tool_use` 和 `tool_result` 内容。客户端只应声明自己实际支持的能力；未声明 sampling 的连接仍可正常调用九个工具和接收普通事件。
-
-鱼鱼把交互事件及其 `sequence`、`kind`、`detail` 编入请求的用户消息，要求处理该交互，并告知最终文字将显示为气泡。请求使用 `maxTokens:1024`，不会把内置模型的人设提示词作为外部 Agent 的人设。接入端负责自己的模型、语气、批准策略及数据处理。客户端可以拒绝采样；这项能力请求的是客户端模型采样，不能保证启动宿主完整的 Agent 任务或唤醒已经退出的进程。
-
-每个支持 sampling 的已初始化连接都会独立收到符合偏好的交互。每连接串行处理，最多等待16条事件；队列已满时跳过本次采样并更新状态，普通事件通知仍照常发送。多个连接可能各自回复并覆盖同一个气泡，客户端应自行安排控制权。普通事件和采样消息中的同一 `sequence` 代表同一次交互，接入端应避免自行重复触发。
-
-没有协商工具能力时，采样返回的非空文本通过现有 `say` 显示，最多保留前4000个 UTF-16 单元。协商 `sampling.tools` 后，请求附带与 `tools/list` 相同的九个工具及 `toolChoice:{"mode":"auto"}`；服务器执行返回的工具调用，再把结果加入下一轮消息。每次交互最多8轮采样、每轮最多16次工具调用，参数和权限沿用普通工具调用规则。已执行过 `say` 时，不再把本次采样最后的普通文本重复显示；`say_next` 不占用该去重标记。客户端应读取工具结果中的 `isError`，而非将返回结果一概当成成功。
-
-每次采样请求最多等待60秒，服务器请求 id 使用 `fish-sampling-` 前缀。响应与普通工具返回、日志通知可能交错，接入端必须持续读取消息并按 id 路由，不能只处理客户端主动请求的响应。超时或取消时发送 `notifications/cancelled`；迟到响应不再用于显示。关闭总开关会取消正在等待的采样并清空队列；断开连接会取消该连接的采样。取消不能撤回已经执行的工具、已显示的文字或已取得的截图。一次请求失败后仍可以处理后续事件，状态中显示最近错误。
-
-## 并发、取消、断开和失败恢复
-
-所有客户端共享当前设置、模式、动作队列、待说槽位和事件资源，没有独占接管权。普通修改在桌面线程应用；需要用户确认或截图等异步操作期间，其他请求仍可进入。请求与确认可能交错，最后实际应用的值决定结果，不提供基于版本号的比较更新。响应可与通知穿插，多个请求的返回顺序不保证与发送顺序相同；用 JSON-RPC id 匹配，不要读取“下一行”就当成本次响应。
-
-`notifications/cancelled` 按requestId取消仍在执行的请求；等待用户确认时可关闭确认框，截图在可取消点检查取消。取消不能撤销已经显示的文字、已入队动作、已经拍到的屏幕或已应用的设置。Windows 底层同步截图不能保证立刻中断。没有为所有工具设置统一的业务超时，客户端应区分等待用户、等待截图授权和连接失败。
-
-关闭桥接stdin、桌宠退出、用户关闭MCP或管道断开会结束连接。桥接程序不自动重连；由宿主重新启动连接。单纯客户端断开时，服务器和提线木偶模式可以继续存在，动作队列及待说文字不自动清空；关闭MCP或桌宠退出则清除内存队列和待说内容。已保存的设置继续保留，当前气泡按原有显示生命周期结束，不承诺关闭MCP瞬间清掉已经显示的每个字。
-
-协议采用UTF-8、每行一个JSON-RPC对象，不使用Content-Length头或JSON批处理数组。单个输入行最大1,048,576个 UTF-16 单元；响应与通知的每连接输出队列上限128条，队列塞满或写入约10秒不能完成时断开慢客户端。客户端应持续读取stdout；只写请求不读通知可能导致断线。单次截图的数据量不受输入行上限约束，但仍受图像尺寸和输出阻塞限制。
-
-| 情况 | 当前返回或处理 | 接入端处理 |
-| --- | --- | --- |
-| JSON无法解析 | JSON-RPC error `-32700` | 修正封装；不要原样循环重试 |
-| 不是有效请求对象、重复活动id | `-32600` | 使用对象请求与不同活动id |
-| 初始化前调用需初始化的方法 | `-32002` | 完成握手及initialized通知 |
-| 未实现的协议方法 | `-32601` | 只使用已公布能力 |
-| 未知资源、日志级别等 | `-32602` | 检查参数和资源URI |
-| 未知工具、设置无效、动作不存在、队列已满、截图失败等 | 工具 `isError:true`，文本说明原因 | 按错误类型处理，不把result当成功 |
-| 请求取消或用户拒绝确认 | 工具错误，当前通常为“操作已取消。” | 不自动代替用户重试确认；读回状态 |
-| 连接失败或断开 | 桥接stderr提示、流结束或读取异常 | 检查标准版、开关、同一用户与进程，再重新握手 |
-
-工具错误文本不是稳定的错误码枚举，某些类型错误直接包含JSON反序列化信息。不要用中文完整句子做唯一判断，也不要宣称当前实现会对所有畸形请求维持连接；严重封装错误可能导致会话终止。客户端应保持合法JSON对象、正确类型和有限大小。
-
-推荐接入顺序：连接并握手，获取设置与动作列表，按需选择模式，开始持续处理日志或资源事件，再发送控制命令。断线重连后重新读取状态，确认模式、队列和待说内容，按当前服务实例处理sequence，再继续工作。轮询使用读取工具，不用设置写入当轮询；对入队或有副作用的命令，超时后先核对状态。
-
-## 实现入口与协议参考
-
-共享工具定义与范围在 [ControlTools.cs](../code/BigBlueFish.Control/ControlTools.cs)，协议、通知和资源在 [ControlServer.cs](../code/BigBlueFish.Control/ControlServer.cs)，桥接入口在 [Program.cs](../code/BigBlueFish.Mcp/Program.cs)。平台执行器分别为 [Windows CompanionMcp.cs](../code/BigBlueFish.Windows/Companion/CompanionMcp.cs) 与 [Linux LinuxMcp.cs](../code/BigBlueFish.Linux/LinuxMcp.cs)。
-
-标准消息形式参考 MCP 官方的[工具](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)、[日志](https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/logging)、[资源](https://modelcontextprotocol.io/specification/2025-11-25/server/resources)和[客户端采样](https://modelcontextprotocol.io/specification/2025-11-25/client/sampling)规格。本文的平台限制、调度与状态字段以本项目当前实现为准。
+Agent自行保存会话和处理模型请求；输入、截图或工具结果可能经其配置发送给云端模型。鱼鱼的连接告知统一覆盖其自身的控制工具；普通文件、终端等Agent操作仍按对应Harness的权限请求处理。

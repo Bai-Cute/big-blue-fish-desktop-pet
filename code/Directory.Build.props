@@ -9,7 +9,7 @@
     <DebugType>portable</DebugType>
     <EmbedAllSources>true</EmbedAllSources>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BigBlueFish.Control' Or '$(MSBuildProjectName)' == 'BigBlueFish.Mcp'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'BigBlueFish.Control' Or '$(MSBuildProjectName)' == 'BigBlueFish.Mcp' Or '$(MSBuildProjectName)' == 'BigBlueFish.Agent'">
     <BaseIntermediateOutputPath>obj/$(RuntimeIdentifier)/</BaseIntermediateOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);obj/**;bin/**</DefaultItemExcludes>
     <NuGetLockFilePath>packages.$(RuntimeIdentifier).lock.json</NuGetLockFilePath>

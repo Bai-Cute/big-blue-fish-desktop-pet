@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BigBlueFish.Windows;
 internal sealed class CompanionPreferences
@@ -12,13 +13,19 @@ internal sealed class CompanionPreferences
     public bool StopModelOnBattery { get; set; } = true;
     public bool HideOnFullscreen { get; set; } = true;
     public bool CheckUpdatesOnStartup { get; set; } = true;
-    public bool McpEnabled { get; set; }
+    public bool AgentEnabled { get; set; }
+    public string AgentHarnessId { get; set; } = "codex";
+    public bool AgentDailySpeech { get; set; }
+    public bool AgentRespondToClick { get; set; }
+    public bool AgentRespondToDrag { get; set; }
+    // Old UI/animation helpers use this internal alias. Legacy MCP settings do not turn on a new CLI connection.
+    [JsonIgnore] public bool McpEnabled { get => AgentEnabled; set => AgentEnabled = value; }
     public bool PuppetMode { get; set; }
-    public bool McpChatEnabled { get; set; }
-    public bool McpWakeEnabled { get; set; }
-    public bool McpWakeOnText { get; set; } = true;
-    public bool McpWakeOnClick { get; set; }
-    public bool McpWakeOnDrag { get; set; }
+    [JsonIgnore] public bool McpChatEnabled { get => AgentEnabled; set { } }
+    [JsonIgnore] public bool McpWakeEnabled { get => false; set { } }
+    [JsonIgnore] public bool McpWakeOnText { get => true; set { } }
+    [JsonIgnore] public bool McpWakeOnClick { get => AgentRespondToClick; set => AgentRespondToClick = value; }
+    [JsonIgnore] public bool McpWakeOnDrag { get => AgentRespondToDrag; set => AgentRespondToDrag = value; }
     public string WeatherRegionCode { get; set; } = CompanionRegions.DefaultCode;
     public double Scale { get; set; } = 1;
     public double BubbleScale { get; set; } = 1;
@@ -91,6 +98,7 @@ internal sealed class CompanionPreferences
                     s.PuppetMode = false;
                     s.McpChatEnabled = false;
                     s.McpWakeEnabled = false;
+                    s.AgentDailySpeech = false;
 #endif
                     if (!s.McpEnabled) s.PuppetMode = false;
                     s.Scale = double.IsFinite(s.Scale) ? Math.Clamp(s.Scale, .5, 2.0) : 1;

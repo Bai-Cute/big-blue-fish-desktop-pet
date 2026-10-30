@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 using Avalonia.Threading;
 using Avalonia;
@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 #if !COMPANION_SAFE
 using BigBlueFish.Control;
+using BigBlueFish.Agent;
 #endif
 
 namespace BigBlueFish.Windows;
@@ -14,6 +15,10 @@ internal sealed partial class LinuxPetWindow
 {
 #if COMPANION_SAFE
     static bool McpAvailable => false;
+    bool AgentDailyActive => false;
+    void TickAgent(DateTime now) { }
+    void ConfigureAgent() { }
+    bool DispatchAgentDaily() => false;
     void InitializeMcp() { Preferences.McpEnabled = false; Preferences.PuppetMode = false; Preferences.McpWakeEnabled = false; }
     void StopMcp() { }
     void PublishInteraction(string kind, object detail) { }
@@ -21,29 +26,59 @@ internal sealed partial class LinuxPetWindow
 #else
     static bool McpAvailable => true;
     ControlServer? mcpServer;
+    AgentCoordinator? agent;
+    readonly string agentPipe = ControlTools.PipeName + "." + Guid.NewGuid().ToString("N");
+    bool AgentDailyActive => Preferences.AgentEnabled && Preferences.AgentDailySpeech;
+    void ConfigureAgent() { agent?.Configure(Preferences.AgentHarnessId, new(Preferences.AgentEnabled, Preferences.PuppetMode, Preferences.AgentDailySpeech)); if (!AgentDailyActive) nextWarmup = DateTime.MinValue; }
+    void TickAgent(DateTime now)
+    {
+        agent?.Tick(new DateTimeOffset(now), !hidden && !fullscreenHidden && !dragging && !closed && phase != "Exit");
+        if (!generating) loading.IsVisible = agent?.AwaitingSpeech == true && !hidden && !fullscreenHidden;
+    }
+    bool DispatchAgentDaily()
+    {
+        if (!AgentDailyActive) return false;
+        nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random)); agent?.DailyCare(); return true;
+    }
     Window? mcpInput;
-    bool McpInputAvailable => Preferences.McpEnabled && Preferences.McpChatEnabled && (mcpServer?.Connections ?? 0) > 0;
+    bool McpInputAvailable => Preferences.AgentEnabled;
     void InitializeMcp()
     {
-        if (Preferences.McpEnabled) mcpServer ??= new ControlServer(ExecuteMcp);
-        mcpServer?.SetWakeEnabled(Preferences.McpWakeEnabled);
-        if (Puppet) brain.Stop();
+        if (!Preferences.AgentEnabled) return;
+        mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
+        agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"), Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), agentPipe, RequestAgentPermission,
+            App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+        if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
+        agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
+        ConfigureAgent();
+        if (AgentDailyActive) brain.Stop();
     }
-    void StopMcp() { consentWindow?.Close(); mcpInput?.Close(); mcpServer?.Dispose(); mcpServer = null; externalActions.Clear(); nextExternalText = null; }
-    void PublishInteraction(string kind, object detail) => mcpServer?.Publish(kind, detail,
-        Preferences.McpWakeEnabled && (kind == "user_message" && Preferences.McpWakeOnText
-            || kind == "click" && Preferences.McpWakeOnClick || kind == "drag_end" && Preferences.McpWakeOnDrag));
+    void StopMcp() { consentWindow?.Close(); mcpInput?.Close(); agent?.Dispose(); agent = null; mcpServer?.Dispose(); mcpServer = null; externalActions.Clear(); nextExternalText = null; }
+    void PublishInteraction(string kind, object detail)
+    {
+        mcpServer?.Publish(kind, detail);
+        if (kind == "click" && Preferences.AgentRespondToClick || kind == "drag_end" && Preferences.AgentRespondToDrag) agent?.Interaction(kind, detail);
+    }
     void SetPuppet(bool enabled)
     {
         if (Preferences.PuppetMode == enabled) return;
-        Preferences.PuppetMode = enabled; speechVersion++; brain.Stop(); loading.IsVisible = false; moveRule = null;
+        Preferences.PuppetMode = enabled; speechVersion++; if (AgentDailyActive) brain.Stop(); else brain.CancelGeneration(); loading.IsVisible = false; moveRule = null;
         if (!externalSpeech) { typing = false; bubbleWindow.Hide(); }
-        Idle();
+        ConfigureAgent(); Idle();
         if (!enabled) { nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random)); nextEvent = DateTime.UtcNow.AddSeconds(Preferences.AnimationIntervalSeconds); nextWarmup = DateTime.MinValue; }
+    }
+    async Task RequestAgentLocalSpeech(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!Preferences.AgentEnabled || AgentDailyActive) throw new InvalidOperationException("本地吐字需要连接 Agent 并关闭 AgentDailySpeech。");
+        if (!Preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower) throw new InvalidOperationException("本地模型未启用、尚未安装或已按供电设置暂停。");
+        if (generating || closed || phase == "Exit" || modelInstalling || hidden || fullscreenHidden) throw new InvalidOperationException("鱼鱼当前忙碌或隐藏，请稍后再触发本地吐字。");
+        using var registration = token.Register(() => Dispatcher.UIThread.Post(() => { speechVersion++; brain.CancelGeneration(); }));
+        await Speak(false, true); token.ThrowIfCancellationRequested();
     }
     Dictionary<string, object?> CurrentSettings()
     {
-        var result = typeof(CompanionPreferences).GetProperties().ToDictionary(p => p.Name, p => p.GetValue(Preferences));
+        var result = typeof(CompanionPreferences).GetProperties().Where(p => !Attribute.IsDefined(p, typeof(System.Text.Json.Serialization.JsonIgnoreAttribute))).ToDictionary(p => p.Name, p => p.GetValue(Preferences));
         result["StartupEnabled"] = StartupEnabled; return result;
     }
     async Task<object> ExecuteMcp(string name, JsonElement args, CancellationToken token)
@@ -53,8 +88,9 @@ internal sealed partial class LinuxPetWindow
             if (closed || phase == "Exit" || !Preferences.McpEnabled) throw new InvalidOperationException("MCP 接口已关闭或桌宠正在退出。");
             switch (name)
             {
-                case "get_settings": return ControlTools.Text(new { settings = CurrentSettings(), state = new { visible = IsVisible, hiddenByUser = hidden, fullscreenHidden, action = currentAction, animationPhase = phase, queuedActions = externalActions.ToArray(), queuedSpeech = nextExternalText, connections = mcpServer?.Connections ?? 0, inputOpen = mcpInput?.IsVisible == true, inputAvailable = McpInputAvailable, samplingConnections = mcpServer?.SamplingConnections ?? 0, wakeStatus = mcpServer?.WakeStatus, modelAvailable = brain.ModelAvailable, modelBusy = brain.Busy, modelStatus = brain.Status } });
+                case "get_settings": return ControlTools.Text(new { settings = CurrentSettings(), state = new { visible = IsVisible, hiddenByUser = hidden, fullscreenHidden, action = currentAction, animationPhase = phase, queuedActions = externalActions.ToArray(), queuedSpeech = nextExternalText, connections = mcpServer?.Connections ?? 0, inputOpen = mcpInput?.IsVisible == true, inputAvailable = McpInputAvailable, agentConnected = agent?.Connected == true, agentStatus = agent?.Status, agentSession = agent?.SessionId, nextWake = agent?.NextWake, modelAvailable = brain.ModelAvailable, modelBusy = brain.Busy, modelStatus = brain.Status } });
                 case "update_settings": await UpdateSettings(args, token); return ControlTools.Text(new { settings = CurrentSettings() });
+                case "request_local_speech": await RequestAgentLocalSpeech(token); return ControlTools.Text(new { generated = modelReply && bubbleWindow.IsVisible });
                 case "list_actions": return ControlTools.Text(policy.Rules.Select(r => new { action = r.Id, pool = r.Pool, weight = r.Weight, duration_seconds = r.Pool == "Greeting" ? 10 / 1.5 : 10 }));
                 case "capture_foreground": case "capture_screen":
                     var handle = CompanionNative.ResolveForeground(CompanionNative.GetForegroundWindow(), lastForeground);
@@ -72,8 +108,11 @@ internal sealed partial class LinuxPetWindow
                     return ControlTools.Text(new { action, started = name == "interrupt_action", queued = externalActions.Count });
                 case "say": case "say_next":
                     string text = ControlTools.RequiredText(args, "text");
+                    agent?.MarkSpoken();
                     if (name == "say") SayExternal(text); else nextExternalText = text;
                     return ControlTools.Text(new { displayed = name == "say", pending = name == "say_next", text });
+                case "get_operation_guide": case "get_wakeups": case "schedule_wakeup": case "cancel_wakeup":
+                    return ControlTools.Text(agent?.ExecuteTool(name, args) ?? throw new InvalidOperationException("Agent 尚未连接。"));
                 default: throw new ArgumentException("未知 MCP 工具。");
             }
         });
@@ -101,7 +140,7 @@ internal sealed partial class LinuxPetWindow
             if (!valid) throw new ArgumentException("设置值无效：" + item.Key);
         }
         if (values.TryGetValue("PuppetMode", out var puppet) && puppet is true && !Preferences.PuppetMode
-            && !await Confirm("开启提线木偶模式", ControlTools.PuppetWarning, "了解并开启", token)) throw new OperationCanceledException("用户取消开启提线木偶模式。");
+            && !await Confirm(ControlTools.BehaviorControlTitle, ControlTools.PuppetWarning, "了解并开启", token)) throw new OperationCanceledException("用户取消让 Agent 安排日常关心与动作。");
         token.ThrowIfCancellationRequested(); if (!Preferences.McpEnabled) throw new OperationCanceledException();
         foreach (var item in values)
             if (item.Key == "StartupEnabled") SetStartup((bool)item.Value!);
@@ -111,7 +150,7 @@ internal sealed partial class LinuxPetWindow
         if (values.TryGetValue("Left", out var left) && left is double x) position = new((int)x, position.Y);
         if (values.TryGetValue("Top", out var top) && top is double y) position = new(position.X, (int)y);
         ApplySettings(position);
-        mcpServer?.SetWakeEnabled(Preferences.McpWakeEnabled);
+        ConfigureAgent();
         if (!Preferences.McpChatEnabled) mcpInput?.Close();
         refreshLinuxSettings?.Invoke();
     }
@@ -137,10 +176,10 @@ internal sealed partial class LinuxPetWindow
             HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top,
             Foreground = Hair, Background = Avalonia.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
         Avalonia.Controls.ToolTip.SetTip(close, "收起输入框"); close.Click += (_, _) => dialog.Close(); editor.Children.Add(close);
-        void Send() { if (!McpInputAvailable || string.IsNullOrWhiteSpace(text.Text)) return; PublishInteraction("user_message", new { text = text.Text }); text.Text = ""; status.Text = "已发送给 Agent"; text.Focus(); }
+        void Send() { if (agent?.Connected != true || string.IsNullOrWhiteSpace(text.Text) || !agent.SendUser(text.Text)) return; PublishInteraction("user_message", new { text = text.Text }); text.Text = ""; status.Text = "已发送给 Agent"; text.Focus(); }
         var send = ActionButton("发送", Send); send.MinWidth = 58; send.Padding = new Thickness(12, 5); send.FontSize = 12;
         var actions = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") }; actions.Children.Add(status); actions.Children.Add(send); Grid.SetColumn(send, 1); panel.Children.Add(actions);
-        text.TextChanged += (_,_) => send.IsEnabled = McpInputAvailable && !string.IsNullOrWhiteSpace(text.Text);
+        text.TextChanged += (_,_) => send.IsEnabled = agent?.Connected == true && !string.IsNullOrWhiteSpace(text.Text);
         dialog.AddHandler(InputElement.KeyDownEvent, (_,e) => {
             if (e.Key == Key.Escape) { e.Handled = true; dialog.Close(); }
             else if(e.Key == Key.Enter && e.KeyModifiers == KeyModifiers.Control) { e.Handled = true; Send(); }
@@ -173,9 +212,9 @@ internal sealed partial class LinuxPetWindow
         clock.Tick += (_,_) => {
             if (!Preferences.McpEnabled || !Preferences.McpChatEnabled) { dialog.Close(); return; }
             Follow();
-            send.IsEnabled = McpInputAvailable && !string.IsNullOrWhiteSpace(text.Text);
-            if (!McpInputAvailable) status.Text = "Agent 已断开，重新连接后可发送。";
-            else if (status.Text?.StartsWith("Agent 已断开") == true) status.Text = "Ctrl+Enter 发送";
+            send.IsEnabled = agent?.Connected == true && !string.IsNullOrWhiteSpace(text.Text);
+            if (agent?.Connected != true) status.Text = agent?.Status ?? "Agent 尚未连接";
+            else if (status.Text != "已发送给 Agent") status.Text = agent.Busy ? "Agent 正在处理…" : "Ctrl+Enter 发送";
         };
         mcpInput = dialog; dialog.Closed += (_,_) => { clock.Stop(); PositionChanged -= moved; PropertyChanged -= changed; mcpInput = null; }; dialog.Opened += (_,_) => { text.Focus(); send.IsEnabled = false; };
         clock.Start(); Follow(); dialog.Activate(); return true;

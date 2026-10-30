@@ -3,6 +3,16 @@
   "dependencies": {
     "net10.0-windows10.0.26100": {
       "BigBlueFish": {
+        "type": "Project",
+        "dependencies": {
+          "BigBlueFish.Agent": "[1.1.0, )",
+          "BigBlueFish.Control": "[1.1.0, )"
+        }
+      },
+      "bigbluefish.agent": {
+        "type": "Project"
+      },
+      "bigbluefish.control": {
         "type": "Project"
       }
     },

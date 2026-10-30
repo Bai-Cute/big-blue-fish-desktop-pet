@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -27,6 +27,7 @@ internal sealed partial class LinuxPetWindow
     void ApplySettings(PixelPoint? requestedPosition = null)
     {
         speechVersion++; brain.Stop(); brain.UseGpu = Preferences.GpuEnabled; brain.StopOnBattery = Preferences.StopModelOnBattery; brain.WeatherRegionCode = Preferences.WeatherRegionCode;
+        ConfigureAgent();
         Rescale(); var appliedPosition = Clamp(requestedPosition); nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random)); nextEvent = DateTime.UtcNow.AddSeconds(Preferences.AnimationIntervalSeconds); nextWarmup = DateTime.MinValue;
         if (!Preferences.HideOnFullscreen && fullscreenHidden) { fullscreenHidden = false; if (!hidden) Show(); }
         if (bubbleWindow.IsVisible) ResetDwell();
@@ -77,9 +78,9 @@ internal sealed partial class LinuxPetWindow
             var slider = new Avalonia.Controls.Slider { Minimum = low, Maximum = high, Value = value, TickFrequency = tick, IsSnapToTickEnabled = true };
             slider.ValueChanged += (_, _) => { label.Text = text + "：" + slider.Value.ToString("0.##"); set(slider.Value); Save(); }; body.Children.Add(label); body.Children.Add(slider);
         }
-        void Select(string label, string[] choices, int selected, Action<int> set) {
+        ComboBox Select(string label, string[] choices, int selected, Action<int> set) {
             body.Children.Add(new TextBlock { Text = label, Margin = new Thickness(0, 10, 0, 4) }); var combo = new ComboBox { ItemsSource = choices, SelectedIndex = selected, HorizontalAlignment = HorizontalAlignment.Stretch };
-            combo.SelectionChanged += (_, _) => { if (combo.SelectedIndex >= 0) { set(combo.SelectedIndex); Save(); } }; body.Children.Add(combo);
+            combo.SelectionChanged += (_, _) => { if (combo.SelectedIndex >= 0) { set(combo.SelectedIndex); Save(); } }; body.Children.Add(combo); return combo;
         }
         void General() {
             Title("桌宠与显示"); Slider("桌宠大小（%）", Preferences.Scale * 100, 50, 200, value => { Preferences.Scale = value / 100; Rescale(); Clamp(); }, 5);
@@ -100,7 +101,9 @@ internal sealed partial class LinuxPetWindow
             Toggle("联网获取天气和科技新闻", Preferences.PublicInfo, value => Preferences.PublicInfo = value);
             Toggle("感知当前前台应用", Preferences.ForegroundEnabled, value => Preferences.ForegroundEnabled = value);
             body.Children.Add(ActionButton(brain.ModelAvailable ? "管理本地模型" : "安装模型", async () => await InstallModel()));
-            Select("自动说话间隔", CompanionPreferences.SpeechRanges.Select(r => $"{r.Min}–{r.Max} 分钟").ToArray(), Preferences.SpeechRangeIndex, value => { Preferences.SpeechMinMinutes = CompanionPreferences.SpeechRanges[value].Min; nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random)); });
+            var frequency = Select("自动说话间隔", CompanionPreferences.SpeechRanges.Select(r => $"{r.Min}–{r.Max} 分钟").ToArray(), Preferences.SpeechRangeIndex, value => { Preferences.SpeechMinMinutes = CompanionPreferences.SpeechRanges[value].Min; nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random)); });
+            frequency.IsEnabled = !Puppet;
+            body.Children.Add(Paragraph(Puppet ? "日常关心的触发时机已交给 Agent，此时说话间隔不可调节。关闭接管触发后恢复使用此设置。" : AgentDailyActive ? "鱼鱼按此间隔触发日常关心，由 Agent 编写吐字。" : "鱼鱼按此间隔触发日常关心，由本地模型编写吐字。"));
             body.Children.Add(new TextBlock { Text = "天气地区", Margin = new Thickness(0,12,0,4) });
             var regions = new StackPanel { Spacing = 8 }; body.Children.Add(regions);
             ComboBox province = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch }, city = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch }, district = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -130,37 +133,8 @@ internal sealed partial class LinuxPetWindow
         }
         navigation.Children.Add(ActionButton("桌宠与显示", () => Navigate(General))); navigation.Children.Add(ActionButton("模型与信息", () => Navigate(Model))); navigation.Children.Add(ActionButton("动作与作息", () => Navigate(Animation)));
 #if !COMPANION_SAFE
-        void Agent() {
-            Title("Agent 与 MCP");
-            var enabled = new CheckBox { Content = "开启 MCP 接口", IsChecked = Preferences.McpEnabled }; body.Children.Add(enabled); body.Children.Add(Paragraph("开启后行为可被其他 Agent 控制"));
-            var extra = new StackPanel { IsVisible = Preferences.McpEnabled, Spacing = 10 };
-            var puppet = new CheckBox { Content = "提线木偶模式", IsChecked = Preferences.PuppetMode }; extra.Children.Add(puppet); extra.Children.Add(Paragraph("关闭大肥鱼自身的吐字和动作切换逻辑，完全由外部 Agent 接管"));
-            var chat = new CheckBox { Content = "双击与鱼鱼对话", IsChecked = Preferences.McpChatEnabled };
-            chat.Click += (_,_) => { Preferences.McpChatEnabled = chat.IsChecked == true; if (!Preferences.McpChatEnabled) mcpInput?.Close(); Save(); };
-            extra.Children.Add(chat); extra.Children.Add(Paragraph("仅在 MCP 客户端已连接时生效，输入内容通过 MCP 发送给已连接的 Agent。"));
-            var wake = new CheckBox { Content = "允许鱼鱼通过 MCP 触发 Agent", IsChecked = Preferences.McpWakeEnabled };
-            wake.Click += (_,_) => { Preferences.McpWakeEnabled = wake.IsChecked == true; mcpServer?.SetWakeEnabled(Preferences.McpWakeEnabled); Save(); };
-            extra.Children.Add(wake); extra.Children.Add(Paragraph("通过客户端 sampling 请求响应，由客户端决定是否接受。"));
-            var wakeFlags = Paragraph(""); extra.Children.Add(wakeFlags);
-            var wakeClock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
-            void WakeStatus() {
-                string Flag(bool on) => on ? "唤起" : "不唤起";
-                wakeFlags.Text = $"文字：{Flag(Preferences.McpWakeOnText)}；点击：{Flag(Preferences.McpWakeOnClick)}；拖动：{Flag(Preferences.McpWakeOnDrag)}。三项由 Agent 调整。支持触发的连接：{mcpServer?.SamplingConnections ?? 0}；{mcpServer?.WakeStatus ?? "尚未请求"}";
-            }
-            WakeStatus(); wakeClock.Tick += (_,_) => WakeStatus(); wakeClock.Start();
-            extra.DetachedFromVisualTree += (_,_) => wakeClock.Stop();
-            var config = ActionButton("复制 MCP 连接配置", async () => {
-                if (settings?.Clipboard != null) await settings.Clipboard.SetTextAsync(System.Text.Json.JsonSerializer.Serialize(new { mcpServers = new Dictionary<string, object> { ["big-blue-fish"] = new { command = Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), args = Array.Empty<string>() } } }, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
-            }); extra.Children.Add(config); body.Children.Add(extra);
-            enabled.Click += async (_, _) => {
-                bool on = enabled.IsChecked == true;
-                if (on && !await Confirm("开启 MCP 接口", ControlTools.PrivacyWarning, "了解并开启")) { enabled.IsChecked = false; return; }
-                if (on && !File.Exists(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"))) { await Confirm("MCP 组件未就绪", "请使用包含 MCP 组件的完整标准版安装包。"); enabled.IsChecked = false; return; }
-                if (!on) SetPuppet(false); Preferences.McpEnabled = on; if (on) InitializeMcp(); else StopMcp(); extra.IsVisible = on; puppet.IsChecked = Preferences.PuppetMode; Save();
-            };
-            puppet.Click += async (_, _) => { bool on = puppet.IsChecked == true; if (on && !await Confirm("开启提线木偶模式", ControlTools.PuppetWarning, "了解并开启")) { puppet.IsChecked = false; return; } SetPuppet(on); Save(); };
-        }
-        navigation.Children.Add(ActionButton("Agent 与 MCP", () => Navigate(Agent)));
+        void Agent() { Title("连接 Agent"); BuildAgentSettings(body); }
+        navigation.Children.Add(ActionButton("连接 Agent", () => Navigate(Agent)));
 #endif
         navigation.Children.Add(ActionButton("关于与更新", () => Navigate(About)));
         refreshLinuxSettings = () => { var offset = scroll.Offset; selectedPage(); scroll.Offset = offset; };

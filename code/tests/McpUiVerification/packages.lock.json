@@ -5,8 +5,12 @@
       "BigBlueFish": {
         "type": "Project",
         "dependencies": {
-          "BigBlueFish.Control": "[1.0.0, )"
+          "BigBlueFish.Agent": "[1.1.0, )",
+          "BigBlueFish.Control": "[1.1.0, )"
         }
+      },
+      "bigbluefish.agent": {
+        "type": "Project"
       },
       "bigbluefish.control": {
         "type": "Project"

@@ -11,8 +11,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using BigBlueFish.Control;
+using BigBlueFish.Agent;
 using BigBlueFish.Windows;
 using Button = System.Windows.Controls.Button;
+using ComboBox = System.Windows.Controls.ComboBox;
 using CheckBox = System.Windows.Controls.CheckBox;
 using TextBox = System.Windows.Controls.TextBox;
 using ContextMenu = System.Windows.Controls.ContextMenu;
@@ -37,6 +39,7 @@ internal static class Program
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] static extern bool IsIconic(IntPtr window);
     [DllImport("user32.dll")] static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")] static extern IntPtr SendMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")] static extern IntPtr WindowStyle(IntPtr window, int index);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window, out NativeRect rect);
     [StructLayout(LayoutKind.Sequential)] struct NativeRect { public int Left, Top, Right, Bottom; }
@@ -159,15 +162,53 @@ internal static class Program
     { for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) { var child = VisualTreeHelper.GetChild(root, i); if (child is T t) yield return t; foreach (var nested in Descendants<T>(child)) yield return nested; } }
     static void Render(Visual root, string path, int width, int height)
     { var image = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32); image.Render(root); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(image)); using var file = File.Create(path); encoder.Save(file); }
+    static void VerifyAgentWorkspaceSettings(Window settings)
+    {
+        var coordinator = (AgentCoordinator)Read("agent"); string original = coordinator.Workspaces.Current;
+        Check(Descendants<Button>(settings).Single(b => b.Content?.ToString() == "新建工作区").IsVisible, "workspace controls belong to visible enabled Agent page");
+        Render((Visual)settings.Content, "agent-workspace-top.png", (int)settings.ActualWidth, (int)settings.ActualHeight);
+        Wait(() => Descendants<ComboBox>(settings).Any(c => c.Items.OfType<ComboBoxItem>().Any(i => (string?)i.Tag == "accurate")), 3, "actual settings show Agent-advertised model selector");
+        var selector = Descendants<ComboBox>(settings).Single(c => c.Items.OfType<ComboBoxItem>().Any(i => (string?)i.Tag == "accurate"));
+        selector.BringIntoView(); Pump(150);
+        selector.SelectedItem = selector.Items.OfType<ComboBoxItem>().Single(i => (string?)i.Tag == "accurate");
+        Wait(() => coordinator.CurrentModel == "accurate" && !coordinator.Busy, 5, "settings model selection reaches ACP and receives ACK"); Pump(700);
+        Check(Descendants<TextBlock>(settings).Any(t => t.Text.Contains("思考深度")), "settings render supported reasoning selector");
+        Render((Visual)settings.Content, "agent-workspace-settings.png", (int)settings.ActualWidth, (int)settings.ActualHeight);
+        Descendants<Button>(settings).Single(b => b.Content?.ToString() == "新建工作区").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(100);
+        var dialog = System.Windows.Application.Current.Windows.OfType<Window>().Single(w => w.Title == "新建工作区");
+        string name = "ui-workspace-" + Guid.NewGuid().ToString("N")[..8]; Descendants<TextBox>(dialog).Single().Text = name;
+        Descendants<Button>(dialog).Single(b => b.Content?.ToString() == "创建并打开").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Wait(() => coordinator.Connected && Path.GetFileName(coordinator.Workspaces.Current) == name && !dialog.IsVisible, 8, "new workspace dialog creates folder and reconnects");
+        string file = Path.Combine(coordinator.Workspaces.Current, "review.txt"); File.WriteAllText(file, "retain on cancellation");
+        DispatcherTimer Answer(string button)
+        {
+            var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(80) };
+            timer.Tick += (_, _) => { var confirmation = System.Windows.Application.Current.Windows.OfType<Window>().FirstOrDefault(w => w.Title == "清空工作区"); if (confirmation == null) return; timer.Stop(); Descendants<Button>(confirmation).Single(b => b.Content?.ToString() == button).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
+            timer.Start(); return timer;
+        }
+        var answer = Answer("取消"); Descendants<Button>(settings).Single(b => b.Content?.ToString() == "清空工作区").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Wait(() => !(bool)Read("mcpConsentOpen"), 5, "clear workspace cancel closes confirmation"); answer.Stop();
+        Check(File.Exists(file), "cancelling clear preserves actual workspace files"); Pump(650);
+        string before = coordinator.SessionId; answer = Answer("清空");
+        Descendants<Button>(settings).Single(b => b.Content?.ToString() == "清空工作区").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Wait(() => !File.Exists(file) && coordinator.Connected && coordinator.SessionId != before, 8, "confirmed clear removes files and starts fresh ACP conversation"); answer.Stop();
+        Complete(coordinator.OpenWorkspace(original).ContinueWith(t => { t.GetAwaiter().GetResult(); return true; }));
+        Wait(() => coordinator.Connected && coordinator.Workspaces.Current == original, 8, "original workspace reopens after clear test");
+    }
     sealed class Client : IDisposable
     {
-        readonly NamedPipeClientStream pipe = new(".", ControlTools.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+        readonly NamedPipeClientStream pipe = new(".", (string)Read("agentPipe"), PipeDirection.InOut, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
         readonly StreamReader reader; readonly StreamWriter writer;
+        readonly System.Threading.Channels.Channel<string> incoming = System.Threading.Channels.Channel.CreateUnbounded<string>();
         internal readonly List<JsonElement> Events = [];
         internal Client()
         {
             Complete(pipe.ConnectAsync(5000).ContinueWith(t => { t.GetAwaiter().GetResult(); return true; }));
             reader = new(pipe, new UTF8Encoding(false)); writer = new(pipe, new UTF8Encoding(false)) { AutoFlush = true };
+            _ = Task.Run(async () => {
+                try { while (await reader.ReadLineAsync() is string line) await incoming.Writer.WriteAsync(line); incoming.Writer.TryComplete(); }
+                catch (Exception error) { incoming.Writer.TryComplete(error); }
+            });
             Request("initialize", new { protocolVersion = "2025-11-25", capabilities = new { }, clientInfo = new { name = "WPF verification", version = "1" } });
             Send("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         }
@@ -178,7 +219,7 @@ internal static class Program
             Send(JsonSerializer.Serialize(new { jsonrpc = "2.0", id = request, method, @params = args }));
             while (true)
             {
-                var line = Complete(reader.ReadLineAsync()) ?? throw new IOException("MCP disconnected");
+                var line = Complete(incoming.Reader.ReadAsync().AsTask());
                 using var doc = JsonDocument.Parse(line); var result = doc.RootElement.Clone();
                 if (result.TryGetProperty("id", out var found) && found.GetInt32() == request) return result.GetProperty("result");
                 Events.Add(result);
@@ -193,6 +234,38 @@ internal static class Program
         }
         public void Dispose() { pipe.Dispose(); }
     }
+    static void VerifySpeechRoutingSettings(Window settings)
+    {
+        var prefs = Read("preferences");
+        void Set(string key, object value) => prefs.GetType().GetProperty(key)!.SetValue(prefs, value);
+        Descendants<Button>(settings).Single(b => b.Content?.ToString() == "说话与天气").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(100);
+        var frequency = Descendants<System.Windows.Controls.ComboBox>(settings).Single(c => c.Items.Count > 0 && c.Items[0]?.ToString()?.StartsWith("说话间隔：") == true);
+        Check(settings.Icon != null && settings.ShowInTaskbar && !settings.Topmost, "Settings uses explicit fish icon and ordinary taskbar window policy");
+        Check(SendMessage(Handle(settings), 0x7F, new IntPtr(1), IntPtr.Zero) != IntPtr.Zero, "Native settings HWND has large taskbar icon");
+        Set("AgentDailySpeech", false); Invoke("SetPuppetMode", true); Pump(1200);
+        Check(!frequency.IsEnabled, "Agent timing disables fish speech-interval selector even with local writer");
+        Invoke("RefreshMcpMenuAvailability");
+        var contextMenu = (ContextMenu)Read("companionContextMenu");
+        Check(((MenuItem)contextMenu.Items[1]).IsEnabled && ((MenuItem)contextMenu.Items[2]).IsEnabled, "Pet weather and speech-test entries stay enabled with Agent timing");
+        var tray = Read("notifyIcon"); var trayMenu = (System.Windows.Forms.ContextMenuStrip)tray.GetType().GetProperty("ContextMenuStrip", Access)!.GetValue(tray)!;
+        Check(trayMenu.Items[2].Enabled && trayMenu.Items[3].Enabled, "Tray weather and speech-test entries stay enabled with Agent timing");
+        var manualTest = (Task)Invoke("SpeakCompanionTest")!; Wait(() => manualTest.IsCompleted, 5, "Manual test entry completes disabled-model notice"); manualTest.GetAwaiter().GetResult();
+        Check(((TextBlock)Read("bubbleText")).Text.Contains("暂停了模型"), "Manual local test passes takeover guard and reports disabled model rather than silently returning");
+        Set("AgentDailySpeech", true); Invoke("ConfigureAgent");
+        var manualAgentTest = (Task)Invoke("SpeakCompanionTest")!; Wait(() => manualAgentTest.IsCompleted, 5, "Manual Agent test enqueued without local model"); manualAgentTest.GetAwaiter().GetResult();
+        Wait(() => ((TextBlock)Read("bubbleText")).Text == "tool-only response", 10, "Manual menu test routes through actual ACP fixture and MCP say with Agent timing enabled");
+        Set("AgentDailySpeech", false); Invoke("ConfigureAgent"); Pump(1200);
+        Check(Descendants<System.Windows.Controls.TextBlock>(settings).Any(t => t.Text.Contains("此时说话间隔不可调节")), "Disabled interval explains Agent timing ownership");
+        Descendants<Button>(settings).Single(b => b.Content?.ToString() == "模型与供电").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump(100);
+        Check(Descendants<System.Windows.Controls.TextBlock>(settings).Any(t => t.Text.Contains("本地模型负责吐字")), "Model page describes local writer while Agent owns timing");
+        Invoke("SetPuppetMode", false); Set("AgentDailySpeech", true); Invoke("ConfigureAgent"); Pump(1200);
+        Check(frequency.IsEnabled, "Agent writer alone keeps fish interval adjustable");
+        Set("AgentDailySpeech", false); Invoke("ConfigureAgent"); Pump(1200);
+        Check(frequency.IsEnabled, "Fish timing and local writer keep interval adjustable");
+        Set("AgentEnabled", false); Set("PuppetMode", true); Invoke("ConfigureAgent"); Pump(1200);
+        Check(frequency.IsEnabled, "Disabled Agent connection ignores stored takeover preference");
+    }
+
     [STAThread] static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--focus-fixture") {
@@ -206,15 +279,15 @@ internal static class Program
         App.Args = ["--test-mode"]; var app = new System.Windows.Application { ShutdownMode = ShutdownMode.OnExplicitShutdown }; Environment.CurrentDirectory = sandbox;
         try
         {
-            pet = new MainWindow(); pet.Show(); Wait(() => (bool)Read("companionReady"), 8, "Actual video initialized");
+            pet = new MainWindow(); pet.Show(); Wait(() => (bool)Read("companionReady"), 20, "Actual video initialized");
             Invoke("OpenCompanionSettings"); Pump(150);
             var settings = (Window)Read("companionSettings");
-            Descendants<Button>(settings).Single(b => b.Content?.ToString() == "Agent 与 MCP").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
-            var toggle = Descendants<CheckBox>(settings).Single(c => c.Content?.ToString() == "开启 MCP 接口");
+            Descendants<Button>(settings).Single(b => b.Content?.ToString() == "连接 Agent").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); Pump();
+            var toggle = Descendants<CheckBox>(settings).Single(c => c.Content?.ToString() == "连接本机兼容的 CLI Harness");
             bool sawWarning = false;
             var dialogTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
             dialogTimer.Tick += (_, _) => {
-                var dialog = app.Windows.Cast<Window>().FirstOrDefault(w => w.Title == "开启 MCP 接口"); if (dialog == null) return;
+                var dialog = app.Windows.Cast<Window>().FirstOrDefault(w => w.Title == "连接本机 Agent"); if (dialog == null) return;
                 sawWarning = Descendants<TextBlock>(dialog).Any(t => t.Text == ControlTools.PrivacyWarning);
                 Render((Visual)dialog.Content, "mcp-warning.png", (int)dialog.ActualWidth, (int)dialog.ActualHeight);
                 Descendants<Button>(dialog).Single(b => b.Content?.ToString() == "取消").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
@@ -222,18 +295,24 @@ internal static class Program
             dialogTimer.Start(); toggle.IsChecked = true; toggle.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
             Wait(() => !(bool)Read("mcpConsentOpen"),5,"Asynchronous privacy confirmation finishes after cancellation"); dialogTimer.Stop();
             Check(sawWarning && toggle.IsChecked == false, "Privacy warning shown; cancellation leaves MCP off");
-            var prefs = Read("preferences"); prefs.GetType().GetProperty("McpEnabled")!.SetValue(prefs, true); Invoke("InitializeMcp");
-            prefs.GetType().GetProperty("McpChatEnabled")!.SetValue(prefs, true);
-            Check(!(bool)Invoke("TryOpenMcpInput")!, "Chat input cannot open without a real initialized client");
-            prefs.GetType().GetProperty("McpChatEnabled")!.SetValue(prefs, false);
+            var prefs = Read("preferences");
+            prefs.GetType().GetProperty("AgentHarnessId")!.SetValue(prefs, "opencode");
+            var harnessSelector = Descendants<ComboBox>(settings).Single(c => c.Items.OfType<ComboBoxItem>().Any(i => (string?)i.Tag == "opencode"));
+            harnessSelector.SelectedItem = harnessSelector.Items.OfType<ComboBoxItem>().Single(i => (string?)i.Tag == "opencode");
+            string bridge = Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe");
+            if (!File.Exists(bridge)) File.WriteAllText(bridge, "ACP fixture reads its configured pipe directly");
+            var acceptPrivacy = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            acceptPrivacy.Tick += (_, _) => { var confirmation = app.Windows.OfType<Window>().FirstOrDefault(w => w.Title == "连接本机 Agent"); if (confirmation == null) return; acceptPrivacy.Stop(); Descendants<Button>(confirmation).Single(b => b.Content?.ToString() == "了解并开启").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
+            acceptPrivacy.Start(); toggle.IsChecked = true; toggle.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
+            Wait(() => pet.GetType().GetField("agent", Access)!.GetValue(pet) is AgentCoordinator { Connected: true }, 15, "Actual fixture ACP connection ready");
+            if (args.Contains("--speech-routing-settings")) { VerifySpeechRoutingSettings(settings); Field("exitReady", true); pet.Close(); Console.WriteLine($"Speech routing/settings actual WPF: {checks} checks passed."); return 0; }
+            if (args.Contains("--workspace-settings")) { VerifyAgentWorkspaceSettings(settings); Field("exitReady", true); pet.Close(); Console.WriteLine($"Agent workspace/settings actual WPF: {checks} checks passed."); return 0; }
             settings.Close(); Pump();
             using (var client = new Client())
             {
-                var state = client.Data("get_settings"); Check(state.GetProperty("settings").GetProperty("McpEnabled").GetBoolean(), "MCP settings state");
+                var state = client.Data("get_settings"); Check(state.GetProperty("settings").GetProperty("AgentEnabled").GetBoolean(), "MCP settings state");
                 Check(client.Data("list_actions").GetArrayLength() == 106, "All 106 actions exposed");
                 if (args.Contains("--settings-focus-only")) { VerifySettingsFocus(client); Field("exitReady", true); pet.Close(); Console.WriteLine($"MCP settings focus: {checks} checks passed."); return 0; }
-                Check(!(bool)Invoke("TryOpenMcpInput")!, "Chat feature is off by default even when MCP is connected");
-                client.Data("update_settings", new { settings = new { McpChatEnabled = true } });
                 DoubleClickPet();
                 Wait(() => pet.GetType().GetField("mcpInput", Access)!.GetValue(pet) != null, 4, "Actual double-click opens input with connected enabled MCP chat");
                 var inputWindow = (Window)Read("mcpInput"); Pump(150);
@@ -272,7 +351,7 @@ internal static class Program
                 keybd_event(0x1B,0,0,UIntPtr.Zero); keybd_event(0x1B,0,2,UIntPtr.Zero); Pump(100);
                 Check(pet.GetType().GetField("mcpInput",Access)!.GetValue(pet) == null, "Escape closes the attached editor");
                 if (args.Contains("--input-only")) { Field("exitReady", true); pet.Close(); Console.WriteLine($"Input UI: {checks} checks passed."); return 0; }
-                var denied = client.Call("update_settings", new { settings = new { McpEnabled = false, Scale = 2 } });
+                var denied = client.Call("update_settings", new { settings = new { AgentEnabled = false, Scale = 2 } });
                 Check(denied.GetProperty("isError").GetBoolean(), "Agent cannot disable MCP");
                 Check(client.Data("get_settings").GetProperty("settings").GetProperty("Scale").GetDouble() == 1, "Denied patch applied no fields");
                 client.Data("update_settings", new { settings = new { BubbleScale = 1.3, Scale = .85, AnimationIntervalSeconds = 70 } });
@@ -301,7 +380,7 @@ internal static class Program
                 DragPetByMouse(); Check((string)Read("currentAction") == "待机呼吸休闲","Actual drag preserves puppet idle");
                 Invoke("ClickAnimation"); Check((string)Read("currentAction") == "待机呼吸休闲", "Click cannot switch puppet animation");
                 var context = (ContextMenu)Read("companionContextMenu");
-                Check(!((MenuItem)context.Items[1]).IsEnabled && !((MenuItem)context.Items[2]).IsEnabled, "Weather and speech-test disabled");
+                Check(((MenuItem)context.Items[1]).IsEnabled && ((MenuItem)context.Items[2]).IsEnabled, "Manual weather and speech-test remain enabled");
                 client.Data("say_next", new { text = "下次节奏原文" }); Field("nextSpeech", DateTime.UtcNow.AddMinutes(-1)); Pump(300);
                 Check(((TextBlock)Read("bubbleText")).Text == raw, "Puppet never consumes scheduled speech");
                 client.Data("interrupt_action", new { action = "点击回应-元气挥手" }); Pump(250);
@@ -338,11 +417,12 @@ internal static class Program
                 Invoke("TryOpenMcpInput"); Pump(100);
                 Descendants<TextBox>((Window)Read("mcpInput")).Single().Text = "断线时保留这条草稿";
             }
+            ((IDisposable)Read("agent")).Dispose();
             Pump(600);
             var disconnectedInput = (Window)Read("mcpInput");
             Check(!Descendants<Button>(disconnectedInput).Single(b => b.Content?.ToString() == "发送").IsEnabled, "Disconnect disables sending in the already-open input");
             Check(Descendants<TextBox>(disconnectedInput).Single().Text == "断线时保留这条草稿", "Disconnect preserves unsent draft");
-            Check(!(bool)Invoke("TryOpenMcpInput")!, "Disconnected double-click cannot open chat");
+            Check((bool)Invoke("TryOpenMcpInput")!, "Disconnected input can show connection feedback");
             Check((bool)pet.GetType().GetProperty("PuppetActive", Access)!.GetValue(pet)! && (string)Read("currentAction") == "待机呼吸休闲", "Disconnect keeps puppet mode and fixed idle");
             Invoke("SetPuppetMode", false); Invoke("StopMcp");
             Check((string)Read("animationPhase") == "Idle", "Explicitly leaving puppet restores ordinary idle selection");
@@ -355,7 +435,7 @@ internal static class Program
     {
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
         timer.Tick += (_, _) => {
-            var dialog = System.Windows.Application.Current.Windows.Cast<Window>().FirstOrDefault(w => w.Title == "开启提线木偶模式");
+            var dialog = System.Windows.Application.Current.Windows.Cast<Window>().FirstOrDefault(w => w.Title == ControlTools.BehaviorControlTitle);
             if (dialog == null) return;
             Check(Descendants<TextBlock>(dialog).Any(t => t.Text == ControlTools.PuppetWarning), "Actual puppet warning displayed");
             Render((Visual)dialog.Content, "puppet-warning.png", (int)dialog.ActualWidth, (int)dialog.ActualHeight);

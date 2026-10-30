@@ -190,10 +190,10 @@ internal sealed partial class LinuxPetWindow : Window
         bubbleText.Text = typing ? text[..textBoundaries[1]] : text;
         MoveBubble(); if (!hidden && !fullscreenHidden) bubbleWindow.Show(); if (!typing && phase is not ("Startup" or "Exit")) ResetDwell();
     }
-    void Partial(string text, long expectedVersion)
+    void Partial(string text, long expectedVersion, bool agentTriggered = false)
     {
         Dispatcher.UIThread.Post(() => {
-            if (expectedVersion != speechVersion || Puppet || closed || hidden || fullscreenHidden || !Preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
+            if (expectedVersion != speechVersion || Puppet && !agentTriggered || closed || hidden || fullscreenHidden || !Preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
             greetingNoticeActive = false; streamed = true; fullText = text; typing = false; externalSpeech = false; modelReply = true; bubbleText.Text = text; bubbleUntil = DateTime.MaxValue;
             MoveBubble(); bubbleWindow.Show();
         });
@@ -225,11 +225,12 @@ internal sealed partial class LinuxPetWindow : Window
             if (brain.RunnerPid != null || brain.Busy) { speechVersion++; brain.Stop(); loading.IsVisible = false; }
             if (modelReply) bubbleWindow.Hide();
         }
-        else if (!Puppet && !modelInstalling && Preferences.ModelEnabled && brain.ModelAvailable && !generating && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup) { nextWarmup = now.AddMinutes(2); _ = brain.WarmUp(); }
+        else if (!AgentDailyActive && !modelInstalling && Preferences.ModelEnabled && brain.ModelAvailable && !generating && !brain.Busy && brain.RunnerPid == null && now >= nextWarmup) { nextWarmup = now.AddMinutes(2); _ = brain.WarmUp(); }
         bool full = Preferences.HideOnFullscreen && CompanionNative.IsFullscreen();
         if (full && !fullscreenHidden && !hidden) { fullscreenHidden = true; Hide(); bubbleWindow.Hide(); speechVersion++; brain.CancelGeneration(); }
         else if (!full && fullscreenHidden) { fullscreenHidden = false; if (!hidden) { Show(); Clamp(); } }
         player.Paused = hidden || fullscreenHidden;
+        TickAgent(now);
         if (hidden || fullscreenHidden) return;
         if (typing)
         {
@@ -239,14 +240,14 @@ internal sealed partial class LinuxPetWindow : Window
         }
         if (now >= bubbleUntil) bubbleWindow.Hide();
         if (Puppet || dragging || settings != null || modelInstalling || now < nextSpeech) return;
-        if (nextExternalText == null && (generating || brain.Busy || !Preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)) return;
+        if (nextExternalText == null && !AgentDailyActive && (generating || brain.Busy || !Preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)) return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600) { nextSpeech = now.AddSeconds(30); return; }
         if (nextExternalText != null) { string text = nextExternalText; nextExternalText = null; SayExternal(text); nextSpeech = now.Add(Preferences.NextSpeechDelay(random)); }
-        else await Speak(false);
+        else if (!DispatchAgentDaily()) await Speak(false);
     }
-    async Task Speak(bool weather)
+    async Task Speak(bool weather, bool agentTriggered = false)
     {
-        if (Puppet || generating || closed || phase == "Exit" || modelInstalling) return;
+        if (Puppet && !agentTriggered || generating || closed || phase == "Exit" || modelInstalling) return;
         if (!brain.ModelAvailable) { await InstallModel(); return; }
         if (!Preferences.ModelEnabled) { ShowText("主人，请先在设置里启用本地大模型哦~", false); return; }
         if (!brain.CanRunOnCurrentPower) { ShowText("主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。", false); return; }
@@ -255,21 +256,40 @@ internal sealed partial class LinuxPetWindow : Window
         {
             var until = DateTime.UtcNow.AddSeconds(100);
             while (brain.Busy && DateTime.UtcNow < until && version == speechVersion) await Task.Delay(100);
-            if (brain.Busy || version != speechVersion || Puppet || hidden || fullscreenHidden) return;
+            if (brain.Busy || version != speechVersion || Puppet && !agentTriggered || hidden || fullscreenHidden) return;
             nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random));
-            var text = weather ? await brain.GenerateWeather(p => Partial(p, version)) : await brain.Generate(Preferences.PublicInfo, Preferences.ForegroundEnabled, lastForeground, p => Partial(p, version));
-            if (version != speechVersion || Puppet || hidden || fullscreenHidden || closed || !Preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
+            var text = weather ? await brain.GenerateWeather(p => Partial(p, version, agentTriggered)) : await brain.Generate(Preferences.PublicInfo, Preferences.ForegroundEnabled, lastForeground, p => Partial(p, version, agentTriggered));
+            if (version != speechVersion || Puppet && !agentTriggered || hidden || fullscreenHidden || closed || !Preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
             if (text.Length > 0) { if (streamed) { fullText = text; bubbleText.Text = text; ResetDwell(); } else ShowText(text, false, fromModel: true); }
             else if (streamed && !externalSpeech) bubbleWindow.Hide();
         }
         finally { generating = false; loading.IsVisible = false; }
     }
     void SayExternal(string text) { speechVersion++; brain.CancelGeneration(); loading.IsVisible = false; ShowText(text, true); }
+    async Task SpeakManual(bool weather)
+    {
+        if (closed || phase == "Exit") return;
+        if (hidden || fullscreenHidden) { hidden = false; fullscreenHidden = false; Show(); }
+#if !COMPANION_SAFE
+        if (AgentDailyActive)
+        {
+            try
+            {
+                ShowText(weather ? "主人，正在准备天气资料交给 Agent～" : "主人，正在请 Agent 回应这次吐字测试～", false);
+                string context = weather ? await brain.GetWeatherContext(CancellationToken.None) : "";
+                if (agent?.ManualSpeech(weather, context) != true) ShowText("主人，Agent 请求尚未就绪或队列已满，请查看连接状态后重试～", false);
+            }
+            catch (Exception error) { ShowText("主人，" + error.Message, false); }
+            return;
+        }
+#endif
+        await Speak(weather, true);
+    }
     void OpenMenu()
     {
         var menu = new ContextMenu();
         MenuItem Item(string title, Action action, bool available = true) { var item = new MenuItem { Header = title, IsEnabled = available }; item.Click += (_, _) => action(); return item; }
-        menu.ItemsSource = new[] { Item("设置", OpenSettings), Item("天气", async () => await Speak(true), !Puppet), Item("吐字测试", async () => await Speak(false), !Puppet),
+        menu.ItemsSource = new[] { Item("设置", OpenSettings), Item("天气", async () => await SpeakManual(true)), Item("吐字测试", async () => await SpeakManual(false)),
             Item(hidden ? "显示桌宠" : "隐藏桌宠", () => { if (hidden) { hidden = false; Show(); Clamp(); } else { hidden = true; Hide(); bubbleWindow.Hide(); speechVersion++; brain.CancelGeneration(); } }), Item("关闭桌宠", Close) };
         ContextMenu = menu; menu.Open(this);
     }

@@ -1,4 +1,4 @@
-﻿using Microsoft.Win32;
+using Microsoft.Win32;
 using System;
 using System.Linq;
 using System.Windows;
@@ -34,6 +34,7 @@ public partial class MainWindow
             FontFamily = new FontFamily("Microsoft YaHei UI"),
             FontSize = 14,
             ShowInTaskbar = true,
+            Icon = System.Windows.Media.Imaging.BitmapFrame.Create(new Uri(System.IO.Path.Combine(AppContext.BaseDirectory, "BigBlueFish.ico"))),
             ShowActivated = true,
             Topmost = false
         };
@@ -71,7 +72,7 @@ public partial class MainWindow
 #if COMPANION_SAFE
         var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电" };
 #else
-        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电", "Agent 与 MCP" };
+        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电", "连接 Agent" };
 #endif
         var pages = new StackPanel[titles.Length];
         var views = new ScrollViewer[titles.Length];
@@ -238,6 +239,8 @@ public partial class MainWindow
             SaveCompanion();
         };
         p.Children.Add(freq);
+        var frequencyHint = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray, Margin = new Thickness(0, 0, 0, 8) };
+        p.Children.Add(frequencyHint);
         var dwellLabel = new TextBlock
         {
             Text = "气泡驻留时间：" + CompanionPreferences.BubbleDurationLabels[preferences.BubbleDurationIndex],
@@ -284,11 +287,15 @@ public partial class MainWindow
         };
         void UpdateStatus()
         {
+            freq.IsEnabled = !PuppetActive;
+            frequencyHint.Text = PuppetActive ? "日常关心的触发时机已交给 Agent，此时说话间隔不可调节。关闭接管触发后恢复使用此设置。"
+                : AgentDailyActive ? "鱼鱼仍按此间隔触发日常关心，由 Agent 编写吐字。" : "鱼鱼按此间隔触发日常关心，由本地模型编写吐字。";
             bool available = brain.ModelAvailable;
             installModel.Visibility = available ? Visibility.Collapsed : Visibility.Visible;
             status.Text = (CompanionNative.OnAC ? "已插电" :
                 preferences.StopModelOnBattery ? "电池供电 · 已按设置暂停模型" : "电池供电 · 允许模型运行")
-                + "\n" + (available ? brain.Status : "尚未安装模型")
+                + "\n" + (AgentDailyActive ? "日常吐字由 Agent 编写，本地模型不自动加载。" : PuppetActive ? "Agent 决定日常关心的时机，本地模型负责吐字。\n" : "")
+                + (available ? brain.Status : "尚未安装模型")
                 + "\n推理设备：" + brain.ExecutionDevice;
         }
         timer.Tick += (_, _) => UpdateStatus();

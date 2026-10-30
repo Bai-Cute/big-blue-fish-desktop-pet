@@ -25,11 +25,11 @@ async Task<JsonElement> Request(int id, string method, object? parameters = null
 }
 var response = await Request(1, "initialize", new { protocolVersion = "2025-11-25", capabilities = new { }, clientInfo = new { name = "verification", version = "1" } });
 Check(response.GetProperty("result").GetProperty("protocolVersion").GetString() == "2025-11-25", "Protocol handshake");
-Check(response.GetProperty("result").GetProperty("instructions").GetString()!.Contains("user_message"), "Handshake explains input event handling");
+Check(response.GetProperty("result").GetProperty("instructions").GetString()!.Contains("say"), "Handshake explains tool-only speech");
 await process.StandardInput.WriteLineAsync("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
 response = await Request(2, "tools/list");
 var tools = response.GetProperty("result").GetProperty("tools").EnumerateArray().ToArray();
-Check(tools.Length == 9, "Nine tools");
+Check(tools.Length == 14, "Fourteen tools including real local-generation request");
 foreach (var tool in tools) Check(tool.GetProperty("inputSchema").GetProperty("type").GetString() == "object", "Object schema");
 var settingSchema = tools.Single(t => t.GetProperty("name").GetString() == "update_settings").GetProperty("inputSchema").GetProperty("properties").GetProperty("settings");
 Check(!settingSchema.GetProperty("additionalProperties").GetBoolean(), "Settings schema rejects undocumented fields");
@@ -77,4 +77,3 @@ server.Dispose();
 await second.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
 Check(second.HasExited, "Disabling service disconnects bridge");
 Console.WriteLine($"MCP protocol: {checks} checks passed.");
-Console.WriteLine($"MCP sampling: {await SamplingVerification.Run()} checks passed.");

@@ -40,22 +40,24 @@ public partial class MainWindow
         hide.Icon = Icon("\uE8A7");
         hide.Click += (_, _) => { companionContextMenu.IsOpen = false; HideCompanion(); };
         companionContextMenu.Items.Add(hide);
-        companionContextMenu.Opened += (_, _) => { weather.IsEnabled = !PuppetActive; test.IsEnabled = !PuppetActive; };
+        companionContextMenu.Opened += (_, _) => { weather.IsEnabled = true; test.IsEnabled = true; };
     }
 
     private async Task SpeakCompanionWeather()
     {
-        if (PuppetActive || weatherRequestPending || companionClosed || exitAnimation) return;
+        if (weatherRequestPending || companionClosed || exitAnimation) return;
+        if (hiddenByUser || fullscreenHidden) RestoreCompanion();
+        if (await TryManualAgentSpeech(true)) return;
         if (!brain.ModelAvailable) { OpenModelInstaller(); return; }
         if (hiddenByUser || fullscreenHidden) RestoreCompanion();
         if (!preferences.ModelEnabled)
         {
-            ShowCompanionNotice("主人，请先在设置里启用本地大模型，再来查看天气吧～");
+            ShowCompanionNotice("主人，请先在设置里启用本地大模型，再来查看天气吧～", manual: true);
             return;
         }
         if (!brain.CanRunOnCurrentPower)
         {
-            ShowCompanionNotice(BatteryPauseNotice, true);
+            ShowCompanionNotice(BatteryPauseNotice, true, true);
             return;
         }
         InvalidateSpeechRequests();
@@ -64,19 +66,19 @@ public partial class MainWindow
         string regionCode = preferences.WeatherRegionCode;
         try
         {
-            ShowCompanionNotice("主人，正在查看" + CompanionRegions.FullName(CompanionRegions.District(regionCode)) + "的天气～");
+            ShowCompanionNotice("主人，正在查看" + CompanionRegions.FullName(CompanionRegions.District(regionCode)) + "的天气～", manual: true);
             // Let an in-flight warm-up or utterance finish; automatic speech yields to this request.
             var deadline = DateTime.UtcNow.AddSeconds(100);
             while (brain.Busy && DateTime.UtcNow < deadline && !companionClosed && brain.CanRunOnCurrentPower)
                 await Task.Delay(100);
             if (version != speechRequestVersion || companionClosed || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower || regionCode != preferences.WeatherRegionCode)
                 return;
-            if (brain.Busy) { ShowCompanionNotice("主人，模型暂时还在忙，请稍后再试一下～"); return; }
+            if (brain.Busy) { ShowCompanionNotice("主人，模型暂时还在忙，请稍后再试一下～", manual: true); return; }
             BeginModelSpeech();
             string text;
             try
             {
-                text = await brain.GenerateWeather(partial => ShowCompanionPartial(partial, version));
+                text = await brain.GenerateWeather(partial => ShowCompanionPartial(partial, version, true));
             }
             finally
             {
@@ -85,8 +87,8 @@ public partial class MainWindow
             if (version == speechRequestVersion && !companionClosed && !hiddenByUser && !fullscreenHidden && preferences.ModelEnabled
                 && brain.CanRunOnCurrentPower && regionCode == preferences.WeatherRegionCode)
             {
-                if (text.Length > 0) { FinishCompanionPartial(text); }
-                else ShowCompanionNotice("主人，" + brain.Status + "。");
+                if (text.Length > 0) { FinishCompanionPartial(text, true); }
+                else ShowCompanionNotice("主人，" + brain.Status + "。", manual: true);
             }
         }
         finally
@@ -98,24 +100,43 @@ public partial class MainWindow
         }
     }
 
-    private Task SpeakCompanionTest()
+    private async Task SpeakCompanionTest()
     {
-        if (PuppetActive || companionClosed || exitAnimation) return Task.CompletedTask;
+        if (companionClosed || exitAnimation) return;
         if (hiddenByUser || fullscreenHidden) RestoreCompanion();
+        if (await TryManualAgentSpeech(false)) return;
         if (!preferences.ModelEnabled)
         {
-            ShowCompanionNotice("主人，当前设置暂停了模型，请启用模型并确认供电设置后再测试～");
-            return Task.CompletedTask;
+            ShowCompanionNotice("主人，当前设置暂停了模型，请启用模型并确认供电设置后再测试～", manual: true);
+            return;
         }
         if (!brain.CanRunOnCurrentPower)
         {
-            ShowCompanionNotice(BatteryPauseNotice, true);
-            return Task.CompletedTask;
+            ShowCompanionNotice(BatteryPauseNotice, true, true);
+            return;
         }
         // A test directly enters the same single handler used when the ordinary
         // speech countdown reaches zero.
         speechForegroundOverride = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
-        return SpeechCountdownZeroAsync();
+        await GenerateLocalSpeechAsync(true);
+    }
+
+    private async Task<bool> TryManualAgentSpeech(bool weather)
+    {
+#if COMPANION_SAFE
+        await Task.CompletedTask; return false;
+#else
+        if (!AgentDailyActive) return false;
+        try
+        {
+            ShowCompanionNotice(weather ? "主人，正在准备天气资料交给 Agent～" : "主人，正在请 Agent 回应这次吐字测试～", true, true);
+            string context = weather ? await brain.GetWeatherContext(System.Threading.CancellationToken.None) : "";
+            if (companionClosed || exitAnimation) return true;
+            if (agent?.ManualSpeech(weather, context) != true) ShowCompanionNotice("主人，Agent 请求尚未就绪或队列已满，请查看连接状态后重试～", true, true);
+        }
+        catch (Exception error) { ShowCompanionNotice("主人，" + error.Message, true, true); }
+        return true;
+#endif
     }
 
     private void AddCompanionRegionSelectors(Panel panel)

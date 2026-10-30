@@ -15,6 +15,6 @@ try
 }
 catch (Exception e)
 {
-    await Console.Error.WriteLineAsync("蓝色大肥鱼 MCP 未连接：请启动标准版并在设置中开启 MCP 接口。" + e.Message);
+    await Console.Error.WriteLineAsync("蓝色大肥鱼内部工具未连接：请通过标准版的“连接 Agent”页面建立连接。" + e.Message);
     Environment.ExitCode = 1;
 }
