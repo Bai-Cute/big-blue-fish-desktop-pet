@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Diagnostics;
 
 const string fixturePersonality = "你是大肥鱼测试伙伴。";
-if (args.Contains("--bubble-layout")) { MacBubbleLayoutVerification.Run(); return; }
+if (args.Contains("--bubble-layout")) { MacBubbleLayoutVerification.Run(args.Contains("--bubble-layout-visible")); return; }
 if (args.Contains("--acp-fixture")) {
     while (Console.ReadLine() is { } line) {
         using var document = JsonDocument.Parse(line); var message = document.RootElement;

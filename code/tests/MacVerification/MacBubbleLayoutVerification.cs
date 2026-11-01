@@ -8,6 +8,7 @@ using BigBlueFish.Windows;
 internal sealed class BubbleVerificationApp : Application
 {
     internal static Exception? Failure;
+    internal static bool ShowWindow;
 
     static void Check(bool condition, string label)
     {
@@ -17,23 +18,25 @@ internal sealed class BubbleVerificationApp : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
-        const string reply = "唔，给主人摸摸～鱼鱼乖乖低下头，小鲸鱼尾巴也跟着晃了晃。再摸一下嘛，嘿嘿💙";
+        const string initialReply = "嗨，主人！";
+        const string reply = "晚上好呀，主人～今天过得怎么样？忙完了就歇一歇，鱼鱼陪你聊会儿。";
         var text = new TextBlock {
-            Text = reply,
+            Text = initialReply,
             TextWrapping = TextWrapping.Wrap,
             MaxWidth = 270,
             FontSize = 17,
             FontFamily = new FontFamily("avares://MacVerification/Assets#LemiXiaoNaiPaoTi")
         };
-        text.Measure(new Size(270, double.PositiveInfinity));
-        double measuredTextHeight = text.DesiredSize.Height;
+        double initialTextHeight = MacBubbleLayout.Measure(text, initialReply, 270).Height;
         var frame = new LinuxBubble { Padding = new Thickness(16, 16, 16, 30), Child = text };
         var window = new Window {
+            Title = "Bubble layout verification",
             WindowDecorations = WindowDecorations.None,
+            Topmost = true,
             CanResize = false,
             ShowActivated = false,
             ShowInTaskbar = false,
-            Opacity = 0,
+            Opacity = ShowWindow ? 1 : 0,
             Background = Brushes.Transparent,
             TransparencyLevelHint = [WindowTransparencyLevel.Transparent],
             Content = frame
@@ -44,13 +47,29 @@ internal sealed class BubbleVerificationApp : Application
         window.Opened += (_, _) => {
             Dispatcher.UIThread.Post(() => {
             try {
-                Check(measuredTextHeight > 20, "manual pre-measure detects multiple Chinese text lines");
+                Check(text.Bounds.Height >= initialTextHeight - .5, "native bubble lays out the initial short reply");
+                var responseSize = MacBubbleLayout.Measure(text, reply, 270);
+                var display = MacBubbleReplyPolicy.ForBubble(reply, MacChatSettings.DefaultBubbleCharacterLimit,
+                    responseSize.Height + 46, 800);
+                Check(display == reply, "screenshot reply remains eligible for complete bubble display");
+                var size = MacBubbleLayout.Measure(text, display, 270);
+                double measuredTextHeight = size.Height;
+                window.Width = Math.Ceiling(size.Width + 32);
+                window.Height = Math.Ceiling(measuredTextHeight + 46);
+                window.UpdateLayout();
+                Check(measuredTextHeight > initialTextHeight, "remeasuring a reused text block detects the longer reply lines");
                 Check(window.Height >= measuredTextHeight + 46 - .5,
-                    "window height retains the complete pre-show text measurement");
-                Check(text.Bounds.Height >= measuredTextHeight - .5, "auto-sized native window lays out all reply lines");
+                    "resized native window retains the complete updated text measurement");
+                Check(text.Bounds.Height >= measuredTextHeight - .5, "reused native bubble lays out all updated reply lines");
                 Check(text.Text == reply, "native bubble window retains the complete reply text");
             } catch (Exception error) { Failure = error; }
-            finally { window.Close(); desktop.Shutdown(); }
+            finally {
+                if (ShowWindow) {
+                    var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+                    timer.Tick += (_, _) => { timer.Stop(); window.Close(); desktop.Shutdown(); };
+                    timer.Start();
+                } else { window.Close(); desktop.Shutdown(); }
+            }
             }, DispatcherPriority.Background);
         };
         window.Show();
@@ -62,8 +81,9 @@ internal sealed class BubbleVerificationApp : Application
 
 internal static class MacBubbleLayoutVerification
 {
-    internal static void Run()
+    internal static void Run(bool showWindow = false)
     {
+        BubbleVerificationApp.ShowWindow = showWindow;
         AppBuilder.Configure<BubbleVerificationApp>().UsePlatformDetect().StartWithClassicDesktopLifetime([]);
         if (BubbleVerificationApp.Failure is not null) throw BubbleVerificationApp.Failure;
     }

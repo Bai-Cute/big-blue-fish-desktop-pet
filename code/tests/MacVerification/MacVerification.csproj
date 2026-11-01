@@ -15,6 +15,7 @@
     <Compile Include="../../BigBlueFish.Mac/MacHitTest.cs" Link="MacHitTest.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacChatScrollState.cs" Link="MacChatScrollState.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacChatRequestQueue.cs" Link="MacChatRequestQueue.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacBubbleLayout.cs" Link="MacBubbleLayout.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacBubbleReplyPolicy.cs" Link="MacBubbleReplyPolicy.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacChatEntry.cs" Link="MacChatEntry.cs" />
     <Compile Include="../../BigBlueFish.Windows/Companion/CompanionPreferences.cs" Link="CompanionPreferences.cs" />

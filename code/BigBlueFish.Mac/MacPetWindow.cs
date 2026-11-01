@@ -136,21 +136,20 @@ internal sealed partial class MacPetWindow : Window
     }
     void Say(string message)
     {
-        text.Text = message;
-        text.Measure(new Size(270, double.PositiveInfinity));
+        var size = MacBubbleLayout.Measure(text, message, 270);
+        bubble.Width = Math.Ceiling(size.Width + 32);
+        bubble.Height = Math.Ceiling(size.Height + 46);
         bubble.Show();
-        bubble.Width = Math.Ceiling(text.DesiredSize.Width + 32);
-        bubble.Height = Math.Ceiling(text.DesiredSize.Height + 46);
+        bubble.UpdateLayout();
         MoveBubble();
         bubbleUntil = DateTime.UtcNow.AddSeconds(8);
     }
     void SayChatReply(string response)
     {
-        text.Text = response;
-        text.Measure(new Size(270, double.PositiveInfinity));
+        var size = MacBubbleLayout.Measure(text, response, 270);
         var area = (Screens.ScreenFromWindow(this) ?? Screens.Primary)?.WorkingArea ?? new PixelRect(0, 0, 1280, 720);
         string display = MacBubbleReplyPolicy.ForBubble(response, chatSettings.BubbleCharacterLimit,
-            text.DesiredSize.Height + 46, area.Height / DesktopScaling);
+            size.Height + 46, area.Height / DesktopScaling);
         Say(display);
     }
     void MoveBubble()
