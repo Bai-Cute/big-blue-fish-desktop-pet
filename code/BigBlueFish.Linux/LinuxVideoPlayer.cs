@@ -8,9 +8,9 @@ using Avalonia.Threading;
 
 namespace BigBlueFish.Windows;
 
-internal sealed class LinuxVideoPlayer(Image image) : IDisposable
+internal sealed class LinuxVideoPlayer(Image image, string decoderPath = "/usr/bin/ffmpeg", bool rgba = false) : IDisposable
 {
-    readonly WriteableBitmap bitmap = new(new PixelSize(640, 360), new Vector(96, 96), PixelFormat.Bgra8888, AlphaFormat.Unpremul);
+    readonly WriteableBitmap bitmap = new(new PixelSize(640, 360), new Vector(96, 96), rgba ? PixelFormat.Rgba8888 : PixelFormat.Bgra8888, AlphaFormat.Unpremul);
     CancellationTokenSource? current;
     Process? decoder;
     long generation;
@@ -29,12 +29,12 @@ internal sealed class LinuxVideoPlayer(Image image) : IDisposable
         image.Source = bitmap;
         image.RenderTransformOrigin = new(.5, .5, RelativeUnit.Relative);
         image.RenderTransform = new Avalonia.Media.ScaleTransform(mirror ? -1 : 1, 1);
-        var command = new ProcessStartInfo("/usr/bin/ffmpeg") { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+        var command = new ProcessStartInfo(decoderPath) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
         foreach (var arg in new[] { "-v", "error", "-nostdin", "-threads", "1", "-c:v", "libvpx-vp9" }) command.ArgumentList.Add(arg);
         if (startSeconds > 0) { command.ArgumentList.Add("-ss"); command.ArgumentList.Add(startSeconds.ToString("R", System.Globalization.CultureInfo.InvariantCulture)); }
         command.ArgumentList.Add("-i"); command.ArgumentList.Add(path);
         if (endSeconds.HasValue) { command.ArgumentList.Add("-t"); command.ArgumentList.Add((endSeconds.Value - startSeconds).ToString("R", System.Globalization.CultureInfo.InvariantCulture)); }
-        foreach (var arg in new[] { "-an", "-sn", "-f", "rawvideo", "-pix_fmt", "bgra", "pipe:1" }) command.ArgumentList.Add(arg);
+        foreach (var arg in new[] { "-an", "-sn", "-f", "rawvideo", "-pix_fmt", rgba ? "rgba" : "bgra", "pipe:1" }) command.ArgumentList.Add(arg);
         try { decoder = LinuxProcesses.Start(command); var process = decoder; _ = Task.Run(() => Decode(process, id, token, startSeconds, rate, mirror, completed)); }
         catch (Exception error) { Failed?.Invoke(error.Message); }
     }

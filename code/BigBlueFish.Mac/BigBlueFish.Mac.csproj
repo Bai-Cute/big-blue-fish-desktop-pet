@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><RuntimeIdentifier>osx-arm64</RuntimeIdentifier>
+    <ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><DefineConstants>$(DefineConstants);COMPANION_SAFE</DefineConstants>
+    <NativeLibrary>$(MSBuildProjectDirectory)/obj/native/$(RuntimeIdentifier)/libBigBlueFish.Mac.dylib</NativeLibrary>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../BigBlueFish.Agent/BigBlueFish.Agent.csproj" AdditionalProperties="RuntimeIdentifier=$(RuntimeIdentifier)" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionAnimationPolicy.cs" Link="Shared/CompanionAnimationPolicy.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionPreferences.cs" Link="Shared/CompanionPreferences.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionRegions.cs" Link="Shared/CompanionRegions.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxVideoPlayer.cs" Link="Shared/LinuxVideoPlayer.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxVisuals.cs" Link="Shared/LinuxVisuals.cs" />
+    <Compile Include="../../deployment/ModelStore.cs" Link="Shared/ModelStore.cs" />
+    <Compile Include="../../deployment/ArtifactDownload.cs" Link="Shared/ArtifactDownload.cs" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/china-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.china-regions.json" />
+    <AvaloniaResource Include="../BigBlueFish.Windows/Res/Font/LemiXiaoNaiPaoTi.ttf" Link="Assets/LemiXiaoNaiPaoTi.ttf" />
+    <Content Include="../BigBlueFish.Windows/assets/fish/**/*" Link="assets/fish/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../BigBlueFish.Windows/BigBlueFish.ico" Link="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="TrayIcon.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(NativeLibrary)" Link="libBigBlueFish.Mac.dylib" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="BuildMacNative" BeforeTargets="PrepareForBuild" Inputs="$(MSBuildProjectDirectory)/MacNative.m" Outputs="$(NativeLibrary)">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('$(NativeLibrary)'))" />
+    <Exec Command="xcrun clang -arch arm64 -mmacosx-version-min=12.0 -dynamiclib -fobjc-arc -Wall -Wextra -Werror -framework AppKit -framework Security &quot;$(MSBuildProjectDirectory)/MacNative.m&quot; -o &quot;$(NativeLibrary)&quot;" />
+  </Target>
+</Project>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><RuntimeIdentifier>osx-arm64</RuntimeIdentifier><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><DefineConstants>$(DefineConstants);COMPANION_SAFE</DefineConstants></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../BigBlueFish.Agent/BigBlueFish.Agent.csproj" AdditionalProperties="RuntimeIdentifier=$(RuntimeIdentifier)" />
+    <Compile Include="../../BigBlueFish.Mac/MacAgentSession.cs" Link="MacAgentSession.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacAcpExecutableLocator.cs" Link="MacAcpExecutableLocator.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacChatSettings.cs" Link="MacChatSettings.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacChatPersonality.cs" Link="MacChatPersonality.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacLocalChat.cs" Link="MacLocalChat.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacModelDownload.cs" Link="MacModelDownload.cs" />
+    <Compile Include="../../../deployment/ModelStore.cs" Link="ModelStore.cs" />
+    <Compile Include="../../../deployment/ArtifactDownload.cs" Link="ArtifactDownload.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacHitTest.cs" Link="MacHitTest.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacChatScrollState.cs" Link="MacChatScrollState.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacChatRequestQueue.cs" Link="MacChatRequestQueue.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacChatEntry.cs" Link="MacChatEntry.cs" />
+    <Compile Include="../../BigBlueFish.Windows/Companion/CompanionPreferences.cs" Link="CompanionPreferences.cs" />
+    <Compile Include="../../BigBlueFish.Windows/Companion/CompanionRegions.cs" Link="CompanionRegions.cs" />
+    <EmbeddedResource Include="../../BigBlueFish.Windows/assets/regions/china-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.china-regions.json" />
+  </ItemGroup>
+</Project>
