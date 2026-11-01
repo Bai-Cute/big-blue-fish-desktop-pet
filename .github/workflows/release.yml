@@ -137,7 +137,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
       - name: Build Apple Silicon app
-        run: bash tools/build-macos.sh
+        env:
+          PACKAGE_VERSION: ${{ needs.version.outputs.package_version }}
+        run: bash tools/build-macos.sh "$PACKAGE_VERSION"
       - name: Create DMG installer
         shell: bash
         run: |

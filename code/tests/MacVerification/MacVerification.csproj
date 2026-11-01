@@ -6,6 +6,7 @@
     <Compile Include="../../BigBlueFish.Linux/LinuxVisuals.cs" Link="LinuxVisuals.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacAgentSession.cs" Link="MacAgentSession.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacAcpExecutableLocator.cs" Link="MacAcpExecutableLocator.cs" />
+    <Compile Include="../../BigBlueFish.Mac/MacInstanceLock.cs" Link="MacInstanceLock.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacChatSettings.cs" Link="MacChatSettings.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacChatPersonality.cs" Link="MacChatPersonality.cs" />
     <Compile Include="../../BigBlueFish.Mac/MacLocalChat.cs" Link="MacLocalChat.cs" />

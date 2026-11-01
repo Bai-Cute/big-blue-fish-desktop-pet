@@ -4,10 +4,19 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ "$(uname -s)" != Darwin || "$(uname -m)" != arm64 ]]; then
   echo 'This build currently requires an Apple Silicon Mac.' >&2; exit 1
 fi
-if [[ $# -gt 0 ]]; then
-  echo 'This build writes to release/macos only; remove the output-directory argument.' >&2
+if [[ $# -gt 1 ]]; then
+  echo 'Usage: tools/build-macos.sh [version]' >&2
   exit 2
 fi
+version="$(sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' "$root/Version.props" | head -n 1)"
+if [[ $# -eq 1 ]]; then
+  if [[ ! "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo 'Version must be a numeric major.minor.patch value.' >&2
+    exit 2
+  fi
+  version="$1"
+fi
+[[ -n "$version" ]]
 output="$root/release/macos"
 mkdir -p "$output"
 output="$(cd "$output" && pwd)"
@@ -31,9 +40,7 @@ command -v dotnet >/dev/null
 xcrun --find clang >/dev/null
 mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
 dotnet publish "$root/code/BigBlueFish.Mac/BigBlueFish.Mac.csproj" -c Release -r osx-arm64 \
-  --self-contained true -p:RestoreLockedMode=true --nologo -o "$app/Contents/MacOS"
-version="$(sed -n 's/.*<Version>\([^<]*\)<\/Version>.*/\1/p' "$root/Version.props" | head -n 1)"
-[[ -n "$version" ]]
+  --self-contained true -p:RestoreLockedMode=true "-p:Version=$version" --nologo -o "$app/Contents/MacOS"
 cat > "$app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

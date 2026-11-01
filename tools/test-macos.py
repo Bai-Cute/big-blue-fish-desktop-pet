@@ -12,8 +12,15 @@ app = Path(sys.argv[1]).resolve()
 with tempfile.TemporaryDirectory(prefix="bbf-mac-test-") as directory:
     data = Path(directory)
     env = dict(os.environ, BIGBLUEFISH_DATA=directory)
+    instance_lock = data / "companion.lock"
     with (data / "stdout.log").open("w") as log:
-        process = subprocess.Popen([str(app / "Contents/MacOS/BigBlueFish.Mac"), "--test-mode"], env=env, stdout=log, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(
+            [str(app / "Contents/MacOS/BigBlueFish.Mac"), "--test-mode", "--test-data-directory", directory,
+             "--test-instance-lock", str(instance_lock)],
+            env=env,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+        )
         def wait_for(predicate, timeout=20):
             deadline = time.monotonic() + timeout
             last_status = None
@@ -33,8 +40,11 @@ with tempfile.TemporaryDirectory(prefix="bbf-mac-test-") as directory:
             pending = data / "test-command.pending"
             pending.write_text(text)
             pending.replace(data / "test-command.txt")
+        isolated = False
         try:
             status = wait_for(lambda s: s["frames"] > 5)
+            assert Path(status["dataDirectory"]).resolve() == data.resolve(), status
+            isolated = True
             assert status["decoderError"] == "", status
             assert status["handle"] == "NSWindow", status
             assert status["width"] > 0 and status["height"] > 0, status
@@ -49,7 +59,8 @@ with tempfile.TemporaryDirectory(prefix="bbf-mac-test-") as directory:
                 duplicate = None
                 with (duplicate_data / "stdout.log").open("w") as duplicate_log:
                     duplicate = subprocess.Popen(
-                        [str(app / "Contents/MacOS/BigBlueFish.Mac"), "--test-mode"],
+                        [str(app / "Contents/MacOS/BigBlueFish.Mac"), "--test-mode",
+                         "--test-data-directory", duplicate_directory, "--test-instance-lock", str(instance_lock)],
                         env=duplicate_env,
                         stdout=duplicate_log,
                         stderr=subprocess.STDOUT,
@@ -76,9 +87,9 @@ with tempfile.TemporaryDirectory(prefix="bbf-mac-test-") as directory:
                 assert not (duplicate_data / "test-status.json").exists(), "A duplicate launch created a second app instance"
             assert process.poll() is None, "The duplicate launch terminated the primary app"
             print("PASS: duplicate launch exits without creating another instance")
+            subprocess.run(["open", "-a", str(app)], check=True)
+            wait_for(lambda s: s["applicationActive"])
             if not os.environ.get("BIGBLUEFISH_SKIP_MENU_FOCUS_TEST"):
-                subprocess.run(["open", "-a", str(app)], check=True)
-                wait_for(lambda s: s["applicationActive"])
                 command("context-menu")
                 status = wait_for(lambda s: s["contextMenuOpen"])
                 assert status["applicationActive"] and status["contextMenuOpenedWhileAppActive"], status
@@ -128,6 +139,33 @@ with tempfile.TemporaryDirectory(prefix="bbf-mac-test-") as directory:
             assert not (data / "companion-errors.log").exists()
             print("PASS: settings, hide/show, saved position, graceful exit, no remaining decoder")
         finally:
+            try:
+                children = subprocess.check_output(["pgrep", "-P", str(process.pid)], text=True).split()
+            except subprocess.CalledProcessError:
+                children = []
             if process.poll() is None:
-                process.terminate()
-                process.wait(timeout=5)
+                if not isolated:
+                    process.kill()
+                    process.wait(timeout=5)
+                else:
+                    try:
+                        command("exit")
+                        process.wait(timeout=15)
+                    except (OSError, subprocess.TimeoutExpired):
+                        process.terminate()
+                        try:
+                            process.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            process.wait(timeout=5)
+            for child in children:
+                subprocess.run(["kill", "-TERM", child], check=False)
+            for child in children:
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    alive = subprocess.run(["kill", "-0", child], capture_output=True).returncode == 0
+                    if not alive:
+                        break
+                    time.sleep(.1)
+                else:
+                    subprocess.run(["kill", "-KILL", child], check=False)

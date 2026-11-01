@@ -37,6 +37,7 @@ MacChatScrollStateVerification.Run();
 MacChatRequestQueueVerification.Run();
 MacChatEntryVerification.Run();
 MacBubbleReplyPolicyVerification.Run();
+MacInstanceLockVerification.Run();
 pixels[(20 * 640 + 10) * 4 + 3] = 255;
 var alpha = new byte[640 * 360];
 Check(MacHitTest.CopyAlpha(pixels, alpha), "valid frame alpha copied");
