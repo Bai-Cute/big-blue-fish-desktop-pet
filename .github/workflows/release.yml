@@ -1,0 +1,197 @@
+name: Build and publish release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-24.04
+    outputs:
+      package_version: ${{ steps.parse.outputs.package_version }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
+    steps:
+      - id: parse
+        shell: bash
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Unsupported release tag: $TAG" >&2
+            exit 1
+          fi
+          echo "package_version=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          if [[ -n "${BASH_REMATCH[2]}" ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-windows:
+    needs: version
+    runs-on: windows-2022
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Download and verify llama.cpp runtime
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'llama-b10809-bin-win-vulkan-x64.zip'
+          $runtime = Join-Path $env:RUNNER_TEMP 'llama-runtime'
+          Invoke-WebRequest -Uri 'https://github.com/ggml-org/llama.cpp/releases/download/b10809/llama-b10809-bin-win-vulkan-x64.zip' -OutFile $archive
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne '97e50b3ef0cdd2cb4d5afd446a9006b3496bee6c0d0ba7083d32f36075771870') { throw 'llama.cpp Windows runtime SHA-256 mismatch.' }
+          Expand-Archive -LiteralPath $archive -DestinationPath $runtime
+          if (!(Test-Path -LiteralPath (Join-Path $runtime 'llama-server.exe'))) { throw 'llama-server.exe is missing from the verified archive.' }
+          "LLAMA_RUNTIME=$runtime" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Build Standard and Safe installers
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ needs.version.outputs.package_version }}
+        run: |
+          ./tools/Build-Installer.ps1 -Version $env:PACKAGE_VERSION -RuntimeDirectory $env:LLAMA_RUNTIME -Edition Standard
+          ./tools/Build-Installer.ps1 -Version $env:PACKAGE_VERSION -RuntimeDirectory $env:LLAMA_RUNTIME -Edition Safe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          if-no-files-found: error
+          path: |
+            release/BigBlueFish-v${{ needs.version.outputs.package_version }}-OCR-Setup.exe
+            release/BigBlueFish-v${{ needs.version.outputs.package_version }}-OCR-Setup.sha256
+            release/BigBlueFish-v${{ needs.version.outputs.package_version }}-Safe-OCR-Setup.exe
+            release/BigBlueFish-v${{ needs.version.outputs.package_version }}-Safe-OCR-Setup.sha256
+
+  build-linux:
+    needs: version
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Install package build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential pkg-config libdbus-1-dev dpkg-dev ffmpeg
+      - name: Download and verify llama.cpp runtime
+        shell: bash
+        run: |
+          archive="$RUNNER_TEMP/llama-b10809-bin-ubuntu-vulkan-x64.tar.gz"
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://github.com/ggml-org/llama.cpp/releases/download/b10809/llama-b10809-bin-ubuntu-vulkan-x64.tar.gz' \
+            --output "$archive"
+          printf '%s  %s\n' '07f029cef440c82c3cff5310641eb6347e5cbcd865a5d88990215058aa049e93' "$archive" | sha256sum --check -
+          mkdir -p "$RUNNER_TEMP/llama-runtime"
+          tar -xzf "$archive" --strip-components=1 -C "$RUNNER_TEMP/llama-runtime"
+          test -x "$RUNNER_TEMP/llama-runtime/llama-server"
+          echo "LLAMA_RUNTIME=$RUNNER_TEMP/llama-runtime" >> "$GITHUB_ENV"
+      - name: Build Standard and Safe packages
+        shell: bash
+        env:
+          PACKAGE_VERSION: ${{ needs.version.outputs.package_version }}
+        run: |
+          output="$RUNNER_TEMP/release-output"
+          mkdir -p "$output"
+          for edition in Standard Safe; do
+            work="$RUNNER_TEMP/bigbluefish-$edition"
+            mkdir -p "$work/payload"
+            dotnet publish code/BigBlueFish.Linux/BigBlueFish.Linux.csproj \
+              -c Release -r linux-x64 --self-contained true \
+              "-p:CompanionEdition=$edition" -p:RestoreLockedMode=true \
+              "-p:Version=$PACKAGE_VERSION" -o "$work/payload" --nologo
+            if [[ "$edition" == Standard ]]; then
+              dotnet publish code/BigBlueFish.Mcp/BigBlueFish.Mcp.csproj \
+                -c Release -r linux-x64 --self-contained true \
+                -p:RestoreLockedMode=true "-p:Version=$PACKAGE_VERSION" \
+                -o "$work/payload" --nologo
+            fi
+            bash tools/build-linux-deb.sh "$GITHUB_WORKSPACE" "$work" "$LLAMA_RUNTIME" "$output" "$PACKAGE_VERSION" "$edition"
+          done
+          mkdir -p release-linux
+          cp "$output"/*.deb "$output"/*.sha256 release-linux/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          if-no-files-found: error
+          path: release-linux/*
+
+  build-macos:
+    needs: version
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Build Apple Silicon app
+        run: bash tools/build-macos.sh
+      - name: Create DMG installer
+        shell: bash
+        run: |
+          stage="$RUNNER_TEMP/bigbluefish-dmg"
+          mkdir -p "$stage"
+          cp -R release/macos/BigBlueFish.app "$stage/BigBlueFish.app"
+          ln -s /Applications "$stage/Applications"
+          dmg="release/macos/BigBlueFish-${GITHUB_REF_NAME}-macOS-arm64.dmg"
+          hdiutil create -volname "Big Blue Fish ${GITHUB_REF_NAME}" -srcfolder "$stage" -ov -format UDZO "$dmg"
+          dmg_name="$(basename "$dmg")"
+          (cd release/macos && shasum -a 256 "$dmg_name" > "$dmg_name.sha256")
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installers
+          if-no-files-found: error
+          path: |
+            release/macos/BigBlueFish-${{ github.ref_name }}-macOS-arm64.dmg
+            release/macos/BigBlueFish-${{ github.ref_name }}-macOS-arm64.dmg.sha256
+
+  publish-release:
+    needs: [version, build-windows, build-linux, build-macos]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: '*-installers'
+          path: release-assets
+          merge-multiple: true
+      - name: Verify package checksums
+        shell: bash
+        run: |
+          packages=$(find release-assets -maxdepth 1 -type f ! -name '*.sha256' | wc -l | tr -d ' ')
+          checksums=$(find release-assets -maxdepth 1 -type f -name '*.sha256' | wc -l | tr -d ' ')
+          [[ "$packages" == 5 && "$checksums" == 5 ]]
+          for checksum in release-assets/*.sha256; do
+            read -r expected filename < "$checksum"
+            filename="${filename%$'\r'}"
+            actual=$(sha256sum "release-assets/$filename" | awk '{print $1}')
+            [[ "$actual" == "$expected" ]] || { echo "Checksum failed: $filename" >&2; exit 1; }
+          done
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+        shell: bash
+        run: |
+          tag="$GITHUB_REF_NAME"
+          assets=(release-assets/*)
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" "${assets[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            options=(--repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Big Blue Fish $tag")
+            if [[ "$PRERELEASE" == true ]]; then options+=(--prerelease); fi
+            gh release create "$tag" "${assets[@]}" "${options[@]}"
+          fi

@@ -43,6 +43,8 @@ open release/macos/BigBlueFish.app
 
 构建脚本只输出到 `release/macos/BigBlueFish.app`。它先在同一 `release/` 下完成暂存构建，再替换现有 `.app`；失败时保留上一版。真实窗口烟测使用隔离设置，检查动画解码、白色不透明设置窗口、关闭未保存设置不会写入、明确保存后写入、对话窗口默认不连接、隐藏/恢复、退出和解码进程清理。鼠标穿透单元测试不等于物理鼠标与多显示器验收。烟测需要已登录且正常工作的 macOS 图形桌面；若锁屏或无显示器导致 Avalonia.Native RenderTimer 无法启动，须在可用桌面上重试。
 
+推送 `vX.Y.Z` 标签会触发 GitHub Actions，为 Windows、Ubuntu/Debian 和 Apple Silicon macOS 构建安装包并发布 GitHub Release。macOS 产物为含 Applications 拖放入口的 `.dmg`；目前未进行 Developer ID 签名和公证，也不内置 FFmpeg。
+
 ## ACP 方案与接入
 
 2026-11-01 核对：OpenCode 官方支持 `opencode acp`，通过 stdio JSON-RPC 通信；Claude 与 Codex 可分别使用 ACP 组织维护的 `claude-agent-acp` 与 `codex-acp`。Mac 版直接复用仓库 `BigBlueFish.Agent/AcpConnection.cs`，不另造 JSON-RPC 实现，不自动下载适配器。参考：

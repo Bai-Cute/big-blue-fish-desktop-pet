@@ -57,12 +57,13 @@
 
 ## 安装
 
-普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载对应系统的安装包。每个平台都提供标准版和无ACP版，文件名中带 `Safe` 的是无ACP版，各安装包都附有配套的 `.sha256` 校验文件。
+普通用户请从 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载对应系统的安装包。Windows 和 Linux 提供标准版与无 ACP 版，文件名中带 `Safe` 的是无 ACP 版；macOS 提供 Apple Silicon DMG。所有安装包都附有配套的 `.sha256` 校验文件。
 
 | 平台 | 标准版 | 无ACP版 |
 | --- | --- | --- |
 | Windows x64 | `BigBlueFish-v1.1.0-OCR-Setup.exe` | `BigBlueFish-v1.1.0-Safe-OCR-Setup.exe` |
 | Ubuntu／Debian x64 | `BigBlueFish-v1.1.0-Linux-x64.deb` | `BigBlueFish-v1.1.0-Safe-Linux-x64.deb` |
+| macOS Apple Silicon | `BigBlueFish-v1.1.0-macOS-arm64.dmg` | — |
 
 在 Windows 上，双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时一并安装好，默认位置是 `Program Files` 下的“蓝色大肥鱼”文件夹，并创建桌面和开始菜单快捷方式。随后安装器会请主人选择模型的准备方式：Hugging Face（推荐）、国内源（稳定）或手动安装。自动下载的模型约 2.7 GB，下载完成后会经过 SHA-256 校验，中途断开也能从已有进度继续。下载时如果想改用手动安装，可以选择“放弃并转为手动安装”；手动安装会显示模型应放入的文件夹，并打开模型来源页面，也可以直接选择已经下载好的 GGUF 文件。卸载时可以在卸载界面勾选“保留模型和设置”。
 
@@ -73,6 +74,8 @@ sudo apt install ./BigBlueFish-v1.1.0-Linux-x64.deb
 ```
 
 安装无ACP版时换成对应的文件名即可。安装完成后，可以从应用菜单或 `bigbluefish` 命令启动鱼鱼，再到设置的“模型与信息”中点击“安装模型”，为她准备本地模型。
+
+在 macOS 上，打开 DMG 并将 BigBlueFish 拖入 Applications。当前版本面向 Apple Silicon，运行还需要 FFmpeg（可通过 `brew install ffmpeg` 安装）。DMG 内的应用尚未进行 Developer ID 签名和公证；首次打开时，macOS 可能要求在“隐私与安全性”中允许打开。
 
 如果暂时不想下载模型，也可以先让鱼鱼以无模型模式住进桌面。这时她依然会行礼、问候、道别，播放全部动作表情，回应主人的点击和拖动。之后随时可以到设置中点击“安装模型”，让她开始读懂屏幕、开口说话。
 
