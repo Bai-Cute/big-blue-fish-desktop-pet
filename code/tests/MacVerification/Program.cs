@@ -1,8 +1,10 @@
 using BigBlueFish.Windows;
 using BigBlueFish.Agent;
 using System.Text.Json;
+using System.Diagnostics;
 
 const string fixturePersonality = "你是大肥鱼测试伙伴。";
+if (args.Contains("--bubble-layout")) { MacBubbleLayoutVerification.Run(); return; }
 if (args.Contains("--acp-fixture")) {
     while (Console.ReadLine() is { } line) {
         using var document = JsonDocument.Parse(line); var message = document.RootElement;
@@ -34,6 +36,7 @@ var pixels = new byte[640 * 360 * 4];
 MacChatScrollStateVerification.Run();
 MacChatRequestQueueVerification.Run();
 MacChatEntryVerification.Run();
+MacBubbleReplyPolicyVerification.Run();
 pixels[(20 * 640 + 10) * 4 + 3] = 255;
 var alpha = new byte[640 * 360];
 Check(MacHitTest.CopyAlpha(pixels, alpha), "valid frame alpha copied");
@@ -84,3 +87,15 @@ try {
 
 await MacLocalChatVerification.Run();
 await MacModelDownloadVerification.Run();
+var bubbleExecutable = Environment.ProcessPath!;
+var bubbleArguments = new List<string>();
+if (Path.GetFileNameWithoutExtension(bubbleExecutable) == "dotnet") bubbleArguments.Add(typeof(MacBubbleLayoutVerification).Assembly.Location);
+bubbleArguments.Add("--bubble-layout");
+var bubbleStart = new ProcessStartInfo(bubbleExecutable) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+foreach (var argument in bubbleArguments) bubbleStart.ArgumentList.Add(argument);
+using var bubbleTest = Process.Start(bubbleStart) ?? throw new InvalidOperationException("Could not start bubble layout verification.");
+var bubbleOutput = bubbleTest.StandardOutput.ReadToEndAsync();
+var bubbleError = bubbleTest.StandardError.ReadToEndAsync();
+await bubbleTest.WaitForExitAsync();
+Console.Write(await bubbleOutput);
+if (bubbleTest.ExitCode != 0) throw new Exception(await bubbleError);

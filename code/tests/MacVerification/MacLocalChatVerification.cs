@@ -33,6 +33,18 @@ internal static class MacLocalChatVerification
             File.WriteAllText("mac-chat-settings.json", "{\"PersonalityPrompt\":\"你是“蓝色大肥鱼”的桌面伙伴，昵称“大肥鱼”或“鱼鱼”。语气温柔、亲切、自然，认真回应用户，不夸张、不刻意卖萌。优先使用中文，回答清楚简洁。\\n用户问你是谁时，自称大肥鱼（蓝色大肥鱼桌宠）；不要主动自称 ChatGPT、OpenAI、Claude、Codex 或其他厂商/模型。若用户明确询问底层模型或服务来源，请说明回复由当前配置的 API、本机模型或 ACP Agent 提供，不要编造。\\n只依据当前对话和实际可用能力回答；不要声称能看见屏幕、记住未提供的事情、具有真实感受或已经执行未执行的动作。\"}");
             Check(MacChatSettings.Read().PersonalityPrompt == MacChatSettings.DefaultPersonalityPrompt,
                 "previous built-in personality upgrades to the full character card");
+            Check(MacChatSettings.Read().BubbleCharacterLimit == MacChatSettings.DefaultBubbleCharacterLimit,
+                "older chat settings without a bubble limit use the default");
+            Check(defaults.BubbleCharacterLimit == 120, "chat bubble character limit has a safe default");
+            defaults.BubbleCharacterLimit = 240;
+            defaults.Save();
+            Check(MacChatSettings.Read().BubbleCharacterLimit == 240, "custom chat bubble character limit persists");
+            defaults.BubbleCharacterLimit = 1;
+            defaults.Normalize();
+            Check(defaults.BubbleCharacterLimit == 20, "chat bubble character limit clamps its minimum");
+            defaults.BubbleCharacterLimit = 10000;
+            defaults.Normalize();
+            Check(defaults.BubbleCharacterLimit == 1000, "chat bubble character limit clamps its maximum");
             var settings = new MacChatSettings { Backend = "api", Endpoint = "http://127.0.0.1:1234/v1", Model = "test-model", PersonalityPrompt = "你是测试用的大肥鱼。" };
             settings.Save();
             var saved = MacChatSettings.Read();

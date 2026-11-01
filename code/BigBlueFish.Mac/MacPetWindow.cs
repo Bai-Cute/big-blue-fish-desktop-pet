@@ -9,6 +9,7 @@ namespace BigBlueFish.Windows;
 
 internal sealed partial class MacPetWindow : Window
 {
+    const string BubbleLayoutTestReply = "唔，给主人摸摸～鱼鱼乖乖低下头，小鲸鱼尾巴也跟着晃了晃。再摸一下嘛，嘿嘿💙";
     readonly CompanionPreferences preferences = CompanionPreferences.Read();
     readonly CompanionAnimationPolicy policy = CompanionAnimationPolicy.Load(Path.Combine(AppContext.BaseDirectory, "assets/fish"));
     readonly MacChatSettings chatSettings = MacChatSettings.Read();
@@ -66,6 +67,10 @@ internal sealed partial class MacPetWindow : Window
             ResizePet();
             InitializeTray(); timer.Start();
             if (decoderError.Length > 0) { Say(decoderError); return; }
+            if (App.Args.Contains("--test-mode") && App.Args.Contains("--bubble-layout")) {
+                SayChatReply(BubbleLayoutTestReply);
+                return;
+            }
             firstGreetingPending = true;
             Play(policy.Find("女仆屈膝礼仪"), "Startup");
         };
@@ -139,10 +144,25 @@ internal sealed partial class MacPetWindow : Window
         MoveBubble();
         bubbleUntil = DateTime.UtcNow.AddSeconds(8);
     }
+    void SayChatReply(string response)
+    {
+        text.Text = response;
+        text.Measure(new Size(270, double.PositiveInfinity));
+        var area = (Screens.ScreenFromWindow(this) ?? Screens.Primary)?.WorkingArea ?? new PixelRect(0, 0, 1280, 720);
+        string display = MacBubbleReplyPolicy.ForBubble(response, chatSettings.BubbleCharacterLimit,
+            text.DesiredSize.Height + 46, area.Height / DesktopScaling);
+        Say(display);
+    }
     void MoveBubble()
     {
         if (bubble == null) return;
-        var target = new PixelPoint(Position.X + (int)(Width * DesktopScaling * .32), Position.Y + (int)(Height * DesktopScaling * .16) - 110);
+        var area = (Screens.ScreenFromWindow(this) ?? Screens.Primary)?.WorkingArea ?? new PixelRect(0, 0, 1280, 720);
+        int width = (int)Math.Ceiling(bubble.Width * DesktopScaling), height = (int)Math.Ceiling(bubble.Height * DesktopScaling);
+        int x = Position.X + (int)(Width * DesktopScaling * .32);
+        int y = Position.Y + (int)(Height * DesktopScaling * .16) - 110;
+        var target = new PixelPoint(
+            Math.Clamp(x, area.X + 8, Math.Max(area.X + 8, area.Right - width - 8)),
+            Math.Clamp(y, area.Y + 8, Math.Max(area.Y + 8, area.Bottom - height - 8)));
         if (bubble.Position != target) bubble.Position = target;
     }
     void Restore() { hidden = false; Show(); player.Paused = false; Clamp(); }
@@ -201,7 +221,7 @@ internal sealed partial class MacPetWindow : Window
             Backend = chatSettings.Backend, AcpProvider = chatSettings.AcpProvider, AcpExecutable = chatSettings.AcpExecutable,
             Endpoint = chatSettings.Endpoint, Model = chatSettings.Model, ApiProtocol = chatSettings.ApiProtocol, LlamaServerExecutable = chatSettings.LlamaServerExecutable,
             GgufPath = chatSettings.GgufPath, AcpConsent = chatSettings.AcpConsent, WindowOpacity = chatSettings.WindowOpacity,
-            PersonalityPrompt = chatSettings.PersonalityPrompt
+            BubbleCharacterLimit = chatSettings.BubbleCharacterLimit, PersonalityPrompt = chatSettings.PersonalityPrompt
         };
         var draftScale = preferences.Scale;
         var draftApiKey = apiKey;
@@ -230,6 +250,22 @@ internal sealed partial class MacPetWindow : Window
         panel.Children.Add(opacityLabel);
         var opacity = new Slider { Minimum = 65, Maximum = 100, Value = chatSettings.WindowOpacity * 100, TickFrequency = 5, IsSnapToTickEnabled = true };
         opacity.ValueChanged += (_, _) => { draft.WindowOpacity = opacity.Value / 100; opacityLabel.Text = $"对话窗口透明度  ·  {Math.Round(opacity.Value):0}%"; }; panel.Children.Add(opacity);
+
+        Section("聊天气泡");
+        var bubbleLimitRow = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto"), VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center };
+        bubbleLimitRow.Children.Add(new TextBlock { Text = "直接显示阈值（字）", FontSize = 12, Foreground = ink, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center });
+        var bubbleLimit = new NumericUpDown {
+            Minimum = MacChatSettings.MinimumBubbleCharacterLimit, Maximum = MacChatSettings.MaximumBubbleCharacterLimit,
+            Increment = 10, Value = draft.BubbleCharacterLimit, FormatString = "0", Width = 130, Height = 34,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+        };
+        bubbleLimit.ValueChanged += (_, _) => draft.BubbleCharacterLimit = (int)(bubbleLimit.Value ?? MacChatSettings.DefaultBubbleCharacterLimit);
+        Grid.SetColumn(bubbleLimit, 1); bubbleLimitRow.Children.Add(bubbleLimit);
+        panel.Children.Add(bubbleLimitRow);
+        panel.Children.Add(new TextBlock {
+            Text = "超过阈值或气泡高度不适合当前屏幕时，气泡提示查看聊天窗；聊天记录保留全文。",
+            FontSize = 11, TextWrapping = TextWrapping.Wrap, Foreground = muted
+        });
 
         Section("大肥鱼人格");
         panel.Children.Add(new TextBlock {
@@ -378,6 +414,7 @@ internal sealed partial class MacPetWindow : Window
             chatSettings.LlamaServerExecutable = draft.LlamaServerExecutable; chatSettings.GgufPath = draft.GgufPath;
             chatSettings.AcpProvider = draft.AcpProvider; chatSettings.AcpExecutable = draft.AcpExecutable;
             chatSettings.AcpConsent = draft.AcpConsent; chatSettings.WindowOpacity = draft.WindowOpacity;
+            chatSettings.BubbleCharacterLimit = draft.BubbleCharacterLimit;
             chatSettings.PersonalityPrompt = draft.PersonalityPrompt;
             apiKey = draftApiKey; apiKeyLoadError = null; preferences.Scale = draftScale; ResizePet(); Clamp(); ApplyChatOpacity(chatSettings.WindowOpacity); SetChatStatus(BackendStatus());
             Save(); settings?.Close();
@@ -407,7 +444,7 @@ internal sealed partial class MacPetWindow : Window
         if (bubble.IsVisible) MoveBubble();
         if (DateTime.UtcNow >= bubbleUntil) bubble.Hide();
         if (!App.Args.Contains("--test-mode")) return;
-        if (++ticks % 25 == 0) File.WriteAllText("test-status.json", JsonSerializer.Serialize(new { phase, frames = player.Frames, decoderError, hidden, applicationActive = MacPlatform.bbf_application_active() != 0, contextMenuOpen = ContextMenu?.IsOpen == true, contextMenuOpenedWhileAppActive, settingsOpen = settings?.IsVisible == true, settingsOpacity = settings?.Opacity ?? 0, settingsBackground = settings?.Background?.ToString() ?? "", agentOpen = chat?.IsVisible == true, agentConnected = agentSession.Connected, chatWidth = chat?.Bounds.Width ?? 0, chatHeight = chat?.Bounds.Height ?? 0, chatOpacity = chat?.Opacity ?? ChatWindowOpacity, scale = preferences.Scale, desktopScaling = DesktopScaling, x = Position.X, y = Position.Y, width = Width, height = Height, boundsWidth = Bounds.Width, boundsHeight = Bounds.Height, spriteWidth = sprite.Bounds.Width, spriteHeight = sprite.Bounds.Height, bubbleWidth = bubble.Bounds.Width, bubbleHeight = bubble.Bounds.Height, bubbleX = bubble.Position.X, bubbleY = bubble.Position.Y, handle = handle?.HandleDescriptor }));
+        if (++ticks % 25 == 0) File.WriteAllText("test-status.json", JsonSerializer.Serialize(new { phase, frames = player.Frames, decoderError, hidden, applicationActive = MacPlatform.bbf_application_active() != 0, contextMenuOpen = ContextMenu?.IsOpen == true, contextMenuOpenedWhileAppActive, settingsOpen = settings?.IsVisible == true, settingsOpacity = settings?.Opacity ?? 0, settingsBackground = settings?.Background?.ToString() ?? "", agentOpen = chat?.IsVisible == true, agentConnected = agentSession.Connected, chatWidth = chat?.Bounds.Width ?? 0, chatHeight = chat?.Bounds.Height ?? 0, chatOpacity = chat?.Opacity ?? ChatWindowOpacity, scale = preferences.Scale, desktopScaling = DesktopScaling, x = Position.X, y = Position.Y, width = Width, height = Height, boundsWidth = Bounds.Width, boundsHeight = Bounds.Height, spriteWidth = sprite.Bounds.Width, spriteHeight = sprite.Bounds.Height, bubbleText = text.Text, bubbleTextLength = text.Text?.Length ?? 0, bubbleTextDesiredWidth = text.DesiredSize.Width, bubbleTextDesiredHeight = text.DesiredSize.Height, bubbleTextWidth = text.Bounds.Width, bubbleTextHeight = text.Bounds.Height, bubbleWidth = bubble.Bounds.Width, bubbleHeight = bubble.Bounds.Height, bubbleX = bubble.Position.X, bubbleY = bubble.Position.Y, handle = handle?.HandleDescriptor }));
         if (!File.Exists("test-command.txt")) return; var command = File.ReadAllText("test-command.txt").Trim(); File.Delete("test-command.txt");
         switch (command) { case "context-menu": OpenMenu(); break; case "settings": OpenSettings(); break; case "close-settings": settings?.Close(); break; case "save-settings": saveSettingsAction?.Invoke(); break; case "agent": OpenAgent(); break; case "hide": HidePet(); break; case "show": Restore(); break; case "exit": Exit(); break; }
     }

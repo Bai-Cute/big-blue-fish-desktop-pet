@@ -5,6 +5,9 @@ namespace BigBlueFish.Windows;
 
 internal sealed class MacChatSettings
 {
+    internal const int DefaultBubbleCharacterLimit = 120;
+    internal const int MinimumBubbleCharacterLimit = 20;
+    internal const int MaximumBubbleCharacterLimit = 1000;
     internal const string DefaultPersonalityPrompt = MacChatPersonality.DefaultPrompt;
     internal const string PreviousDefaultPersonalityPrompt = """
 你是“蓝色大肥鱼”的桌面伙伴，昵称“大肥鱼”或“鱼鱼”。语气温柔、亲切、自然，认真回应用户，不夸张、不刻意卖萌。优先使用中文，回答清楚简洁。
@@ -22,6 +25,7 @@ internal sealed class MacChatSettings
     public string GgufPath { get; set; } = "";
     public bool AcpConsent { get; set; }
     public double WindowOpacity { get; set; } = .94;
+    public int BubbleCharacterLimit { get; set; } = DefaultBubbleCharacterLimit;
     public string PersonalityPrompt { get; set; } = DefaultPersonalityPrompt;
 
     [JsonIgnore]
@@ -66,6 +70,7 @@ internal sealed class MacChatSettings
         if (PersonalityPrompt == PreviousDefaultPersonalityPrompt) PersonalityPrompt = DefaultPersonalityPrompt;
         if (PersonalityPrompt.Length > 4000) PersonalityPrompt = PersonalityPrompt[..4000].TrimEnd();
         WindowOpacity = double.IsFinite(WindowOpacity) ? Math.Clamp(WindowOpacity, .65, 1) : .94;
+        BubbleCharacterLimit = Math.Clamp(BubbleCharacterLimit, MinimumBubbleCharacterLimit, MaximumBubbleCharacterLimit);
         return this;
     }
 }

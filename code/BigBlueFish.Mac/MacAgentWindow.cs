@@ -276,7 +276,7 @@ internal sealed partial class MacPetWindow
                         } else response = await localChat.Send(request.Message, chatSettings, apiKey, token);
                         if (request.ConversationVersion == chatConversationVersion) {
                             UpdateChatEntry(request.ActivityEntry, response, isActivity: false, countsAsNewMessage: true);
-                            if (response.Length > 0) Say(response[..Math.Min(response.Length, 600)]);
+                            if (response.Length > 0) SayChatReply(response);
                         }
                     } catch (OperationCanceledException) {
                         cancelled = true;
