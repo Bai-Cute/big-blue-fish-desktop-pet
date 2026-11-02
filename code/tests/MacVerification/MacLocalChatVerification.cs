@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using BigBlueFish.Windows;
+using BigBlueFish.Agent;
 
 internal static class MacLocalChatVerification
 {
@@ -56,12 +57,32 @@ internal static class MacLocalChatVerification
             Check(!File.ReadAllText("mac-chat-settings.json").Contains("apiKey", StringComparison.OrdinalIgnoreCase), "API credentials are not persisted");
             var gguf = new MacChatSettings { Backend = "gguf", LlamaServerExecutable = "/opt/homebrew/bin/llama-server", GgufPath = "/tmp/fish.gguf", Model = "fish", WindowOpacity = .72 };
             gguf.Save();
+            var ggufJson = File.ReadAllText("mac-chat-settings.json");
             var restoredGguf = MacChatSettings.Read();
             Check(restoredGguf.Backend == "gguf" && restoredGguf.LlamaServerExecutable == gguf.LlamaServerExecutable && restoredGguf.GgufPath == gguf.GgufPath && restoredGguf.WindowOpacity == .72, "GGUF path and chat opacity persist");
             var acp = new MacChatSettings { Backend = "acp", AcpProvider = "codex", AcpExecutable = "/usr/local/bin/codex-acp", AcpConsent = true, WindowOpacity = 9 };
             acp.Save();
             var restoredAcp = MacChatSettings.Read();
             Check(restoredAcp.Backend == "acp" && restoredAcp.AcpProvider == "codex" && restoredAcp.AcpExecutable == acp.AcpExecutable && restoredAcp.AcpConsent && restoredAcp.WindowOpacity == 1, "ACP configuration persists and opacity is bounded");
+            Check(!acp.ChangesAcpConnection(restoredAcp), "unchanged ACP connection can be reused");
+            Check(acp.ChangesAcpConnection(new MacChatSettings { Backend = "acp", AcpProvider = "kimi", AcpExecutable = acp.AcpExecutable, AcpConsent = true }),
+                "changing ACP provider disconnects the previous session");
+            Check(acp.ChangesAcpConnection(new MacChatSettings { Backend = "acp", AcpProvider = acp.AcpProvider, AcpExecutable = "/different/agent", AcpConsent = true }),
+                "changing ACP executable disconnects the previous session");
+            Check(acp.ChangesAcpConnection(new MacChatSettings { Backend = "api", AcpProvider = acp.AcpProvider, AcpExecutable = acp.AcpExecutable, AcpConsent = true }),
+                "switching ACP backend disconnects the previous session");
+            Check(acp.ChangesAcpConnection(new MacChatSettings { Backend = "acp", AcpProvider = acp.AcpProvider, AcpExecutable = acp.AcpExecutable, AcpConsent = false }),
+                "revoking ACP consent disconnects the previous session");
+            Check(!new MacChatSettings { Backend = "api" }.ChangesAcpConnection(new MacChatSettings { Backend = "gguf" }),
+                "switching non-ACP backends preserves queued chat requests");
+            var removedProvider = new MacChatSettings { Backend = "acp", AcpProvider = "grok", AcpExecutable = "/usr/local/bin/grok", AcpConsent = true }.Normalize();
+            Check(removedProvider.AcpProvider == "opencode" && removedProvider.AcpExecutable == "" && !removedProvider.AcpConsent,
+                "removed provider cannot reuse its executable or consent");
+            foreach (var harness in HarnessCatalog.All) {
+                acp.AcpProvider = harness.Id; acp.Save();
+                Check(MacChatSettings.Read().AcpProvider == harness.Id, $"ACP {harness.Id} provider persists without falling back");
+            }
+            File.WriteAllText("mac-chat-settings.json.bak", ggufJson);
             var acpPrompt = MacChatPersonality.BuildAcpPrompt(acp.PersonalityPrompt, "你好");
             Check(acpPrompt.Contains(acp.PersonalityPrompt, StringComparison.Ordinal) && acpPrompt.EndsWith("用户消息：\n你好", StringComparison.Ordinal),
                 "ACP prompt includes personality and original user message");
@@ -258,20 +279,51 @@ internal static class MacLocalChatVerification
         var folder = Path.Combine(Path.GetTempPath(), "bbf-mac-acp-path-" + Guid.NewGuid());
         Directory.CreateDirectory(folder);
         try {
-            foreach (var command in new[] { "opencode", "claude-agent-acp", "codex-acp" })
+            foreach (var command in HarnessCatalog.All.Select(h => h.Commands[0]).Concat(["claude-agent-acp", "codex-acp", "pi-acp", "npm"]).Distinct())
             {
                 var executable = Path.Combine(folder, command);
                 File.WriteAllText(executable, "#!/bin/sh\nexit 0\n");
                 File.SetUnixFileMode(executable, UnixFileMode.UserRead | UnixFileMode.UserExecute);
             }
-            foreach (var (provider, command) in new[] {
-                ("opencode", "opencode"), ("claude", "claude-agent-acp"), ("codex", "codex-acp")
-            }) {
-                Check(MacAcpExecutableLocator.Find(provider, folder, folder) == Path.Combine(folder, command),
-                    $"ACP {provider} executable discovered on PATH");
-                Check(MacAcpExecutableLocator.Resolve(provider, "/custom/agent", folder, folder) == "/custom/agent",
-                    $"ACP {provider} manual path remains selected");
+            for (var index = 0; index < HarnessCatalog.All.Count; index++) {
+                var harness = HarnessCatalog.All[index];
+                Check(MacAcpExecutableLocator.ProviderAt(index) == harness.Id && MacAcpExecutableLocator.IndexOf(harness.Id) == index,
+                    $"ACP {harness.Id} selector preserves catalog identity");
+                Check(MacAcpExecutableLocator.Find(harness.Id, folder, folder) == Path.Combine(folder, harness.Commands[0]),
+                    $"ACP {harness.Id} native command discovered on PATH");
+                Check(MacAcpExecutableLocator.Resolve(harness.Id, "/custom/agent", folder, folder) == "/custom/agent",
+                    $"ACP {harness.Id} manual path remains selected");
+                Check(MacAcpExecutableLocator.StartArguments(harness.Id, Path.Combine(folder, harness.Commands[0])).SequenceEqual(harness.Arguments),
+                    $"ACP {harness.Id} startup uses catalog arguments");
             }
+            Check(MacAcpExecutableLocator.FindCommand("npm", folder, folder) == Path.Combine(folder, "npm"),
+                "macOS adapter installer finds npm outside inherited process PATH");
+            var selectedAntigravity = Path.Combine(folder, "manual", "agy_acp_server.par");
+            Directory.CreateDirectory(Path.GetDirectoryName(selectedAntigravity)!);
+            File.WriteAllText(selectedAntigravity, "agent fixture");
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(selectedAntigravity)!, "localharness_external"), "helper fixture");
+            Check(MacAcpExecutableLocator.FindReadyCommand("antigravity", selectedAntigravity, folder, folder) is { } manualAntigravity &&
+                manualAntigravity.Path == selectedAntigravity && manualAntigravity.Arguments.Length == 0,
+                "manually selected Antigravity component takes priority over PATH");
+            foreach (var provider in new[] { "claude", "codex", "pi" }) {
+                var adapter = HarnessCatalog.Get(provider).AdapterCommand!;
+                Check(MacAcpExecutableLocator.IsAdapterExecutable(provider, Path.Combine(folder, adapter)) &&
+                    MacAcpExecutableLocator.StartArguments(provider, Path.Combine(folder, adapter)).Length == 0,
+                    $"ACP {provider} adapter direct path starts without CLI arguments");
+                Check(MacAcpExecutableLocator.FindReadyCommand(provider, Path.Combine(folder, adapter), folder, folder) is { } manuallySelected &&
+                    manuallySelected.Path == Path.Combine(folder, adapter) && manuallySelected.Arguments.Length == 0,
+                    $"ACP {provider} manually selected adapter takes precedence");
+                Check(MacAcpExecutableLocator.FindReadyCommand(provider, Path.Combine(folder, HarnessCatalog.Get(provider).Commands[0]), folder, folder) is { } installed &&
+                    installed.Path == Path.Combine(folder, adapter) && installed.Arguments.Length == 0,
+                    $"ACP {provider} installed adapter handles selected CLI");
+            }
+            var adapterOnly = Path.Combine(folder, "adapter-only");
+            Directory.CreateDirectory(adapterOnly);
+            File.Copy(Path.Combine(folder, "codex-acp"), Path.Combine(adapterOnly, "codex-acp"));
+            Check(MacAcpExecutableLocator.Find("codex", adapterOnly, folder) == Path.Combine(adapterOnly, "codex-acp"),
+                "ACP adapter without CLI can be selected directly");
+            Check(MacAcpExecutableLocator.FindReadyCommand("kimi", Path.Combine(folder, "kimi"), folder, folder) == null,
+                "native ACP command falls back to catalog arguments");
         } finally { Directory.Delete(folder, true); }
     }
 }

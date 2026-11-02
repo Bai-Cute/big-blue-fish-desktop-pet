@@ -1,4 +1,5 @@
 using System.Text.Json;
+using BigBlueFish.Agent;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -346,7 +347,7 @@ internal sealed partial class MacPetWindow : Window
         {
             if (renderedBackend == null) return;
             // Keep the path paired with the provider even while switching backends.
-            if (acp != null) { draft.AcpProvider = provider?.SelectedIndex switch { 1 => "claude", 2 => "codex", _ => "opencode" }; draft.AcpExecutable = acp.Text ?? ""; acpPaths[draft.AcpProvider] = draft.AcpExecutable; }
+            if (acp != null) { draft.AcpProvider = MacAcpExecutableLocator.ProviderAt(provider?.SelectedIndex ?? -1); draft.AcpExecutable = acp.Text ?? ""; acpPaths[draft.AcpProvider] = draft.AcpExecutable; }
             if (endpoint != null) draft.Endpoint = endpoint.Text ?? "";
             if (model != null) draft.Model = model.Text ?? "";
             if (protocol != null) draft.ApiProtocol = protocol.SelectedIndex == 1 ? "responses" : "chat";
@@ -371,11 +372,11 @@ internal sealed partial class MacPetWindow : Window
             }
             else if (backend.SelectedIndex == 1) { llama = Field("llama-server 绝对路径", draft.LlamaServerExecutable); gguf = Field("GGUF 模型绝对路径", draft.GgufPath); }
             else {
-                provider = new ComboBox { ItemsSource = new[] { "OpenCode ACP", "Claude ACP", "Codex ACP" }, SelectedIndex = draft.AcpProvider switch { "claude" => 1, "codex" => 2, _ => 0 }, Height = 34 }; backendFields.Children.Add(new TextBlock { Text = "Agent 类型", FontSize = 12, Foreground = ink }); backendFields.Children.Add(provider);
+                provider = new ComboBox { ItemsSource = HarnessCatalog.All.Select(h => h.Name).ToArray(), SelectedIndex = MacAcpExecutableLocator.IndexOf(draft.AcpProvider), Height = 34 }; backendFields.Children.Add(new TextBlock { Text = "Agent 类型", FontSize = 12, Foreground = ink }); backendFields.Children.Add(provider);
                 var pathHelp = new TextBlock { Foreground = muted, TextWrapping = TextWrapping.Wrap, FontSize = 11 };
                 void UpdateAcpPath()
                 {
-                    var selected = provider.SelectedIndex switch { 1 => "claude", 2 => "codex", _ => "opencode" };
+                    var selected = MacAcpExecutableLocator.ProviderAt(provider.SelectedIndex);
                     if (selected != draft.AcpProvider) {
                         acpPaths[draft.AcpProvider] = acp?.Text ?? draft.AcpExecutable;
                         draft.AcpProvider = selected;
@@ -383,10 +384,13 @@ internal sealed partial class MacPetWindow : Window
                         if (acp != null) acp.Text = draft.AcpExecutable;
                     }
                     pathHelp.Text = string.IsNullOrWhiteSpace(draft.AcpExecutable)
-                        ? "未找到对应 ACP 程序；安装后可重新打开设置，或手动填写绝对路径。"
-                        : "已填入可执行文件路径；可手动修改。";
+                        ? selected == "antigravity" ? "首次发送时将下载并校验 Antigravity 官方 ACP 组件；也可手动填写绝对路径。"
+                            : "未找到对应 CLI；安装后可重新打开设置，或手动填写绝对路径。"
+                        : HarnessCatalog.Get(selected).AdapterPackage != null
+                            ? "首次发送时如未找到 ACP 适配器，将使用 npm 安装固定版本；可手动填写适配器路径。"
+                            : "已填入程序路径；可手动修改。";
                 }
-                acp = Field("ACP 可执行文件绝对路径", draft.AcpExecutable);
+                acp = Field("CLI 或 ACP 适配器绝对路径", draft.AcpExecutable);
                 acp.TextChanged += (_, _) => { draft.AcpExecutable = acp.Text ?? ""; acpPaths[draft.AcpProvider] = draft.AcpExecutable; pathHelp.Text = "可手动修改；保存后使用此路径。"; };
                 provider.SelectionChanged += (_, _) => UpdateAcpPath();
                 UpdateAcpPath();
@@ -409,6 +413,7 @@ internal sealed partial class MacPetWindow : Window
                 // Keychain errors may be handled here; never place secret values in logs.
                 Log(error.Message); Say("设置保存失败：" + error.Message); return;
             }
+            if (chatSettings.ChangesAcpConnection(draft)) _ = DisconnectAgent();
             chatSettings.Backend = draft.Backend; chatSettings.Endpoint = draft.Endpoint; chatSettings.Model = draft.Model; chatSettings.ApiProtocol = draft.ApiProtocol;
             chatSettings.LlamaServerExecutable = draft.LlamaServerExecutable; chatSettings.GgufPath = draft.GgufPath;
             chatSettings.AcpProvider = draft.AcpProvider; chatSettings.AcpExecutable = draft.AcpExecutable;

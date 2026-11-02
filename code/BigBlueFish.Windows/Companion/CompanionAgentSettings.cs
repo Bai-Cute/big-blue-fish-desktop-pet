@@ -104,7 +104,8 @@ public partial class MainWindow
                 if (!on) SetPuppetMode(false);
                 preferences.AgentEnabled = on;
                 if (on) InitializeMcp(); else StopMcp();
-                extra.Visibility = on ? Visibility.Visible : Visibility.Collapsed; puppet.IsChecked = preferences.PuppetMode;
+                enabled.IsChecked = preferences.AgentEnabled;
+                extra.Visibility = preferences.AgentEnabled ? Visibility.Visible : Visibility.Collapsed; puppet.IsChecked = preferences.PuppetMode;
                 SaveCompanion(); Refresh();
             }
             catch (Exception e) { ModernUI.Error(owner, "连接设置失败", e); }

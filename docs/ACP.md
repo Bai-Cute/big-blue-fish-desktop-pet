@@ -1,10 +1,10 @@
 # 连接本机 CLI Harness
 
-标准版的“连接 Agent”页面通过 ACP 驱动用户本机已经安装的 CLI Harness。开启连接、选择 Harness 后，鱼鱼在后台启动该产品的 ACP 入口，建立自己的会话并安装 `big-blue-fish` 操作技能。用户双击鱼鱼即可输入，Enter 换行，Ctrl+Enter 或发送按钮提交。
+Windows/Linux 标准版的“连接 Agent”页面通过 ACP 驱动用户本机已经安装的 CLI Harness。开启连接、选择 Harness 后，鱼鱼在后台启动该产品的 ACP 入口，建立自己的会话并安装 `big-blue-fish` 操作技能。用户双击鱼鱼即可输入，Enter 换行，Ctrl+Enter 或发送按钮提交。macOS 的 ACP 聊天使用同一内置 Harness 目录，但会话与工具能力不同，详见下文“平台能力”。
 
 ## 支持目录
 
-下表列出内置适配项。程序从 PATH 寻找对应命令；Windows 同时检查进程 PATH 与当前用户、系统 PATH，优先查找 exe、cmd、bat、ps1。软件不在检测时启动所有产品，也不安装所选 Harness 本体。各产品需要完成自己的登录、模型和运行环境配置。
+下表列出 20 个内置启动配置。程序从 PATH 寻找对应命令；Windows 同时检查进程 PATH 与当前用户、系统 PATH，优先查找 exe、cmd、bat、ps1；macOS 还查找常见的 Homebrew、用户级包管理器安装目录。软件不在检测时启动所有产品，也不安装所选 Harness 本体。找到命令仅表示可以尝试连接；ACP 握手、登录、生成和工具能力需要逐个产品、版本和平台实际验证。
 
 | 名称 | 命令 | ACP 启动方式 |
 | --- | --- | --- |
@@ -25,7 +25,6 @@
 | Kiro CLI | kiro-cli | acp |
 | Pi | pi | pi-acp 适配器 |
 | Devin CLI | devin | acp |
-| Grok Build | grok | agent stdio |
 | Hermes Agent | hermes | acp |
 | OpenClaw | openclaw | acp，连接其已配置的 Gateway |
 | MiniMax Code | mcode | acp |
@@ -36,7 +35,22 @@ Agent 要求认证时，鱼鱼展示它公布的登录方式。协议认证通�
 
 Windows 使用可直接启动的程序入口打开登录终端；Linux 使用系统已有的 GNOME Terminal、Konsole 或 xterm。登录方式和参数来自 Agent，认证窗口展示终端参数与环境项。没有公布认证方式的产品沿用它自己的配置、登录方式和“安装与登录说明”入口。生成开始前凭据失效时，鱼鱼可以恢复连接并继续原轮次；已经发生工具调用或发言的轮次不会自动重发。
 
-这些条目表示程序采用的接入路径。CLI 版本、可用平台、账号及模型配置由各产品决定。DeepSeek Harness 的 ACP profile 与 Web profile 分开配置；OpenClaw 的 ACP 桥接需要可用的 Gateway。连接页显示实际协商状态与错误原因。
+这些条目表示程序采用的接入路径，并非对 20 款产品逐一完成端到端认证。CLI 版本、可用平台、账号及模型配置由各产品决定。DeepSeek Harness 的 ACP profile 与 Web profile 分开配置；OpenClaw 的 ACP 桥接需要可用的 Gateway。Grok Build 暂未列入可选目录：本机 `1.1.4-rc5` 的 `grok agent stdio` 进入交互式终端而非输出 ACP 消息，待确认可用入口后再接入。连接页显示实际协商状态与错误原因。
+
+升级前若保存了 Grok 选项，Windows/Linux 会关闭 Agent 连接并预选 Codex，需用户重新确认权限后才能启用；macOS 会清除旧路径与授权。不会自动启动其他 Agent。
+
+## 平台能力
+
+| 能力 | Windows/Linux 标准版 | macOS |
+| --- | --- | --- |
+| 20 项命令识别与 ACP 启动配置 | 是；从 PATH 检测 | 是；从 PATH 和常见安装目录检测，支持手动指定路径 |
+| Claude/Codex/Pi 适配器、Antigravity 组件 | 连接时准备缺失组件 | 连接时准备缺失组件 |
+| ACP 文本对话 | 是；普通 Agent 文字不自动显示为气泡，需调用 `say` | 是；Agent 文本直接显示在聊天记录中 |
+| 桌宠动作、说话、截图 MCP 工具 | 是 | 尚未提供 |
+| 会话跨应用重启恢复、模型与权限配置选择器 | 按 Agent 协商能力支持 | 尚未提供 |
+| 应用内 ACP 认证与终端登录 | 按 Agent 提供的方式支持 | 尚未提供；需先登录 CLI |
+
+macOS 在同一进程连接期间支持多轮会话和逐项权限批准。两类实现都不会仅凭 PATH 命中就宣称连接成功。以下未另行注明的平台功能说明只适用于 Windows/Linux 标准版；macOS 细节见 [macOS 使用与构建说明](MACOS.md)。
 
 ## 工作区、对话与项目
 

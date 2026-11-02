@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using BigBlueFish.Agent;
 
 namespace BigBlueFish.Windows;
 
@@ -59,7 +60,9 @@ internal sealed class MacChatSettings
     internal MacChatSettings Normalize()
     {
         Backend = (Backend ?? "").Trim().ToLowerInvariant() switch { "acp" => "acp", "gguf" => "gguf", _ => "api" };
-        AcpProvider = (AcpProvider ?? "").Trim().ToLowerInvariant() switch { "claude" => "claude", "codex" => "codex", _ => "opencode" };
+        var provider = (AcpProvider ?? "").Trim().ToLowerInvariant();
+        if (!HarnessCatalog.All.Any(h => h.Id == provider)) { AcpExecutable = ""; AcpConsent = false; }
+        AcpProvider = HarnessCatalog.All.Any(h => h.Id == provider) ? provider : "opencode";
         AcpExecutable = (AcpExecutable ?? "").Trim();
         Endpoint = string.IsNullOrWhiteSpace(Endpoint) ? "https://api.deepseek.com" : Endpoint.Trim();
         Model = string.IsNullOrWhiteSpace(Model) ? "deepseek-flash" : Model.Trim();
@@ -73,4 +76,9 @@ internal sealed class MacChatSettings
         BubbleCharacterLimit = Math.Clamp(BubbleCharacterLimit, MinimumBubbleCharacterLimit, MaximumBubbleCharacterLimit);
         return this;
     }
+
+    internal bool ChangesAcpConnection(MacChatSettings next) =>
+        (Backend == "acp" || next.Backend == "acp") &&
+        (Backend != next.Backend || AcpProvider != next.AcpProvider || AcpExecutable != next.AcpExecutable ||
+        AcpConsent != next.AcpConsent);
 }

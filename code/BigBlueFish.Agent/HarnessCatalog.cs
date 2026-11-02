@@ -29,7 +29,6 @@ public static class HarnessCatalog
         new("kiro", "Kiro CLI", ["kiro-cli"], ["acp"], "https://kiro.dev/docs/cli", ".kiro/skills"),
         new("pi", "Pi", ["pi"], [], "https://github.com/earendil-works/pi", ".pi/skills", "pi-acp@0.0.34", "pi-acp"),
         new("devin", "Devin CLI", ["devin"], ["acp"], "https://docs.devin.ai/cli"),
-        new("grok", "Grok Build", ["grok"], ["agent", "stdio"], "https://docs.x.ai/build/overview"),
         new("hermes", "Hermes Agent", ["hermes"], ["acp"], "https://hermes-agent.nousresearch.com/docs", ".agents/skills"),
         new("openclaw", "OpenClaw", ["openclaw"], ["acp"], "https://docs.openclaw.ai/cli/acp"),
         new("minimax", "MiniMax Code", ["mcode"], ["acp"], "https://www.npmjs.com/package/@minimax-ai/code")

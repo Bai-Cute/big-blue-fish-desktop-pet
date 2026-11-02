@@ -49,7 +49,11 @@ internal sealed partial class MacPetWindow
 
     Task DisconnectAgent()
     {
-        agentOperation?.Cancel(); chatQueue.Clear(); permissionWindow?.Close();
+        agentOperation?.Cancel();
+        while (chatQueue.TryDequeue(out var pending))
+            if (pending.ConversationVersion == chatConversationVersion)
+                UpdateChatEntry(pending.ActivityEntry, "已取消", isActivity: false, countsAsNewMessage: true);
+        permissionWindow?.Close();
         agentDisconnectTask = DisposeAgentAfter(agentDisconnectTask);
         return agentDisconnectTask;
     }
@@ -203,6 +207,7 @@ internal sealed partial class MacPetWindow
     {
         if (!chatSettings.AcpConsent) return "ACP · 请在设置中确认权限";
         var path = MacAcpExecutableLocator.Resolve(chatSettings.AcpProvider, chatSettings.AcpExecutable);
+        if (chatSettings.AcpProvider == "antigravity" && path.Length == 0) return null;
         if (!Path.IsPathRooted(path)) return "ACP · 请在设置中填写可执行文件绝对路径";
         if (!File.Exists(path)) return "ACP · 找不到可执行文件，请检查设置中的路径";
         return null;
@@ -214,8 +219,23 @@ internal sealed partial class MacPetWindow
         if (AcpConfigurationIssue() is { } issue) { SetChatStatus(issue); return false; }
         var path = MacAcpExecutableLocator.Resolve(chatSettings.AcpProvider, chatSettings.AcpExecutable);
         var workspace = Path.Combine(Environment.CurrentDirectory, "agent/workspace"); Directory.CreateDirectory(workspace);
-        var start = AgentProcess.StartInfo(path, chatSettings.AcpProvider == "opencode" ? ["acp"] : [], workspace);
-        start.Environment["PATH"] = Path.GetDirectoryName(path) + Path.PathSeparator + "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + Environment.GetEnvironmentVariable("PATH");
+        var harness = HarnessCatalog.Get(chatSettings.AcpProvider);
+        var adapters = new AgentAdapterStore(Path.Combine(Environment.CurrentDirectory, "agent"));
+        var command = MacAcpExecutableLocator.FindReadyCommand(harness.Id, path)
+            ?? await adapters.Resolve(harness, path, token, SetChatStatus, MacAcpExecutableLocator.FindCommand("npm"));
+        var start = AgentProcess.StartInfo(command.Path, command.Arguments, workspace);
+        var underlyingCli = harness.AdapterCommand != null
+            ? harness.Commands.Select(name => MacAcpExecutableLocator.FindCommand(name)).FirstOrDefault(found => found != null)
+            : null;
+        start.Environment["PATH"] = Path.GetDirectoryName(command.Path) + Path.PathSeparator +
+            (path.Length > 0 ? Path.GetDirectoryName(path) + Path.PathSeparator : "") +
+            (underlyingCli != null ? Path.GetDirectoryName(underlyingCli) + Path.PathSeparator : "") +
+            (MacAcpExecutableLocator.FindCommand("npm") is { } npm ? Path.GetDirectoryName(npm) + Path.PathSeparator : "") +
+            "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:" + Environment.GetEnvironmentVariable("PATH");
+        if (harness.Id == "codex" && path.Length > 0 && !MacAcpExecutableLocator.IsAdapterExecutable(harness.Id, path))
+            start.Environment["CODEX_PATH"] = path;
+        if (harness.Id == "antigravity" && AgentAdapterStore.AntigravityHelper(command.Path) is { } helper)
+            start.Environment["ANTIGRAVITY_HARNESS_PATH"] = helper;
         SetChatStatus("ACP · 正在连接…");
         await agentSession.Connect(start, workspace, RequestPermission, token);
         UpdateChatActivityStatus();

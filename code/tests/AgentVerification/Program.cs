@@ -31,7 +31,7 @@ async Task Until(Func<bool> predicate, string label, int seconds = 15)
 string root = Path.GetFullPath(args.FirstOrDefault(a => !a.StartsWith("--")) ?? Path.Combine(".work", "agent-verification-" + Guid.NewGuid().ToString("N")));
 Directory.CreateDirectory(root);
 WorkspaceVerification.Run(Path.Combine(root, "workspace-rules"), Check);
-Check(HarnessCatalog.All.Count == 21 && HarnessCatalog.All.Select(x => x.Id).Distinct().Count() == 21, "21 distinct selected harnesses");
+Check(HarnessCatalog.All.Count == 20 && HarnessCatalog.All.Select(x => x.Id).Distinct().Count() == 20, "20 distinct selected harnesses");
 Check(HarnessCatalog.Get("kimi").Arguments.SequenceEqual(["acp"]), "Kimi native ACP launch");
 Check(HarnessCatalog.Get("codex").AdapterPackage != null && HarnessCatalog.Get("claude").AdapterPackage != null && HarnessCatalog.Get("pi").AdapterPackage != null, "three explicit ACP adapters");
 Check(HarnessCatalog.FindExecutable("fish-no-such-cli", root) == null, "missing CLI is not invented");

@@ -71,11 +71,16 @@ public partial class MainWindow
     private void InitializeMcp()
     {
         if (!preferences.AgentEnabled) return;
+        if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) {
+            preferences.AgentEnabled = false; preferences.PuppetMode = false; preferences.AgentDailySpeech = false;
+            preferences.AgentHarnessId = "codex";
+            SaveCompanion();
+            return;
+        }
         mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
         agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"),
             Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe"), agentPipe, RequestAgentPermission,
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
-        if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.InvokeAsync(() => RequestAgentLocalSpeech(token)).Task.Unwrap();
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();

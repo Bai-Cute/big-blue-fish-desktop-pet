@@ -153,7 +153,7 @@ MCP 的 capture_foreground 显式调用上述前台选择与截图路径；captu
 
 标准版设置有“连接 Agent”页面。“连接本机兼容的 CLI Harness”默认关闭，开启前异步确认读屏、输入和交互内容将交给所选Agent，可能由其发送给所配置模型服务。取消保持关闭。开启后显示Harness下拉列表、重新检测、安装与登录说明、状态、重新连接、开始新对话、取消当前请求、人设编辑、Agent接管日常吐字和关心触发与动作接管。没有独立的双击对话开关或允许唤醒开关。日常关心的两个开关分别显示为“把日常关心的吐字交给 Agent”（AgentDailySpeech）和“把日常关心的触发和日常的动作切换逻辑交给 Agent”（PuppetMode），前者选择话语的编写者，后者选择关心时机及动作的安排者。
 
-目录包含Claude、Codex、Gemini、DeepSeek Harness、Kimi、Qwen、Antigravity、Copilot、Cursor、OpenCode、Cline、CodeBuddy、Qoder、TRAE、Kiro、Pi、Devin、Grok、Hermes、OpenClaw、MiniMax共21项。原生命令和适配器启动方式见[ACP连接参考](ACP.md)。检测使用PATH；Windows合并当前进程、用户和系统PATH，按exe、cmd、bat、ps1及无扩展名顺序寻找。下拉列表将检测到的项目放在前面，未检测到的标明状态。检测不启动全部Agent。
+目录包含Claude、Codex、Gemini、DeepSeek Harness、Kimi、Qwen、Antigravity、Copilot、Cursor、OpenCode、Cline、CodeBuddy、Qoder、TRAE、Kiro、Pi、Devin、Hermes、OpenClaw、MiniMax共20项。原生命令和适配器启动方式见[ACP连接参考](ACP.md)。检测使用PATH；Windows合并当前进程、用户和系统PATH，按exe、cmd、bat、ps1及无扩展名顺序寻找。下拉列表将检测到的项目放在前面，未检测到的标明状态。检测不启动全部Agent。
 
 选定的CLI在后台自有进程中运行，使用UTF-8逐行JSON-RPC ACP v1。鱼鱼声明不提供文件读写与终端回调，Agent使用自身工具；权限请求返回其提供的选项，未知客户端方法返回Method not found。鱼鱼自己的可识别工具请求按连接授权处理，其他请求通过正常窗口等待用户选择。普通Agent输出和历史重放不显示为气泡。Windows自有进程加入退出时清理的Job，正常关闭时终止所启动的进程树。
 

@@ -45,10 +45,15 @@ internal sealed partial class LinuxPetWindow
     void InitializeMcp()
     {
         if (!Preferences.AgentEnabled) return;
+        if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) {
+            Preferences.AgentEnabled = false; Preferences.PuppetMode = false; Preferences.AgentDailySpeech = false;
+            Preferences.AgentHarnessId = "codex";
+            Save();
+            return;
+        }
         mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
         agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"), Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), agentPipe, RequestAgentPermission,
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
-        if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();

@@ -74,7 +74,8 @@ internal sealed partial class LinuxPetWindow
                 if (on && !await Confirm("连接本机 Agent", ControlTools.PrivacyWarning, "了解并开启")) { enabled.IsChecked = false; return; }
                 if (!on) SetPuppet(false); Preferences.AgentEnabled = on;
                 if (on) InitializeMcp(); else StopMcp();
-                extra.IsVisible = on; puppet.IsChecked = Preferences.PuppetMode; Save(); Refresh();
+                enabled.IsChecked = Preferences.AgentEnabled;
+                extra.IsVisible = Preferences.AgentEnabled; puppet.IsChecked = Preferences.PuppetMode; Save(); Refresh();
             }
             finally { enabled.IsEnabled = true; }
         };

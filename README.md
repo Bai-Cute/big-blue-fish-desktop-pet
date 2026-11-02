@@ -2,7 +2,7 @@
 
 蓝色大肥鱼是一款住在电脑桌面上的 AI 桌宠软件，支持 Windows、Linux 和 Apple Silicon macOS。Windows 与 Linux 版内置 4B 本地大模型，借助 OCR 技术读懂主人正在桌面上做的事情，每隔一段时间就从文字气泡里送来一句可爱的话，陪伴和关心主人；她还会查看天气、浏览科技新闻，再用自己的方式讲给主人听。macOS 版提供透明桌宠、API／本机 GGUF／ACP 对话和手动下载本地模型，不会读取屏幕；详见 [macOS 使用与构建说明](docs/MACOS.md)。
 
-鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版还能通过 ACP 一键连接 21 款主流 CLI Agent，陪主人进行稳定的长对话。
+鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版内置 20 款 CLI Agent 的 ACP 启动配置；是否能连接取决于所装 CLI 的版本、登录状态及 ACP 支持情况。
 
 当前版本为 **1.1.0**，安装包请前往 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载。
 
@@ -91,22 +91,26 @@ Hugging Face 来源为 [Biomanticus/Qwen3.5-4B-heretic-gguf](https://huggingface
 
 ## 通过 ACP 连接桌面 Agent
 
-从 1.1.0 起，标准版的蓝色大肥鱼通过 ACP（Agent Client Protocol）连接主人电脑上已经安装的 CLI Agent。连接只需在设置里点选一次：鱼鱼会在后台启动所选的 Agent，为自己开一个专用对话，并自动接好动作、截图、说话等工具。接上之后，主人可以和鱼鱼长时间地聊天，也可以借助 Agent 的能力，实现电脑操控、与云端大模型对话、自定义陪伴和动作逻辑等各种玩法。
+从 1.1.0 起，蓝色大肥鱼可以通过 ACP（Agent Client Protocol）连接主人电脑上已经安装的 CLI Agent。Windows/Linux 标准版会为连接的 Agent 建立专用会话，提供动作、截图、说话等内部工具；macOS 版目前提供 ACP 文本聊天及逐项权限批准，不向 Agent 暴露桌宠工具或屏幕。Agent 本身的电脑操作和云端对话能力取决于所选产品及其配置。
 
-鱼鱼目前已经适配了 21 款 CLI Agent，其中有 Claude Code、Codex CLI、Gemini CLI、DeepSeek Harness、Kimi Code、Qwen Code、GitHub Copilot CLI、Cursor CLI、OpenCode 等。全部适配项和各自的启动方式见[连接本机 CLI Harness](docs/ACP.md)。
+内置目录列出 20 款 CLI Agent 的命令与 ACP 启动方式，包括 Claude Code、Codex CLI、Gemini CLI、DeepSeek Harness、Kimi Code、Qwen Code、GitHub Copilot CLI、Cursor CLI、OpenCode 等。检测到可执行文件只代表找到了命令，不代表 ACP 握手、登录或实际生成已经验证通过；连接状态会在运行时显示。完整目录与平台差异见[连接本机 CLI Harness](docs/ACP.md)。
 
 ### 连接方法
+
+以下步骤适用于 Windows/Linux 标准版。macOS 请在聊天设置中选择 ACP 后端与 Agent，填写或使用自动发现的可执行文件路径，确认权限后保存；具体能力见[macOS 使用与构建说明](docs/MACOS.md)。
 
 1. 按所选 Agent 自己的说明把它装好，并完成登录和模型配置。
 2. 打开鱼鱼的设置，进入“连接 Agent”页面，打开“连接本机兼容的 CLI Harness”，阅读并确认弹出的权限说明。
 3. 从下拉列表里选一个 Agent。电脑上检测到的 Agent 排在前面；刚装好新的 Agent 时，点一下“重新检测”。
 4. 等页面显示出连接状态、Agent 版本、模型和会话编号，就可以开始用了。
 
-Claude Code、Codex CLI 和 Pi 需要经过 ACP 适配器连接。电脑上还没有这些适配器时，鱼鱼会借助 Node.js 和 npm 自动装上固定版本；Antigravity CLI 的官方 ACP 组件也会在第一次连接时自动准备。Agent 要求登录时，鱼鱼会列出它提供的登录方式；选了终端登录，鱼鱼会打开一个登录终端，登录成功后自动重连，接着处理刚才的请求。
+Claude Code、Codex CLI 和 Pi 需要经过 ACP 适配器连接；如果未找到适配器，连接时会借助 Node.js 和 npm 安装固定版本。Antigravity CLI 的官方 ACP 组件也可在连接时准备。Windows/Linux 会展示 Agent 公布的认证方式并支持终端登录后重连；macOS 目前需要先在终端完成所选 CLI 的登录。
 
 ### 和鱼鱼长聊
 
-连上之后，双击鱼鱼，她身边会展开一个小输入框。写下想说的话，按 Ctrl+Enter 或点发送，Agent 的回复就会出现在鱼鱼的气泡里。第一次连接时，鱼鱼会给 Agent 装上“大肥鱼操作”技能，里面写着她的鲸鱼娘人设，还有播放动作、截图、说话这些操作的用法；人设也可以在设置里随时改成主人喜欢的样子。
+本节至“鱼鱼与 Agent 的分工”说明 Windows/Linux 标准版。macOS 使用独立聊天窗口，Enter 发送、Shift+Enter 换行；Agent 文本进入聊天记录，具体行为见 [macOS 使用与构建说明](docs/MACOS.md)。
+
+连上之后，双击鱼鱼，她身边会展开一个小输入框。写下想说的话，按 Ctrl+Enter 或点发送；Agent 调用 `say` 或 `say_next` 工具时，文字会出现在鱼鱼的气泡里，普通 ACP 回复不会自动进入气泡。第一次连接时，鱼鱼会给 Agent 装上“大肥鱼操作”技能，里面写着她的鲸鱼娘人设，还有播放动作、截图、说话这些操作的用法；人设也可以在设置里随时改成主人喜欢的样子。
 
 鱼鱼在每个 Agent 那里都有一个专属对话。说完一轮，下一句话还在同一个对话里继续，前面聊过的内容都留在上下文中，所以能聊得很长、很稳。Agent 支持恢复对话时，关掉鱼鱼再打开，或者断线重连，她都会先把原来的对话接回来；登录过期、网络波动这类情况也会保留原对话，恢复后继续聊。想换个话题从头来过，点“开始新对话”就好。
 

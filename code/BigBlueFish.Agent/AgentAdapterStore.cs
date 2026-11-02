@@ -19,13 +19,13 @@ public sealed class AgentAdapterStore(string root)
         return File.Exists(helper) ? helper : null;
     }
 
-    public async Task<(string Path, string[] Arguments)> Resolve(HarnessDefinition harness, string executable, CancellationToken token, Action<string> status)
+    public async Task<(string Path, string[] Arguments)> Resolve(HarnessDefinition harness, string executable, CancellationToken token, Action<string> status, string? npmPath = null)
     {
         if (harness.Id == "antigravity") return await Antigravity(executable, token, status);
         if (harness.AdapterPackage == null) return (executable, harness.Arguments);
         string? existing = HarnessCatalog.FindExecutable(harness.AdapterCommand!);
         if (existing != null) return (existing, []);
-        var npm = HarnessCatalog.FindExecutable("npm") ?? throw new IOException("此 Harness 的 ACP 适配器需要 Node.js / npm，请先安装 Node.js。");
+        var npm = npmPath ?? HarnessCatalog.FindExecutable("npm") ?? throw new IOException("此 Harness 的 ACP 适配器需要 Node.js / npm，请先安装 Node.js。");
         string folder = Path.Combine(root, "adapters", harness.Id);
         string command = Path.Combine(folder, "node_modules", ".bin", harness.AdapterCommand! + (OperatingSystem.IsWindows() ? ".cmd" : ""));
         string receipt = Path.Combine(folder, "fish-adapter.json");
@@ -33,6 +33,7 @@ public sealed class AgentAdapterStore(string root)
         Directory.CreateDirectory(folder);
         status("正在安装 " + harness.Name + " 的 ACP 适配器…");
         var start = AgentProcess.StartInfo(npm, ["install", "--prefix", folder, "--no-audit", "--no-fund", "--save-exact", "--registry", "https://registry.npmjs.org", "--cache", Path.Combine(root, "adapter-cache"), harness.AdapterPackage], folder);
+        if (npmPath != null) start.Environment["PATH"] = Path.GetDirectoryName(npmPath) + Path.PathSeparator + start.Environment["PATH"];
         using var process = Process.Start(start) ?? throw new IOException("无法启动适配器安装。");
         using var ownership = new ProcessOwnership(process);
         var stdout = process.StandardOutput.ReadToEndAsync(token); var stderr = process.StandardError.ReadToEndAsync(token);
@@ -48,6 +49,8 @@ public sealed class AgentAdapterStore(string root)
     private async Task<(string, string[])> Antigravity(string executable, CancellationToken token, Action<string> status)
     {
         // Google's official ACP distribution is a separate executable from agy.
+        if (Path.GetFileName(executable).StartsWith("agy_acp_server", StringComparison.Ordinal) && AntigravityHelper(executable) != null)
+            return (executable, []);
         string? existing = HarnessCatalog.FindExecutable("agy_acp_server");
         if (existing != null && AntigravityHelper(existing) != null) return (existing, []);
         string platform = OperatingSystem.IsWindows() ? "windows-x86_64" : OperatingSystem.IsMacOS() ? "darwin-aarch64" : "linux-x86_64";

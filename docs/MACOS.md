@@ -2,7 +2,7 @@
 
 ## 已确认范围
 
-支持 Apple Silicon（osx-arm64），提供可启动的 `.app`、106 段透明动画、点击回应、拖拽、右键与状态栏菜单、大小和位置保存，以及退出时清理解码进程。双击桌宠打开对话；聊天可选 OpenAI 兼容 API、本机 GGUF 模型或 ACP Agent。应用不读屏、不自动更新；本地模型只在用户明确点击下载时获取，不在后台自动下载模型或 Agent。Windows/Linux 入口保持不变。
+支持 Apple Silicon（osx-arm64），提供可启动的 `.app`、106 段透明动画、点击回应、拖拽、右键与状态栏菜单、大小和位置保存，以及退出时清理解码进程。双击桌宠打开对话；聊天可选 OpenAI 兼容 API、本机 GGUF 模型或 ACP Agent。应用不读屏、不自动更新；本地 GGUF 模型只在用户明确点击下载时获取。首次使用某些 ACP Agent 时，应用可能准备其适配器组件。Windows/Linux 入口保持不变。
 
 ## 对话和设置
 
@@ -10,7 +10,7 @@
 
 发送的消息会立即进入聊天记录并按顺序处理。当前请求显示“正在思考…”，后续请求显示“排队中…”，生成期间可以继续输入和发送；每条回复会更新到对应消息下方。
 
-所有后端配置都在“设置”窗口。设置采用普通白色窗口，调整桌宠大小、对话透明度和后端参数后，点击“保存设置”生效；直接关闭设置则丢弃尚未保存的更改。API Key 保存在 macOS 钥匙串中，可跨应用重启使用；不会写入设置 JSON。模型下载需要用户明确发起；Agent 不会自动下载。
+所有后端配置都在“设置”窗口。设置采用普通白色窗口，调整桌宠大小、对话透明度和后端参数后，点击“保存设置”生效；直接关闭设置则丢弃尚未保存的更改。API Key 保存在 macOS 钥匙串中，可跨应用重启使用；不会写入设置 JSON。GGUF 模型下载需要用户明确发起；应用不会安装 Agent 本体。
 
 设置中的“大肥鱼人格”以项目人设卡为基础，包含鱼鱼的身份、性格、称呼、说话方式、角色化小愿望和能力边界；可以直接编辑或恢复默认。API 和本机 GGUF 模型会把它作为系统级指令发送；修改人格后会清除旧对话上下文，避免旧历史继续影响新设定。ACP 没有通用的系统提示词字段，因此应用会把人格随每轮用户消息发送，并要求 Agent 遵循。所选 ACP Agent 的系统提示优先级可能更高；如果它仍自称 ChatGPT 或不遵循角色设定，需要在该 Agent 自己的配置中调整身份指令。旧版内置默认人格会升级为此完整设定，自定义人格会保留。
 
@@ -47,15 +47,15 @@ open release/macos/BigBlueFish.app
 
 ## ACP 方案与接入
 
-2026-11-01 核对：OpenCode 官方支持 `opencode acp`，通过 stdio JSON-RPC 通信；Claude 与 Codex 可分别使用 ACP 组织维护的 `claude-agent-acp` 与 `codex-acp`。Mac 版直接复用仓库 `BigBlueFish.Agent/AcpConnection.cs`，不另造 JSON-RPC 实现，不自动下载适配器。参考：
+macOS 复用 `BigBlueFish.Agent` 的 20 项 Harness 启动目录和 `AcpConnection` 协议实现。目录列出命令及参数，不意味着每个 CLI 版本都已完成真实账号生成测试。OpenCode 使用 `opencode acp`；Claude Code、Codex CLI 与 Pi 借助固定版本的 ACP 适配器；Antigravity 使用官方 ACP 组件。连接时缺失的适配器可由应用自动准备，CLI 本体仍由用户安装。参考：
 
 - https://docs.opencode.ai/docs/acp/
 - https://github.com/agentclientprotocol/claude-agent-acp
 - https://github.com/agentclientprotocol/codex-acp
 
-在设置中勾选风险说明，选择已安装的 Agent/适配器。应用从 PATH 及常见 macOS 安装目录查找 `opencode`、`claude-agent-acp` 或 `codex-acp`，找到后预填路径；未找到时可手动输入，已保存的手动路径不会被查找结果覆盖。先在终端完成官方 CLI 登录，应用内不执行认证。首次发送消息时建立 ACP 连接。支持同一连接中的多轮聊天、回复气泡和逐项批准；不提供永久批准选项。会话尚不跨应用重启恢复。
+在设置中勾选风险说明，选择内置目录中的 Agent。应用从 PATH 及常见 macOS 安装目录查找对应 CLI 或适配器，找到后预填路径；未找到时可手动输入，已保存的手动路径不会被查找结果覆盖。Claude/Codex/Pi 缺少适配器时，首次发送会通过 npm 安装固定版本；Antigravity 缺少官方组件时会下载并校验 SHA-256。首次发送消息才建立 ACP 连接；应先在终端完成所选 CLI 的登录，应用内不执行认证。支持同一连接中的多轮聊天、文本回复和逐项批准；不提供永久批准选项。会话尚不跨应用重启恢复。
 
-安全边界：默认关闭；不注入 MCP 桌宠工具，不提供截图，不执行 Agent 输出的文本。Agent 仍可能按其自身配置访问文件、运行命令和联网，批准窗口不是沙箱；尤其不能假设所有 Agent 操作都会请求批准。使用专用工作区 `Application Support/BigBlueFish/agent/workspace`，但这不是文件系统隔离。
+安全边界：默认关闭；不注入 MCP 桌宠工具，不提供截图，不执行 Agent 输出的文本。Agent 仍可能按其自身配置访问文件、运行命令和联网，批准窗口不是沙箱；尤其不能假设所有 Agent 操作都会请求批准。使用专用工作区 `Application Support/BigBlueFish/agent/workspace`，但这不是文件系统隔离。macOS 尚不提供 Windows/Linux 的桌宠工具、会话恢复、Agent 模型/权限选择器与应用内认证。
 
 已验证：ACP fixture 子进程握手、分块回复、会话隔离、多轮对话、输入长度限制和断开。现有 AgentVerification 在 Mac 默认临时目录下暴露 Unix socket 路径过长问题；仅在 `TMPDIR=/tmp` 的测试进程中通过全部 93 项 fixture 检查。本版只走 ACP stdio，不启用有此问题的命名管道工具桥。真实账号生成与各适配器端到端兼容性尚未宣称通过。
 
