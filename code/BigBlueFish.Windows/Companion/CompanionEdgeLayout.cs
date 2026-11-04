@@ -193,11 +193,11 @@ public static class CompanionEdgeLayout
                 styledBubble?.PointAt((pet.Left + petBounds.Left + petBounds.Width / 2.0 - left) / scale, belowPet);
                 popup.Width = Math.Max(1.0, bubbleWidth);
                 popup.Height = Math.Max(1.0, bubbleHeight);
-                popup.Left = left;
-                popup.Top = top;
+                Place(left, top);
                 if (!popup.IsVisible)
                 {
                     popup.Show();
+                    Place(left, top);
                     QueueUpdate();
                 }
             }
@@ -205,6 +205,23 @@ public static class CompanionEdgeLayout
             {
                 updating = false;
             }
+        }
+
+        // left/top are in the pet's DIP space. Setting popup.Left/Top leaves the bubble on the
+        // wrong monitor when monitors use different scaling, so convert through the pet's own
+        // transform and place it in screen pixels (dotnet/wpf#3105).
+        private void Place(double left, double top)
+        {
+            if (PresentationSource.FromVisual(pet) == null)
+            {
+                popup!.Left = left;
+                popup.Top = top;
+                return;
+            }
+
+            System.Windows.Point screen = pet.PointToScreen(new System.Windows.Point(left - pet.Left, top - pet.Top));
+            nint handle = new WindowInteropHelper(popup!).EnsureHandle();
+            SetWindowPos(handle, IntPtr.Zero, (int)Math.Round(screen.X), (int)Math.Round(screen.Y), 0, 0, 0x0001 | 0x0004 | 0x0010);
         }
     }
 
@@ -277,6 +294,8 @@ public static class CompanionEdgeLayout
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint hwnd, int index);
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(nint hwnd, nint insertAfter, int x, int y, int cx, int cy, uint flags);
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern nint SetWindowLongPtr(nint hwnd, int index, nint value);
 }
