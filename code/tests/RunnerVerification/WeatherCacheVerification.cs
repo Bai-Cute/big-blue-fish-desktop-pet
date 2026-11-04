@@ -12,13 +12,16 @@ internal static class WeatherCacheVerification
         internal int Calls;
         internal bool Offline, Invalid, Stale;
         internal TaskCompletionSource? Block;
+        internal string LastUrl = "";
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
         {
             Interlocked.Increment(ref Calls);
+            LastUrl = request.RequestUri!.ToString();
             if (Block != null) await Block.Task.WaitAsync(token);
             if (Offline) throw new HttpRequestException("offline test");
-            var observed = (Stale ? Now.AddHours(-7) : Now).ToOffset(TimeSpan.FromHours(8));
-            var text = JsonSerializer.Serialize(new { current = new { time = observed.ToString("yyyy-MM-ddTHH:mm"),
+            var offset = LastUrl.Contains("timezone=auto") ? TimeSpan.FromHours(-7) : TimeSpan.FromHours(8);
+            var observed = (Stale ? Now.AddHours(-7) : Now).ToOffset(offset);
+            var text = JsonSerializer.Serialize(new { utc_offset_seconds = (int)offset.TotalSeconds, current = new { time = observed.ToString("yyyy-MM-ddTHH:mm"),
                 temperature_2m = 21, apparent_temperature = 20, relative_humidity_2m = 65, weather_code = 0, wind_speed_10m = 8 },
                 daily = new { temperature_2m_min = new[] { 18 }, temperature_2m_max = new[] { 25 }, precipitation_probability_max = new[] { 10 } } });
             return new(HttpStatusCode.OK) { Content = new StringContent(Invalid ? "broken json" : text) };
@@ -93,6 +96,18 @@ internal static class WeatherCacheVerification
         Check(corrupt.CachedContext("350622").Length > 0, "cancelled manual waiter does not cancel shared background refresh");
         now = now.AddDays(-1);
         Check(corrupt.CachedContext("350622") == "", "clock rollback rejects future-dated cache");
+        var la = CompanionRegions.District("US-06037");
+        Check(la.Code == "US-06037" && CompanionRegions.FullName(la) == "美国 · 加利福尼亚州 CA · Los Angeles County", "US county is a valid weather leaf");
+        Check(CompanionRegions.District("US-06").Code == CompanionRegions.DefaultCode && CompanionRegions.District("340100").Code == CompanionRegions.DefaultCode, "state and city codes fall back to default");
+        Check(CompanionRegions.Children("0").All(r => !CompanionRegions.IsUs(r)) && CompanionRegions.Children("US").Length == 52, "China provinces and 52 US states stay separate");
+        Check(CompanionRegions.Children("US").All(s => CompanionRegions.Children(s.Code).Length > 0 && CompanionRegions.Children(s.Code).All(c => c.Latitude != null)), "every US state has located counties");
+        feed.Now = now;
+        await corrupt.RefreshIfDue("US-06037");
+        var us = corrupt.CachedContext("US-06037");
+        Check(feed.LastUrl.Contains("temperature_unit=fahrenheit") && feed.LastUrl.Contains("wind_speed_unit=mph") && feed.LastUrl.Contains("timezone=auto"), "US request asks for imperial units and local time zone");
+        Check(us.Contains("21℉") && us.Contains("英里/小时") && us.Contains("当地时间") && us.Contains("Los Angeles County"), "US weather context uses Fahrenheit, mph and local time");
+        await corrupt.RefreshIfDue("350623");
+        Check(corrupt.CachedContext("350623").Contains("℃") && feed.LastUrl.Contains("Asia%2FShanghai"), "China weather keeps Celsius and Beijing time");
         if (live)
         {
             string actualFile = Path.Combine(directory, "live-weather.json");
@@ -104,6 +119,9 @@ internal static class WeatherCacheVerification
             using var offline = new CompanionWeather(web, actualFile);
             Check(await offline.Context("350622", default) == actualContext, "live downloaded weather is reusable after restart with offline HTTP transport");
             Console.WriteLine("LIVE " + actualContext);
+            var actualUs = await actual.Context("US-36061", default);
+            Check(actualUs.Contains("℉") && actualUs.Contains("New York County"), "live Open-Meteo US fetch is parsed");
+            Console.WriteLine("LIVE " + actualUs);
         }
         Console.WriteLine($"RESULT {checks} weather cache checks passed ({CompanionBrain.InputMode})");
         return 0;

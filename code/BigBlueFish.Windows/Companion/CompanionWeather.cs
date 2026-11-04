@@ -96,7 +96,9 @@ internal sealed class CompanionWeather : IDisposable
         + "&longitude=" + region.Longitude!.Value.ToString(CultureInfo.InvariantCulture)
         + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m"
         + "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
-        + "&forecast_days=1&timezone=Asia%2FShanghai";
+        + (CompanionRegions.IsUs(region)
+            ? "&temperature_unit=fahrenheit&wind_speed_unit=mph&forecast_days=1&timezone=auto"
+            : "&forecast_days=1&timezone=Asia%2FShanghai");
 
     private async Task Fetch(CompanionRegion region)
     {
@@ -111,15 +113,19 @@ internal sealed class CompanionWeather : IDisposable
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
             var current = json.RootElement.GetProperty("current");
             var daily = json.RootElement.GetProperty("daily");
+            var us = CompanionRegions.IsUs(region);
+            // China is always queried in Asia/Shanghai; US regions use the location's own zone (timezone=auto).
+            var offset = us ? TimeSpan.FromSeconds(json.RootElement.GetProperty("utc_offset_seconds").GetInt32()) : TimeSpan.FromHours(8);
             var observed = new DateTimeOffset(DateTime.Parse(current.GetProperty("time").GetString()!,
-                CultureInfo.InvariantCulture, DateTimeStyles.None), TimeSpan.FromHours(8));
+                CultureInfo.InvariantCulture, DateTimeStyles.None), offset);
             string Number(JsonElement value) => value.GetDouble().ToString("0.#", CultureInfo.InvariantCulture);
-            var context = $"地点：{CompanionRegions.FullName(region)}（区县中心附近的天气估算）。"
-                + $"天气资料记录时间：{current.GetProperty("time").GetString()}（北京时间）。"
+            var degree = us ? "℉" : "℃";
+            var context = $"地点：{CompanionRegions.FullName(region)}（{(us ? "县中心" : "区县中心")}附近的天气估算）。"
+                + $"天气资料记录时间：{current.GetProperty("time").GetString()}（{(us ? "当地时间" : "北京时间")}）。"
                 + $"记录时{Description(current.GetProperty("weather_code").GetInt32())}，"
-                + $"气温{Number(current.GetProperty("temperature_2m"))}℃，体感{Number(current.GetProperty("apparent_temperature"))}℃，"
-                + $"相对湿度{Number(current.GetProperty("relative_humidity_2m"))}%，风速{Number(current.GetProperty("wind_speed_10m"))}公里/小时。"
-                + $"资料日期{observed:yyyy-MM-dd}最低{Number(daily.GetProperty("temperature_2m_min")[0])}℃、最高{Number(daily.GetProperty("temperature_2m_max")[0])}℃，"
+                + $"气温{Number(current.GetProperty("temperature_2m"))}{degree}，体感{Number(current.GetProperty("apparent_temperature"))}{degree}，"
+                + $"相对湿度{Number(current.GetProperty("relative_humidity_2m"))}%，风速{Number(current.GetProperty("wind_speed_10m"))}{(us ? "英里/小时" : "公里/小时")}。"
+                + $"资料日期{observed:yyyy-MM-dd}最低{Number(daily.GetProperty("temperature_2m_min")[0])}{degree}、最高{Number(daily.GetProperty("temperature_2m_max")[0])}{degree}，"
                 + $"最高降水概率{Number(daily.GetProperty("precipitation_probability_max")[0])}%。";
             var entry = new Entry(region.Code, clock(), observed, context);
             lock (sync)
