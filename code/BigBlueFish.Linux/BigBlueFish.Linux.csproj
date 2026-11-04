@@ -18,6 +18,7 @@
     <Compile Include="../../deployment/ModelStore.cs" Link="Shared/ModelStore.cs" />
     <Compile Include="../../deployment/ArtifactDownload.cs" Link="Shared/ArtifactDownload.cs" />
     <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/china-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.china-regions.json" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/us-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.us-regions.json" />
     <AvaloniaResource Include="../BigBlueFish.Windows/Res/Font/LemiXiaoNaiPaoTi.ttf" Link="Assets/LemiXiaoNaiPaoTi.ttf" />
     <Content Include="../BigBlueFish.Windows/assets/fish/**/*" Link="assets/fish/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../BigBlueFish.Windows/BigBlueFish.ico" Link="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

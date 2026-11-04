@@ -288,6 +288,20 @@ internal static class Program
             interval.Value=70;Pump();Check(Property<int>(prefs,"AnimationIntervalSeconds")==70,"interval saved live");
             Check(File.ReadAllText("preferences.json").Contains("\"AnimationIntervalSeconds\": 70"),"interval persisted");
             Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&Property<int>(prefs,"BubbleDurationIndex")==5,"settings opening preserved choices");
+            navigation[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(100);
+            var country=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherCountry");
+            var districtBox=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherDistrict");
+            country.SelectedItem=CompanionRegions.UnitedStates;Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode").StartsWith("US-")&&Property<string>(prefs,"WeatherRegionCode").Length==8&&!districtBox.IsVisible,"US weather picker saves a county and hides third level");
+            var stateBox=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherProvince");
+            stateBox.SelectedItem=CompanionRegions.Children("US").Single(r=>r.Code=="US-06");Pump(100);
+            var countyBox=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherCity");
+            countyBox.SelectedValue="US-06037";Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode")=="US-06037","US county selection saved");
+            Render((Visual)settings.Content,"settings-weather-us.png",(int)settings.ActualWidth,(int)settings.ActualHeight);
+            country.SelectedItem=CompanionRegions.China;Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&districtBox.IsVisible,"switching back to China restores default district");
+            navigation[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(50);
             foreach(var scale in new[]{.5,1.0,2.0})
             {
                 Set(prefs,"Scale",scale);Invoke(w,"ApplyCompanionScale",false);Pump();

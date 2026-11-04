@@ -36,9 +36,9 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 | 文件 | 功能 |
 | --- | --- |
 | `BigBlueFish.Windows/Companion/CompanionWindow.cs` | 生命周期、拖动、动画、设置和电源事件 |
-| `BigBlueFish.Windows/Companion/CompanionMenus.cs` | 右键菜单、三级地点选择和手动天气播报 |
+| `BigBlueFish.Windows/Companion/CompanionMenus.cs` | 右键菜单、国家与地点选择和手动天气播报 |
 | `BigBlueFish.Windows/Companion/CompanionPreferences.cs` | 设置默认值、校验和原子保存 |
-| `BigBlueFish.Windows/Companion/CompanionRegions.cs` | 省市区层级与定位 |
+| `BigBlueFish.Windows/Companion/CompanionRegions.cs` | 中国省市区、美国州县层级与定位 |
 | `BigBlueFish.Windows/Companion/CompanionWeather.cs` | 天气请求、天气代码中文映射和按地点缓存 |
 | `BigBlueFish.Windows/Companion/CompanionBrain.cs` | 模型启动、推理、电池策略和提示词 |
 | `BigBlueFish.Windows/Companion/CompanionSpeech.cs` | 所有模型回复的逐字显示、Unicode 字符边界、替换和取消 |
@@ -57,6 +57,12 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 
 ```powershell
 python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
+```
+
+美国地区数据来自美国人口普查局 2026 年 Gazetteer 县级文件（公有领域），共 52 个州级项（50 州、哥伦比亚特区、波多黎各）和 3222 个县级项，代码为 `US-` 加 FIPS。下载 `2026_Gaz_counties_national.zip` 并解压后运行：
+
+```powershell
+python ./tools/import-us-regions.py "2026_Gaz_counties_national.txt"
 ```
 
 脚本只保留区划和中心点；大陆中心点由 GCJ-02 近似转换为 WGS84。更换版本时同步更新脚本中的版本、提交和许可信息。
