@@ -137,12 +137,17 @@ try
     await Until(() => said.Count > before && !host.Busy, "ordinary host daily rhythm can delegate to Agent");
     host.Configure("opencode", new(true, true, true));
     await Until(() => !host.Busy && host.Wakeups.List("opencode", host.SessionId).Length == 1, "Agent trigger mode ready for manual entry tests");
+    host.SpeechBrief = (kind, _) => Task.FromResult("host brief for " + kind);
     int manualBefore = said.Count;
     Check(host.ManualSpeech(false), "manual Agent speech test accepted while automatic timing is controlled by Agent");
     await Until(() => said.Count == manualBefore + 1 && !host.Busy, "manual Agent speech test reaches say tool");
     Check(host.ManualSpeech(true, "verified weather context"), "manual Agent weather accepted while automatic timing is controlled by Agent");
     await Until(() => said.Count == manualBefore + 2 && !host.Busy, "manual Agent weather reaches say tool");
     Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("verified weather context"), "Agent weather event includes actual host weather context");
+    Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host brief for weather_request"), "Agent-written speech event carries the host speech brief");
+    Check(host.SendUser("brief check"), "user message accepted after speech brief");
+    await Until(() => said.Count == manualBefore + 3 && !host.Busy, "user message completes after speech brief");
+    Check(!File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host brief"), "user conversation does not receive the spontaneous speech brief");
     host.Configure("opencode", new(true, false, true));
     string previous = host.SessionId; host.NewConversation();
     await Until(() => host.Connected && host.SessionId != previous && !host.Busy, "new conversation receives different ID");

@@ -54,6 +54,8 @@ public sealed class AgentCoordinator : IDisposable
     public event Action? Changed;
     public event Action<string, JsonElement>? ProtocolEvent;
     public Func<CancellationToken, Task>? LocalSpeechRequested { get; set; }
+    /// <summary>Host-built persona, random tone and material for an event whose line the Agent writes.</summary>
+    public Func<string, CancellationToken, Task<string>>? SpeechBrief { get; set; }
     public AgentSkillStore Skills => new(root, HarnessCatalog.Get(harnessId), Workspaces.Current);
 
     public AgentCoordinator(string root, string bridge, string pipe, Func<AgentPermission, CancellationToken, Task<string?>> permission, string? defaultWorkspace = null)
@@ -223,6 +225,13 @@ public sealed class AgentCoordinator : IDisposable
                     text += mode.Puppet && !mode.DailyCare
                         ? "\n日常关心由你安排时机、由本地模型编写。使用 schedule_wakeup 预约，预约到期由鱼鱼调用本地模型；现在触发使用 request_local_speech。主人主动对话仍用 say 回答。"
                         : "\n日常关心使用当前设置的编写者；由你编写的话通过 say 显示。";
+                    text += "\nsay 的文字是一行、少于100字的小反应，不含代码、路径或列表；任务结果留在正常回答里。";
+                    // wakeup reaches this point only when the Agent is the writer.
+                    if (request.Kind is "daily_care" or "speech_test" or "weather_request" or "wakeup" && SpeechBrief != null)
+                    {
+                        try { text += "\n" + await SpeechBrief(request.Kind, turn.Token); }
+                        catch (Exception) when (!turn.IsCancellationRequested) { }
+                    }
                     var current = connection!;
                     long toolsBeforePrompt = Interlocked.Read(ref toolActivity);
                     Interlocked.Exchange(ref turnStartSpoken, Interlocked.Read(ref spoken));
