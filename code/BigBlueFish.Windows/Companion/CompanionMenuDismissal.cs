@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace BigBlueFish.Windows;
@@ -55,19 +56,22 @@ internal sealed class CompanionMenuDismissal : IDisposable
             if (!menu.Dispatcher.HasShutdownStarted)
                 menu.Dispatcher.BeginInvoke(DispatcherPriority.Input, (Action)(() =>
                 {
-                    if (!disposed && capturedSession == session)
-                        DismissOutside(new Point(position.X, position.Y));
+                    if (disposed || capturedSession != session) return;
+                    // The hook reports physical pixels; WPF screen points differ on a monitor with other scaling.
+                    if (PresentationSource.FromVisual(menu) is HwndSource source)
+                        PhysicalToLogicalPointForPerMonitorDPI(source.Handle, ref position);
+                    DismissOutside(new Point(position.X, position.Y));
                 }));
         }
         return CallNextHookEx(hook, code, message, data);
     }
 
-    internal void DismissOutside(Point physicalPoint)
+    internal void DismissOutside(Point screenPoint)
     {
         if (!menu.IsOpen || PresentationSource.FromVisual(menu) == null) return;
         var first = menu.PointToScreen(new Point(0, 0));
         var last = menu.PointToScreen(new Point(menu.ActualWidth, menu.ActualHeight));
-        if (!new Rect(first, last).Contains(physicalPoint)) menu.IsOpen = false;
+        if (!new Rect(first, last).Contains(screenPoint)) menu.IsOpen = false;
     }
 
     internal void Reset()
@@ -97,6 +101,7 @@ internal sealed class CompanionMenuDismissal : IDisposable
     [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
     private static extern IntPtr SetWindowsHookEx(int kind, MouseCallback callback, IntPtr module, uint thread);
     [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32.dll")] private static extern bool PhysicalToLogicalPointForPerMonitorDPI(IntPtr hwnd, ref NativePoint point);
     [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(string? name);
 }

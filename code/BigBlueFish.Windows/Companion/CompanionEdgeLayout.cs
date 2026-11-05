@@ -207,18 +207,9 @@ public static class CompanionEdgeLayout
             }
         }
 
-        // left/top are in the pet's DIP space. Setting popup.Left/Top leaves the bubble on the
-        // wrong monitor when monitors use different scaling, so convert through the pet's own
-        // transform and place it in screen pixels (dotnet/wpf#3105).
+        // popup.Left/Top lands on the wrong monitor with mixed scaling (dotnet/wpf#3105); place in screen pixels via the pet's transform.
         private void Place(double left, double top)
         {
-            if (PresentationSource.FromVisual(pet) == null)
-            {
-                popup!.Left = left;
-                popup.Top = top;
-                return;
-            }
-
             System.Windows.Point screen = pet.PointToScreen(new System.Windows.Point(left - pet.Left, top - pet.Top));
             nint handle = new WindowInteropHelper(popup!).EnsureHandle();
             SetWindowPos(handle, IntPtr.Zero, (int)Math.Round(screen.X), (int)Math.Round(screen.Y), 0, 0, 0x0001 | 0x0004 | 0x0010);
