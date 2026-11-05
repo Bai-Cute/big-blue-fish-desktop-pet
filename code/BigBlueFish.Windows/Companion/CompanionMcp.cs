@@ -321,7 +321,9 @@ public partial class MainWindow
         var status = new TextBlock { Text = "Ctrl+Enter 发送", Foreground = Brushes.SlateGray, FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 8, 0) };
         // Scrolling up over the input box reveals the chat log above it; scrolling down past its end hides it again.
-        var history = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13, Foreground = blue, Margin = new Thickness(2, 0, 6, 0) };
+        var history = new StackPanel { Margin = new Thickness(2, 0, 6, 0) };
+        // Owner lines get light blue bubbles; black text is 14.8:1 on this blue, white only 1.4:1.
+        var ownerBubble = new SolidColorBrush(Color.FromRgb(0xBF, 0xDB, 0xFE));
         var historyView = new ScrollViewer { Content = history, Height = 220, Margin = new Thickness(0, 0, 0, 8),
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed };
         var content = new StackPanel(); content.Children.Add(historyView); content.Children.Add(editor);
@@ -379,14 +381,14 @@ public partial class MainWindow
         {
             if (historyShown == (chatLog.Version, preferences.ChatLogShowAll)) return;
             historyShown = (chatLog.Version, preferences.ChatLogShowAll);
-            history.Inlines.Clear();
+            history.Children.Clear();
             foreach (var (user, line) in chatLog.Lines(preferences.ChatLogShowAll))
             {
-                if (history.Inlines.Count > 0) { history.Inlines.Add(new System.Windows.Documents.LineBreak()); history.Inlines.Add(new System.Windows.Documents.LineBreak()); }
-                history.Inlines.Add(new System.Windows.Documents.Run(user ? "主人：" : "鱼鱼：") { FontWeight = FontWeights.SemiBold });
-                history.Inlines.Add(new System.Windows.Documents.Run(line) { Foreground = user ? Brushes.SlateGray : blue });
+                var block = new TextBlock { Text = line, TextWrapping = TextWrapping.Wrap, FontSize = 13, Foreground = user ? Brushes.Black : blue, Margin = new Thickness(0, 4, 0, 4) };
+                history.Children.Add(!user ? block : new Border { Child = block, Background = ownerBubble, CornerRadius = new CornerRadius(12),
+                    Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(40, 4, 0, 4), HorizontalAlignment = HorizontalAlignment.Right });
             }
-            if (history.Inlines.Count == 0) history.Inlines.Add(new System.Windows.Documents.Run("还没有聊天记录") { Foreground = Brushes.Gray });
+            if (history.Children.Count == 0) history.Children.Add(new TextBlock { Text = "还没有聊天记录", FontSize = 13, Foreground = Brushes.Gray });
             historyView.ScrollToEnd();
         }
         void ShowHistory(bool show)
