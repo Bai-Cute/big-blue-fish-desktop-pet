@@ -21,11 +21,11 @@
 | ModelEnabled | bool | 启用内置模型 |
 | GpuEnabled | bool | 本地推理启用GPU |
 | PublicInfo | bool | 内置天气、新闻 |
-| ForegroundEnabled | bool | 内置模型读屏；不控制Agent截图工具 |
+| ForegroundEnabled | bool | 内置模型读屏及 Agent 日常关心附图；不控制显式截图工具 |
 | StopModelOnBattery | bool | 离电暂停并卸载内置模型 |
 | HideOnFullscreen | bool | 外部全屏时自动隐藏 |
 | CheckUpdatesOnStartup | bool | 启动检查更新 |
-| WeatherRegionCode | 六位字符串 | 内置地区表存在的区县代码 |
+| WeatherRegionCode | 字符串 | 内置叶级地点代码：中国六位区县代码、美国 US-加五位县 FIPS，其他地点为国家代码-GeoNames 城市 ID，例如340104、US-06037、JP-1850147 |
 | Scale / BubbleScale | 0.5–2的有限数 | 角色／独立气泡倍率 |
 | SpeechMinMinutes | 2、3、5、10、15、20之一 | 分别对应2–3、3–5、5–8、10–16、15–23、20–30分钟 |
 | BubbleDurationIndex | 0–7整数 | 5、10、15、30、60、120、180秒，或直到下一句 |

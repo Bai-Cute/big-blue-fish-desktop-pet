@@ -23,6 +23,7 @@
     <Product>蓝色大肥鱼</Product>
     <StartupObject>BigBlueFish.Windows.App</StartupObject>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../BigBlueFish.Control/BigBlueFish.Control.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
@@ -30,11 +31,15 @@
     <Resource Include="Res/Font/LemiXiaoNaiPaoTi.ttf" />
     <None Update="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="assets/fish/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="media/ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <Content Include="media/FFmpeg-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="assets/regions/china-regions.json" />
+    <EmbeddedResource Include="assets/regions/us-regions.json" />
+    <EmbeddedResource Include="assets/regions/world-regions.json" />
+    <EmbeddedResource Include="assets/regions/world-countries.json" />
   </ItemGroup>
-  <Target Name="EnsureAnimationDecoder" BeforeTargets="PrepareForBuild" Condition="!Exists('$(MSBuildProjectDirectory)/media/ffmpeg.exe')">
-    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Setup-Media.ps1&quot;" />
+  <Target Name="EnsureGpuAnimationDecoder" BeforeTargets="PrepareForBuild">
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Setup-Gstreamer.ps1&quot;" />
+    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Build-Composition.ps1&quot;" />
+    <ItemGroup><Content Include="media/gstreamer/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   </Target>
+  <ItemGroup><ProjectReference Include="../BigBlueFish.Diagnostics/BigBlueFish.Diagnostics.csproj" /></ItemGroup>
 </Project>

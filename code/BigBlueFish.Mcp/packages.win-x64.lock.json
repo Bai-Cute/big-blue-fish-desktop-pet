@@ -3,6 +3,12 @@
   "dependencies": {
     "net10.0": {
       "bigbluefish.control": {
+        "type": "Project",
+        "dependencies": {
+          "BigBlueFish.Diagnostics": "[1.1.1, )"
+        }
+      },
+      "bigbluefish.diagnostics": {
         "type": "Project"
       }
     },

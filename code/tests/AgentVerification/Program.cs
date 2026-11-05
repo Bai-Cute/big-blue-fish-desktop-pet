@@ -4,9 +4,11 @@ using System.Text;
 using System.Text.Json;
 using BigBlueFish.Agent;
 using BigBlueFish.Control;
+using BigBlueFish.Diagnostics;
 
 if (args.Contains("--fixture-login")) { File.WriteAllText("fixture-terminal-authenticated", Environment.GetEnvironmentVariable("FISH_LOGIN_TEST") ?? "missing"); return; }
 if (args.Contains("--fixture")) { await Fixture.Run(); return; }
+if (args.Length >= 5 && args[0] == "--speech-alignment") { Environment.ExitCode = await SpeechAlignmentProbe.Run(args[1], args[2], args[3], args[4]); return; }
 if (args.Length >= 3 && args[0] == "--auth-inventory")
 {
     var harness = HarnessCatalog.Get(args[1]); var adapters = new AgentAdapterStore(args[2]);
@@ -137,12 +139,50 @@ try
     await Until(() => said.Count > before && !host.Busy, "ordinary host daily rhythm can delegate to Agent");
     host.Configure("opencode", new(true, true, true));
     await Until(() => !host.Busy && host.Wakeups.List("opencode", host.SessionId).Length == 1, "Agent trigger mode ready for manual entry tests");
+    host.SpeechBrief = (kind, _) => Task.FromResult(new AgentSpeechBrief("host brief for " + kind));
     int manualBefore = said.Count;
     Check(host.ManualSpeech(false), "manual Agent speech test accepted while automatic timing is controlled by Agent");
     await Until(() => said.Count == manualBefore + 1 && !host.Busy, "manual Agent speech test reaches say tool");
     Check(host.ManualSpeech(true, "verified weather context"), "manual Agent weather accepted while automatic timing is controlled by Agent");
     await Until(() => said.Count == manualBefore + 2 && !host.Busy, "manual Agent weather reaches say tool");
     Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("verified weather context"), "Agent weather event includes actual host weather context");
+    Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host brief for weather_request"), "Agent-written speech event carries the host speech brief");
+    Check(!DiagnosticLog.ExportText().Contains("verified weather context") && !DiagnosticLog.ExportText().Contains("host brief for weather_request"), "actual Agent weather/persona exchange excludes all bodies from shareable diagnostics");
+    Check(host.SendUser("brief check"), "user message accepted after speech brief");
+    await Until(() => said.Count == manualBefore + 3 && !host.Busy, "user message completes after speech brief");
+    Check(!File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host brief"), "user conversation does not receive the spontaneous speech brief");
+    const string samplePng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jB9sAAAAASUVORK5CYII=";
+    host.SpeechBrief = (kind, _) => Task.FromResult(new AgentSpeechBrief("host visual brief", new("image/png", samplePng)));
+    int visualBefore = said.Count;
+    Check(host.ManualSpeech(false), "visual care accepted");
+    await Until(() => said.Count == visualBefore + 1 && !host.Busy, "visual care completes through say");
+    using (var visual = JsonDocument.Parse(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json"))))
+    {
+        var prompt = visual.RootElement.GetProperty("prompt");
+        Check(prompt.GetArrayLength() == 2 && prompt[1].GetProperty("type").GetString() == "image"
+            && prompt[1].GetProperty("data").GetString() == samplePng && prompt[1].GetProperty("mimeType").GetString() == "image/png", "ACP receives the actual image content block without OCR substitution");
+        Check(prompt[0].GetProperty("text").GetString()!.Contains("本轮要求可以调整"), "normal host instructions explain per-turn tone changes separately from observed material");
+    }
+    File.WriteAllText(Path.Combine(host.Workspaces.Current, "fixture-no-images"), ""); host.Reconnect();
+    await Until(() => host.Connected && !host.SupportsImages && !host.Busy, "reconnect observes missing image capability");
+    string lastVisual = File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json"));
+    Check(host.ManualSpeech(false), "unsupported image request enters host validation");
+    await Until(() => !host.Busy && host.Detail.Contains("图片输入"), "unsupported image capability gives an explicit failure");
+    Check(said.Count == visualBefore + 1 && File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json")) == lastVisual, "unsupported image is not silently dropped or replaced with OCR");
+    File.Delete(Path.Combine(host.Workspaces.Current, "fixture-no-images")); host.Reconnect();
+    await Until(() => host.Connected && host.SupportsImages && !host.Busy, "image capability restored");
+    var preparation = new TaskCompletionSource<AgentSpeechBrief>(TaskCreationOptions.RunContinuationsAsynchronously);
+    host.SpeechBrief = (_, _) => preparation.Task;
+    Check(host.ManualSpeech(false), "slow material preparation accepted");
+    await Until(() => host.Busy && host.AwaitingSpeech, "preparing a screenshot activates loading status");
+    host.Cancel(); await Until(() => !host.Busy && host.Status == "请求已取消", "material preparation is cancellable before prompt dispatch");
+    preparation.SetResult(new("abandoned material", new("image/png", samplePng)));
+    await Task.Delay(100);
+    Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json")) == lastVisual, "cancelled screenshot preparation never leaks into the next turn");
+    host.SpeechBrief = (_, _) => throw new IOException("material fixture failure");
+    Check(host.ManualSpeech(false), "failed material preparation accepted for validation");
+    await Until(() => !host.Busy && host.Detail == "material fixture failure", "preparation failures are reported instead of swallowed");
+    host.SpeechBrief = (kind, _) => Task.FromResult(new AgentSpeechBrief("host brief for " + kind));
     host.Configure("opencode", new(true, false, true));
     string previous = host.SessionId; host.NewConversation();
     await Until(() => host.Connected && host.SessionId != previous && !host.Busy, "new conversation receives different ID");
@@ -254,7 +294,7 @@ static class Fixture
             var p = msg.TryGetProperty("params", out var parameters) ? parameters : default;
             switch (method.GetString())
             {
-                case "initialize": await Send(new { jsonrpc = "2.0", id, result = new { protocolVersion = 1, agentCapabilities = new { loadSession = true }, agentInfo = new { name = "Fixture", version = "1" }, authMethods = File.Exists("fixture-terminal-method") ? new object[] { new { id = "terminal-login", name = "Terminal", type = "terminal", args = new[] { "--fixture-login" }, env = new Dictionary<string,string> { ["FISH_LOGIN_TEST"] = "terminal-test" } } } : File.Exists("fixture-auth-methods") ? new object[] { new { id = "oauth-personal", name = "Google account" }, new { id = "future-login", name = "Future", type = "future" } } : [] } }); break;
+                case "initialize": await Send(new { jsonrpc = "2.0", id, result = new { protocolVersion = 1, agentCapabilities = new { loadSession = true, promptCapabilities = new { image = !File.Exists("fixture-no-images") } }, agentInfo = new { name = "Fixture", version = "1" }, authMethods = File.Exists("fixture-terminal-method") ? new object[] { new { id = "terminal-login", name = "Terminal", type = "terminal", args = new[] { "--fixture-login" }, env = new Dictionary<string,string> { ["FISH_LOGIN_TEST"] = "terminal-test" } } } : File.Exists("fixture-auth-methods") ? new object[] { new { id = "oauth-personal", name = "Google account" }, new { id = "future-login", name = "Future", type = "future" } } : [] } }); break;
                 case "authenticate":
                     if (p.GetProperty("methodId").GetString() != "oauth-personal") throw new Exception("Unexpected authentication method");
                     authenticated = true; File.WriteAllText("fixture-authenticated", p.GetProperty("methodId").GetString());
@@ -281,6 +321,7 @@ static class Fixture
                     await Send(new{jsonrpc="2.0",id,result=new{}});break;
                 case "session/set_model": model=p.GetProperty("modelId").GetString()!;await Send(new{jsonrpc="2.0",id,result=new{}});break;
                 case "session/prompt":
+                    File.WriteAllText("fixture-last-prompt.json", p.GetRawText());
                     File.WriteAllText("fixture-last-prompt.txt", p.GetProperty("prompt")[0].GetProperty("text").GetString());
                     if (File.Exists("fixture-prompt-auth") && !File.Exists("fixture-prompt-auth-used"))
                     { File.WriteAllText("fixture-prompt-auth-used", ""); await Send(new {jsonrpc="2.0",id,error=new {code=-32000,message="Authentication required"}}); break; }

@@ -1,0 +1,13 @@
+{
+  "GStreamer-COPYING.txt": "https://raw.githubusercontent.com/GStreamer/gstreamer/main/subprojects/gstreamer/COPYING",
+  "GLib-COPYING.txt": "https://raw.githubusercontent.com/GNOME/glib/main/LICENSES/LGPL-2.1-or-later.txt",
+  "libvpx-LICENSE.txt": "https://raw.githubusercontent.com/webmproject/libvpx/main/LICENSE",
+  "libvpx-PATENTS.txt": "https://raw.githubusercontent.com/webmproject/libvpx/main/PATENTS",
+  "libffi-LICENSE.txt": "https://raw.githubusercontent.com/libffi/libffi/master/LICENSE",
+  "PCRE2-LICENCE.txt": "https://raw.githubusercontent.com/PCRE2Project/pcre2/master/LICENCE.md",
+  "zlib-LICENSE.txt": "https://raw.githubusercontent.com/madler/zlib/master/LICENSE",
+  "bzip2-LICENSE.txt": "https://sourceware.org/git/?p=bzip2.git;a=blob_plain;f=LICENSE;hb=HEAD",
+  "orc-COPYING.txt": "https://raw.githubusercontent.com/GStreamer/orc/main/COPYING",
+  "Real-ESRGAN-LICENSE.txt": "https://raw.githubusercontent.com/xinntao/Real-ESRGAN/master/LICENSE",
+  "RIFE-LICENSE.txt": "https://raw.githubusercontent.com/hzwer/ECCV2022-RIFE/main/LICENSE"
+}

@@ -55,6 +55,7 @@ internal sealed class CompanionWeather : IDisposable
             var last = attempts.TryGetValue(region.Code, out var attempt) ? attempt
                 : entries.TryGetValue(region.Code, out var cached) ? cached.FetchedAt : DateTimeOffset.MinValue;
             if (now >= last && now - last < TimeSpan.FromHours(1)) return Task.CompletedTask;
+            DiagnosticLog.Write(DiagnosticEvent.WeatherRefresh);
             attempts[region.Code] = now;
             return pending[region.Code] = Task.Run(() => Fetch(region));
         }
@@ -71,7 +72,7 @@ internal sealed class CompanionWeather : IDisposable
     {
         var refresh = RefreshIfDue(regionCode);
         var cached = CachedContext(regionCode);
-        if (cached.Length > 0) return cached;
+        if (cached.Length > 0) { DiagnosticLog.Write(DiagnosticEvent.WeatherCached); return cached; }
         await refresh.WaitAsync(token);
         cached = CachedContext(regionCode);
         if (cached.Length == 0) throw new IOException("暂时没有六小时内的天气资料，请稍后重试。");
@@ -96,7 +97,9 @@ internal sealed class CompanionWeather : IDisposable
         + "&longitude=" + region.Longitude!.Value.ToString(CultureInfo.InvariantCulture)
         + "&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,wind_speed_10m"
         + "&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max"
-        + "&forecast_days=1&timezone=Asia%2FShanghai";
+        + (CompanionRegions.Country(region) == CompanionRegions.China ? "&forecast_days=1&timezone=Asia%2FShanghai"
+            : CompanionRegions.IsUs(region) ? "&temperature_unit=fahrenheit&wind_speed_unit=mph&forecast_days=1&timezone=auto"
+            : "&forecast_days=1&timezone=auto");
 
     private async Task Fetch(CompanionRegion region)
     {
@@ -111,15 +114,20 @@ internal sealed class CompanionWeather : IDisposable
             using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync(token));
             var current = json.RootElement.GetProperty("current");
             var daily = json.RootElement.GetProperty("daily");
+            var us = CompanionRegions.IsUs(region);
+            var china = CompanionRegions.Country(region) == CompanionRegions.China;
+            // China is always queried in Asia/Shanghai; elsewhere uses the location's own zone (timezone=auto).
+            var offset = china ? TimeSpan.FromHours(8) : TimeSpan.FromSeconds(json.RootElement.GetProperty("utc_offset_seconds").GetInt32());
             var observed = new DateTimeOffset(DateTime.Parse(current.GetProperty("time").GetString()!,
-                CultureInfo.InvariantCulture, DateTimeStyles.None), TimeSpan.FromHours(8));
+                CultureInfo.InvariantCulture, DateTimeStyles.None), offset);
             string Number(JsonElement value) => value.GetDouble().ToString("0.#", CultureInfo.InvariantCulture);
-            var context = $"地点：{CompanionRegions.FullName(region)}（区县中心附近的天气估算）。"
-                + $"天气资料记录时间：{current.GetProperty("time").GetString()}（北京时间）。"
+            var degree = us ? "℉" : "℃";
+            var context = $"地点：{CompanionRegions.FullName(region)}（{(china ? "区县中心" : us ? "县中心" : "城市中心")}附近的天气估算）。"
+                + $"天气资料记录时间：{current.GetProperty("time").GetString()}（{(china ? "北京时间" : "当地时间")}）。"
                 + $"记录时{Description(current.GetProperty("weather_code").GetInt32())}，"
-                + $"气温{Number(current.GetProperty("temperature_2m"))}℃，体感{Number(current.GetProperty("apparent_temperature"))}℃，"
-                + $"相对湿度{Number(current.GetProperty("relative_humidity_2m"))}%，风速{Number(current.GetProperty("wind_speed_10m"))}公里/小时。"
-                + $"资料日期{observed:yyyy-MM-dd}最低{Number(daily.GetProperty("temperature_2m_min")[0])}℃、最高{Number(daily.GetProperty("temperature_2m_max")[0])}℃，"
+                + $"气温{Number(current.GetProperty("temperature_2m"))}{degree}，体感{Number(current.GetProperty("apparent_temperature"))}{degree}，"
+                + $"相对湿度{Number(current.GetProperty("relative_humidity_2m"))}%，风速{Number(current.GetProperty("wind_speed_10m"))}{(us ? "英里/小时" : "公里/小时")}。"
+                + $"资料日期{observed:yyyy-MM-dd}最低{Number(daily.GetProperty("temperature_2m_min")[0])}{degree}、最高{Number(daily.GetProperty("temperature_2m_max")[0])}{degree}，"
                 + $"最高降水概率{Number(daily.GetProperty("precipitation_probability_max")[0])}%。";
             var entry = new Entry(region.Code, clock(), observed, context);
             lock (sync)
@@ -138,6 +146,6 @@ internal sealed class CompanionWeather : IDisposable
         // A failed hourly refresh retains the last good entry, never extending its lifetime.
         catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException
             or OperationCanceledException or JsonException or InvalidOperationException or FormatException
-            or KeyNotFoundException or ArgumentException or ObjectDisposedException) { }
+            or KeyNotFoundException or ArgumentException or ObjectDisposedException) { DiagnosticLog.Write(DiagnosticEvent.WeatherFailed, error: e); }
     }
 }

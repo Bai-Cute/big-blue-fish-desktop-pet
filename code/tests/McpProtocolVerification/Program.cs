@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text.Json;
 using BigBlueFish.Control;
+using BigBlueFish.Diagnostics;
 
 int checks = 0;
 void Check(bool condition, string label) { if (!condition) throw new Exception(label); checks++; }
@@ -64,6 +65,10 @@ Check(records[records.GetArrayLength()-1].GetProperty("detail").GetProperty("tex
 Check(!notices.Skip(beforeNotices).Any(n=>n.TryGetProperty("method",out var m)&&m.GetString()=="notifications/message"),"Warning log level filters info interaction notifications");
 Check(notices.Skip(beforeNotices).Any(n=>n.TryGetProperty("method",out var m)&&m.GetString()=="notifications/resources/updated"),"Resource subscription still works with info logs filtered");
 Check(server.Connections == 1, "Connection tracked");
+const string privateLine = "PRIVATE-AGENT-SAY-BODY-923784";
+response = await Request(12001, "tools/call", new { name = "say", arguments = new { text = privateLine } });
+Check(response.GetProperty("result").GetProperty("content")[0].GetProperty("text").GetString()!.Contains(privateLine), "MCP tool body reaches its intended receiver");
+Check(!DiagnosticLog.ExportText().Contains(privateLine) && DiagnosticLog.Snapshot().Any(x => x.Code == "McpTool" && x.Details.Contains("kind=say")), "MCP diagnostics retain tool metadata without argument or result body");
 process.StandardInput.Close();
 await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
 Check(process.ExitCode == 0, "Bridge exits at stdin EOF");

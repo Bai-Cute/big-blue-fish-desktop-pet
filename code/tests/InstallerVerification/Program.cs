@@ -165,7 +165,7 @@ internal static class Checks
             foreach (var required in new[] { "BigBlueFish.exe", "Uninstall.exe", "BigBlueFish.dll",
                 "coreclr.dll", "hostfxr.dll",
                 "PresentationFramework.dll", "runtime/llama-server.exe", "runtime/ggml-vulkan.dll", "runtime/mtmd.dll",
-                "media/ffmpeg.exe", "media/FFmpeg-LICENSE.txt", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
+                "media/gstreamer/BigBlueFish.Composition.dll", "media/gstreamer/runtime-manifest.json", "media/gstreamer/gstreamer-1.0-0.dll", "media/gstreamer/plugins/gstd3d12.dll", "media/gstreamer/plugins/gstvpx.dll", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
                 Check(names.Contains(required), "payload includes " + required);
             foreach (var obsolete in new[] { "VPet-Simulator.Core.dll", "VPet-Simulator.Windows.Interface.dll",
                 "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll",
@@ -174,7 +174,9 @@ internal static class Checks
                 Check(!names.Contains(obsolete), "payload excludes unused upstream component " + obsolete);
             foreach (var required in new[] { "runtime/msvcp140.dll", "runtime/vcruntime140.dll", "runtime/vcruntime140_1.dll", "runtime/visual-cpp-runtime.json", "licenses/Microsoft-Visual-Cpp-Runtime.txt" })
                 Check(names.Contains(required), "payload includes native runtime dependency " + required);
-            Check(names.Count(n => n.StartsWith("assets/fish/") && n.EndsWith(".webm")) == 106, "payload includes all 106 animations");
+            Check(names.Count(n=>n.StartsWith("assets/fish/")&&!n.StartsWith("assets/fish/compat/")&&n.EndsWith(".webm"))==106,"payload includes 106 enhanced animations");
+            Check(names.Count(n=>n.StartsWith("assets/fish/compat/")&&n.EndsWith(".webm"))==106,"payload includes 106 compatibility animations");
+            Check(names.Count(n=>n.StartsWith("assets/fish/")&&n.EndsWith(".mask"))==106,"payload includes input masks for every animation");
             Check(!names.Any(n => n.StartsWith("assets/pet/")), "old PNG animation pack is absent");
             Check(names.Contains("WinRT.Runtime.dll") == !InstallerForm.RequiresVision, "OCR projections match input mode");
             InstallerForm.ExtractApplication(archive, target);

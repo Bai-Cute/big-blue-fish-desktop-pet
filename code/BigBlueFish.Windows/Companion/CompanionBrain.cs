@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.IO;
@@ -210,6 +210,7 @@ internal sealed class CompanionBrain : IDisposable
             catch (Exception error) when (gpu && !token.IsCancellationRequested && CanRunOnCurrentPower
                 && error is IOException or TimeoutException)
             {
+                DiagnosticLog.Write(DiagnosticEvent.RunnerCpuFallback, kind: "CPU", error: error);
                 RecordFailure("GPU启动，改用CPU", error);
                 StopRunner();
                 token.ThrowIfCancellationRequested();
@@ -244,6 +245,7 @@ internal sealed class CompanionBrain : IDisposable
         // Preserve the verified high-memory Intel profile; smaller budgets use a smaller
         // compute buffer, while llama.cpp fits layer placement to current device memory.
         usingCpuFallback = UseGpu && !gpu;
+        DiagnosticLog.Write(DiagnosticEvent.RunnerStarting, kind: gpu ? "GPU" : "CPU", count: microBatch, directory: runtimeDirectory);
         var arguments = new List<string>
         {
             "-m",
@@ -360,6 +362,7 @@ internal sealed class CompanionBrain : IDisposable
                         loadingToken.ThrowIfCancellationRequested();
                         if (!ReferenceEquals(runner, process)) throw new OperationCanceledException(token);
                         runnerReady = true;
+                        DiagnosticLog.Write(DiagnosticEvent.RunnerReady, kind: gpu ? "GPU" : "CPU");
                         return;
                     }
                 }
@@ -415,6 +418,8 @@ internal sealed class CompanionBrain : IDisposable
     {
         if (disposed || Busy || !CanRunOnCurrentPower)
             return "";
+        var generationWatch = Stopwatch.StartNew();
+        DiagnosticLog.Write(DiagnosticEvent.SpeechStarted, kind: "weather");
         Busy = true;
         active = new CancellationTokenSource(TimeSpan.FromSeconds(100));
         var token = active.Token;
@@ -426,11 +431,13 @@ internal sealed class CompanionBrain : IDisposable
             Status = "正在生成天气播报";
             var text = await Complete(WeatherPersona, WeatherRequest(context), CompanionDialogue.Temperature, token, onPartial: onPartial);
             Status = ReadyStatus("本地模型就绪");
+            DiagnosticLog.Write(DiagnosticEvent.SpeechCompleted, kind: "local", chars: text.Length, elapsedMs: generationWatch.Elapsed.TotalMilliseconds);
             return CanRunOnCurrentPower ? text : "";
         }
-        catch (OperationCanceledException) { StopRunner(); Status = "天气播报已取消"; return ""; }
+        catch (OperationCanceledException) { DiagnosticLog.Write(DiagnosticEvent.SpeechCancelled, kind: "weather"); StopRunner(); Status = "天气播报已取消"; return ""; }
         catch (Exception e)
         {
+            DiagnosticLog.Write(DiagnosticEvent.SpeechFailed, kind: "local", error: e);
             StopRunner(); RecordFailure("生成", e);
             Status = e is IOException ? e.Message : "暂时无法获取或播报天气，请稍后重试";
             return "";
@@ -537,6 +544,7 @@ internal sealed class CompanionBrain : IDisposable
         {
             try
             {
+                DiagnosticLog.Write(DiagnosticEvent.NewsFetch);
                 using var r = await publicWeb.GetAsync("https://www.ithome.com/rss/", token);
                 r.EnsureSuccessStatusCode();
                 newsItems = CompanionNews.ReadFeed(await r.Content.ReadAsStringAsync(token), DateTimeOffset.UtcNow);
@@ -544,6 +552,7 @@ internal sealed class CompanionBrain : IDisposable
             }
             catch (Exception e)when (e is not OperationCanceledException)
             {
+                DiagnosticLog.Write(DiagnosticEvent.NewsFailed, error: e);
                 newsItems = newsItems.Where(i => DateTimeOffset.UtcNow - i.Published < TimeSpan.FromDays(2)).ToArray();
                 newsExpires = DateTime.UtcNow.AddMinutes(2);
             }
@@ -554,10 +563,26 @@ internal sealed class CompanionBrain : IDisposable
         return candidates.Length == 0 ? null : candidates[Random.Shared.Next(candidates.Length)];
     }
 
+    internal sealed record AgentBriefMaterial(string Text, bool ObserveScreen);
+    private static string AgentBrief(string persona, string request = "") => "【鱼鱼说话要求】\n" + persona + "\n【说话要求结束】" + (request.Length > 0 ? "\n" + request : "");
+    internal async Task<AgentBriefMaterial> AgentSpeechBrief(bool weatherRequest, bool usePublic, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (weatherRequest) { DiagnosticLog.Write(DiagnosticEvent.AgentMaterials, kind: "weather"); return new(AgentBrief(WeatherPersona), false); } // Event payload carries the weather data.
+        var news = usePublic && CompanionNews.ShouldSelect(newsRoll()) ? await NewsItem(token) : null;
+        token.ThrowIfCancellationRequested();
+        if (news != null) { DiagnosticLog.Write(DiagnosticEvent.AgentMaterials, kind: "news"); lastNewsTitle = news.Title; return new(AgentBrief(NewsPersona, NewsRequest(news.Context)), false); }
+        string context = $"现在是{DateTime.Now:yyyy年M月d日 HH:mm}。";
+        if (usePublic && Random.Shared.NextDouble() < .15) context += "\n" + WeatherContext();
+        DiagnosticLog.Write(DiagnosticEvent.AgentMaterials, kind: "persona");
+        return new(AgentBrief(FixedSpeechInstructions(Persona) + CompanionDialogue.ReactionHint(), SpeechRequest(context)), true);
+    }
+
     internal async Task<string> Generate(bool usePublic, bool useForeground, IntPtr foregroundHandle = default, Action<string>? onPartial = null)
     {
         if (disposed || Busy || !CanRunOnCurrentPower)
             return "";
+        DiagnosticLog.Write(DiagnosticEvent.SpeechStarted, kind: "local");
         Busy = true;
         active = new CancellationTokenSource(TimeSpan.FromSeconds(100));
         var token = active.Token;
@@ -584,6 +609,7 @@ internal sealed class CompanionBrain : IDisposable
 #endif
             if (news != null)
             {
+                DiagnosticLog.Write(DiagnosticEvent.NewsSelected);
                 request = NewsRequest(news.Context);
             }
             else
@@ -595,14 +621,39 @@ internal sealed class CompanionBrain : IDisposable
                     // Pin exactly one HWND for both the capture and the supplemental identity.
                     var handle = foregroundHandle == IntPtr.Zero ? CompanionNative.GetForegroundWindow() : foregroundHandle;
                     Status = "正在识别当前窗口文字";
-                    ocr = await CompanionOcr.ReadAsync(handle, token);
-                    context += ocr.Context;
+                    DiagnosticLog.Write(DiagnosticEvent.ScreenReadStarted, kind: "ocr");
+                    try
+                    {
+                        ocr = await CompanionOcr.ReadAsync(handle, token);
+                        context += ocr.Context;
+                        DiagnosticLog.Write(DiagnosticEvent.ScreenReadCompleted, kind: "ocr", count: ocr.WordCount,
+                            elapsedMs: ocr.CaptureMilliseconds + ocr.RecognizeMilliseconds);
+                    }
+                    catch (Exception error) when (error is not OperationCanceledException)
+                    {
+                        ocr = null;
+                        context += "用户正在使用电脑。";
+                        DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "ocr", error: error);
+                    }
                 }
                 else context += "用户正在使用电脑。";
 #else
-                var context = $"现在是{DateTime.Now:yyyy年M月d日 HH:mm}。" + (useForeground ? CompanionNative.ForegroundContext(foregroundHandle) : "用户正在使用电脑。");
-                if (useForeground && VisionAvailable)
-                    image = CompanionNative.ForegroundWindowImage(foregroundHandle);
+                var context = $"现在是{DateTime.Now:yyyy年M月d日 HH:mm}。";
+                try
+                {
+                    context += useForeground ? CompanionNative.ForegroundContext(foregroundHandle) : "用户正在使用电脑。";
+                    if (useForeground && VisionAvailable)
+                    {
+                        DiagnosticLog.Write(DiagnosticEvent.ScreenReadStarted, kind: "image");
+                        image = CompanionNative.ForegroundWindowImage(foregroundHandle);
+                        DiagnosticLog.Write(image == null ? DiagnosticEvent.ScreenReadFallback : DiagnosticEvent.ScreenReadCompleted, kind: "image");
+                    }
+                }
+                catch (Exception error) when (error is not OperationCanceledException)
+                {
+                    image = null; context += "用户正在使用电脑。";
+                    DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "image", error: error);
+                }
 #endif
                 if (usePublic && Random.Shared.NextDouble() < .15)
 #if COMPANION_OCR
@@ -634,7 +685,11 @@ internal sealed class CompanionBrain : IDisposable
 #endif
             var text = await Complete(selectedPersona, request, news == null ? CompanionDialogue.Temperature : .35, token, image, partial =>
             {
-                firstContentMs ??= generationWatch.Elapsed.TotalMilliseconds;
+                if (firstContentMs == null)
+                {
+                    firstContentMs = generationWatch.Elapsed.TotalMilliseconds;
+                    DiagnosticLog.Write(DiagnosticEvent.SpeechStarted, kind: "local", state: "first_content", elapsedMs: firstContentMs);
+                }
                 onPartial?.Invoke(partial);
             });
 #if COMPANION_OCR
@@ -647,16 +702,19 @@ internal sealed class CompanionBrain : IDisposable
             if (news != null && text.Length > 0)
                 lastNewsTitle = news.Title;
             Status = ReadyStatus("本地模型就绪");
+            DiagnosticLog.Write(DiagnosticEvent.SpeechCompleted, kind: "local", chars: text.Length, elapsedMs: generationWatch.Elapsed.TotalMilliseconds);
             return CanRunOnCurrentPower ? text : "";
         }
         catch (OperationCanceledException)
         {
             StopRunner();
+            DiagnosticLog.Write(DiagnosticEvent.SpeechCancelled, kind: "local");
             Status = "模型已暂停";
             return "";
         }
         catch (Exception e)
         {
+            DiagnosticLog.Write(DiagnosticEvent.SpeechFailed, kind: "local", error: e);
             StopRunner(); RecordFailure("生成", e);
             Status = e is IOException ? e.Message : "暂时无法生成，稍后重试";
             return "";
@@ -734,7 +792,7 @@ internal sealed class CompanionBrain : IDisposable
         inferenceDevices = null;
         var previous = runner;
         runner = null;
-        if (previous != null) _ = RetireProcess(previous);
+        if (previous != null) { DiagnosticLog.Write(DiagnosticEvent.RunnerStopped); _ = RetireProcess(previous); }
     }
 
     private static async Task RetireProcess(Process process)
@@ -751,14 +809,7 @@ internal sealed class CompanionBrain : IDisposable
 
     private static void RecordFailure(string stage, Exception error)
     {
-        // Diagnostics contain process/transport failures only, never OCR, prompts or replies.
-        try
-        {
-            const string path = "companion-errors.log";
-            if (File.Exists(path) && new FileInfo(path).Length > 1024 * 1024) File.WriteAllText(path, "");
-            File.AppendAllText(path, $"{DateTimeOffset.Now:O} {stage}: {error.GetType().Name}: {error.Message}\n");
-        }
-        catch { }
+        DiagnosticLog.Write(DiagnosticEvent.RunnerFailed, error: error);
     }
 
     internal void Stop()

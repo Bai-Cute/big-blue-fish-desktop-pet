@@ -12,15 +12,24 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using BigBlueFish.Windows;
 
-internal static class Program
+internal static partial class Program
 {
+    sealed class VerificationApp:App
+    {
+        // The test owns its data directory; normal App startup is exercised by installer tests.
+        protected override void OnStartup(StartupEventArgs e) { }
+    }
     const BindingFlags Access = BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
     static int checks;
     static object Read(object o,string n)=>o.GetType().GetField(n,Access)!.GetValue(o)!;
     static void Field(object o,string n,object v)=>o.GetType().GetField(n,Access)!.SetValue(o,v);
     static T Property<T>(object o,string n)=>(T)o.GetType().GetProperty(n,Access)!.GetValue(o)!;
     static void Set(object o,string n,object v)=>o.GetType().GetProperty(n,Access)!.SetValue(o,v);
-    static object? Invoke(object o,string n,params object[] a)=>o.GetType().GetMethod(n,Access)!.Invoke(o,a);
+    static object? Invoke(object o,string n,params object[] a)
+    {
+        var method=o.GetType().GetMethod(n,Access)!;var parameters=method.GetParameters();
+        var values=parameters.Select((p,i)=>i<a.Length?a[i]:p.DefaultValue).ToArray();return method.Invoke(o,values);
+    }
     static void Check(bool ok,string message){if(!ok)throw new Exception(message);checks++;}
     static void Pump(int ms=30)
     { var f=new DispatcherFrame();var t=new DispatcherTimer(DispatcherPriority.Send){Interval=TimeSpan.FromMilliseconds(ms)};t.Tick+=(_,_)=>{t.Stop();f.Continue=false;};t.Start();Dispatcher.PushFrame(f); }
@@ -209,7 +218,7 @@ internal static class Program
         try
         {
             string sandbox=Path.GetFullPath(args[0]);Directory.CreateDirectory(sandbox);
-            var app=new App();app.InitializeComponent();typeof(Application).GetField("_startupUri",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(app,null);app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var app=new VerificationApp();app.InitializeComponent();typeof(Application).GetField("_startupUri",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(app,null);app.ShutdownMode=ShutdownMode.OnExplicitShutdown;
             Directory.SetCurrentDirectory(sandbox);
             if(args.Contains("--menus"))
             {
@@ -224,6 +233,11 @@ internal static class Program
             native.GetField("TestPowerOverride",Access)!.SetValue(null,false);
             w=new MainWindow();w.Show();Wait(()=>(bool)Read(w,"companionReady"),10,"video load");
             ((DispatcherTimer)Read(w,"companionTimer")).Stop();
+            if(args.Contains("--mixed-dpi"))
+            {
+                Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before mixed-DPI verification");
+                VerifyMixedDpi(w);Field(w,"exitReady",true);w.Close();return 0;
+            }
             if(args.Contains("--menu-dismiss"))
             {
                 Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before outside-click verification");
@@ -256,17 +270,23 @@ internal static class Program
             Check(((Border)Read(w,"bubble")).Visibility!=Visibility.Visible,"welcome closes with bow, independent of 2 minute bubble setting");
             start.Restart();
             Invoke(w,"PlayCompanion","待机呼吸休闲");
-            Wait(()=>Property<long>(player,"Frames")>=240,13,"240-frame playback");
+            Wait(()=>Property<double>(player,"PositionSeconds")>=9.8,13,"full media duration playback");
             Check(start.Elapsed.TotalSeconds>=9.8&&start.Elapsed.TotalSeconds<12,"original fps playback: "+start.Elapsed.TotalSeconds);
-            Render(layout,"pet-transparent.png",(int)w.Width,(int)w.Height);
+            var snapshot=((Task<BitmapSource?>)Invoke(player,"CaptureSnapshotAsync")!).GetAwaiter().GetResult();
+            Check(snapshot!=null,"real animation snapshot available");
+            var rendered=new RenderTargetBitmap((int)w.Width,(int)w.Height,96,96,PixelFormats.Pbgra32);
+            Invoke(player,"RenderSnapshot",rendered,layout,snapshot!);
+            var imageBytes=new byte[rendered.PixelWidth*rendered.PixelHeight*4];rendered.CopyPixels(imageBytes,rendered.PixelWidth*4,0);
+            Check(imageBytes.Where((_,i)=>i%4!=3).Any(v=>v>0),"exported transparent pet image contains visible color");
+            var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(rendered));using(var output=File.Create("pet-transparent.png"))png.Save(output);
             var bmp=(BitmapSource)((Image)Read(w,"videoImage")).Source;
             var pixels=new byte[bmp.PixelWidth*bmp.PixelHeight*4];bmp.CopyPixels(pixels,bmp.PixelWidth*4,0);
-            Check(pixels.Where((_,i)=>i%4==3).Any(a=>a==0)&&pixels.Where((_,i)=>i%4==3).Any(a=>a==255),"real alpha pixels");
+            Check(pixels.Where((_,i)=>i%4==3).Any(a=>a==0)&&pixels.Where((_,i)=>i%4==3).Any(a=>a==255),"input alpha retains opaque and transparent regions");
             var sprite=(Image)Read(w,"videoImage");
             Check(sprite.InputHitTest(new Point(1,1))==null,"transparent video margins ignore clicks");
             Check(sprite.InputHitTest(new Point(sprite.ActualWidth/2,sprite.ActualHeight*.45))!=null,"visible character accepts clicks");
             Invoke(w,"PlayCompanion","待机呼吸休闲");
-            Console.WriteLine("24-fps playback and alpha verified.");
+            Console.WriteLine("Media-clock playback and alpha verified.");
             var firstAction=(string)Read(w,"currentAction");
             Field(w,"nextAction",DateTime.UtcNow.AddSeconds(-1));Pump(300);
             Check((string)Read(w,"currentAction")==firstAction,"deadline did not truncate active clip");
@@ -288,6 +308,35 @@ internal static class Program
             interval.Value=70;Pump();Check(Property<int>(prefs,"AnimationIntervalSeconds")==70,"interval saved live");
             Check(File.ReadAllText("preferences.json").Contains("\"AnimationIntervalSeconds\": 70"),"interval persisted");
             Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&Property<int>(prefs,"BubbleDurationIndex")==5,"settings opening preserved choices");
+            Set(prefs,"ForegroundEnabled",true);
+            var visualBrief=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",System.Threading.CancellationToken.None)!;
+            Wait(()=>visualBrief.IsCompleted,15,"host finishes actual foreground screenshot preparation");
+            var actualBrief=visualBrief.GetAwaiter().GetResult();
+            Check(actualBrief.Image!=null&&actualBrief.Image.MimeType=="image/png"&&!actualBrief.Text.Contains("本机OCR"),"Agent host supplies real screenshot without OCR instruction");
+            using(var agentImageBytes=new MemoryStream(Convert.FromBase64String(actualBrief.Image!.Data)))
+            {var decoded=BitmapFrame.Create(agentImageBytes,BitmapCreateOptions.None,BitmapCacheOption.OnLoad);Check(decoded.PixelWidth>100&&decoded.PixelHeight>100,"actual host screenshot bytes decode to a real image");}
+            File.WriteAllBytes("agent-foreground.png",Convert.FromBase64String(actualBrief.Image.Data));
+            Set(prefs,"ForegroundEnabled",false);
+            var noScreen=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",System.Threading.CancellationToken.None)!;
+            Wait(()=>noScreen.IsCompleted,5,"disabled screen preparation completes");
+            Check(noScreen.Result.Image==null,"disabled foreground setting suppresses automatic Agent image");
+            navigation[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(100);
+            var country=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherCountry");
+            var districtBox=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherDistrict");
+            country.SelectedItem=CompanionRegions.UnitedStates;Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode").StartsWith("US-")&&Property<string>(prefs,"WeatherRegionCode").Length==8&&!districtBox.IsVisible,"US weather picker saves a county and hides third level");
+            var stateBox=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherProvince");
+            stateBox.SelectedItem=CompanionRegions.Children("US").Single(r=>r.Code=="US-06");Pump(100);
+            var countyBox=Children<ComboBox>(settings).Single(c=>c.Name=="WeatherCity");
+            countyBox.SelectedValue="US-06037";Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode")=="US-06037","US county selection saved");
+            Render((Visual)settings.Content,"settings-weather-us.png",(int)settings.ActualWidth,(int)settings.ActualHeight);
+            country.SelectedItem=CompanionRegions.Countries.Single(c=>c.Code=="JP");Pump(100);
+            stateBox.SelectedValue="JP.40";Pump(100);countyBox.SelectedValue="JP-1850147";Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode")=="JP-1850147"&&!districtBox.IsVisible,"world city selection saved");
+            country.SelectedItem=CompanionRegions.China;Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&districtBox.IsVisible,"switching back to China restores default district");
+            navigation[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(50);
             foreach(var scale in new[]{.5,1.0,2.0})
             {
                 Set(prefs,"Scale",scale);Invoke(w,"ApplyCompanionScale",false);Pump();
@@ -304,7 +353,7 @@ internal static class Program
             Invoke(w,"ClickAnimation");Check(((string)Read(w,"currentAction")).StartsWith("点击回应-"),"click pool");
             Invoke(w,"PlayCompanion","drag");Check((string)Read(w,"animationPhase")=="Drag","drag starts");
             Check(Property<double>(player,"StartSeconds")==1.5,"drag begins directly in suspended segment");
-            Wait(()=>Property<long>(player,"Frames")==108,7,"drag plays only 1.5-6 second segment");
+            Wait(()=>Property<double>(player,"PositionSeconds")>=5.9,7,"drag plays only 1.5-6 second segment");
             Check(Property<double>(player,"PositionSeconds")>=5.9&&Property<double>(player,"PositionSeconds")<6,"drag ends before landing segment");
             Check((string)Read(w,"animationPhase")=="Drag","drag holds until release");Invoke(w,"FinishDragAnimation");Check((string)Read(w,"animationPhase")=="Idle","drag release idle");
             var policy=Read(w,"animationPolicy");var rule=Invoke(policy,"Find","原地左转奔跑")!;

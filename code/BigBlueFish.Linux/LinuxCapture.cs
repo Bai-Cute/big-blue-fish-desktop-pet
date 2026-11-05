@@ -174,19 +174,19 @@ internal static class CompanionNative
         using var image = SKImage.FromBitmap(small ?? bitmap); using var png = image.Encode(SKEncodedImageFormat.Png, 100);
         return new("data:image/png;base64," + Convert.ToBase64String(png.ToArray()), image.Width, image.Height);
     }
-    internal static void SetInputShape(IntPtr window, byte[] pixels, double scale, bool mirror)
+    internal static void SetInputShape(IntPtr window,byte[] pixels,int width,int height,double scale,bool mirror)
     {
         if (display == IntPtr.Zero || window == IntPtr.Zero) return;
         var regions = new List<XRectangle>();
-        for (int y = 0; y < 360; y++)
+        for (int y = 0; y < height; y++)
         {
             int start = -1;
-            for (int x = 0; x <= 640; x++)
+            for (int x = 0; x <= width; x++)
             {
-                bool opaque = x < 640 && pixels[(y * 640 + x) * 4 + 3] >= 8;
+                bool opaque = x < width && pixels[(y * width + x) * 4 + 3] >= 8;
                 if (opaque && start < 0) start = x;
                 if (!opaque && start >= 0) {
-                    int left = mirror ? 640 - x : start;
+                    int left = mirror ? width - x : start;
                     regions.Add(new() { x = (short)Math.Floor(left * scale), y = (short)Math.Floor(y * scale), width = (ushort)Math.Max(1, Math.Ceiling((x - start) * scale)), height = (ushort)Math.Max(1, Math.Ceiling(scale)) }); start = -1;
                 }
             }

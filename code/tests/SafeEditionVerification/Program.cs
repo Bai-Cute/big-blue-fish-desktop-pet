@@ -33,6 +33,8 @@ static class Program
             Check((string)Read("animationPhase")=="Startup","safe keeps ordinary welcome animation");
             Invoke("OpenCompanionSettings");Pump(150);var settings=(Window)Read("companionSettings");
             Check(!Descendants<Button>(settings).Any(b=>b.Content?.ToString() is "Agent 与 MCP" or "连接 Agent"),"safe settings have no Agent page");
+            Descendants<Button>(settings).Single(b=>b.Content?.ToString()=="日志控制台").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(350);
+            Check(Descendants<TextBox>(settings).Any(t=>t.Name=="LogConsoleText"&&t.IsReadOnly&&t.Text.Contains("SettingsOpened")),"safe edition has a working shareable log console without loading Agent");
             settings.Close();Invoke("AnimationBoundary");
             Check((string)Read("animationPhase")=="Idle","safe keeps ordinary idle logic");
             Check(!AppDomain.CurrentDomain.GetAssemblies().Any(a=>a.GetName().Name=="BigBlueFish.Control"),"no MCP assembly loaded in actual process");

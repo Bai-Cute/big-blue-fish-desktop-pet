@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Threading;
 
 namespace BigBlueFish.Windows;
@@ -55,19 +56,32 @@ internal sealed class CompanionMenuDismissal : IDisposable
             if (!menu.Dispatcher.HasShutdownStarted)
                 menu.Dispatcher.BeginInvoke(DispatcherPriority.Input, (Action)(() =>
                 {
-                    if (!disposed && capturedSession == session)
-                        DismissOutside(new Point(position.X, position.Y));
+                    if (disposed || capturedSession != session) return;
+                    DismissPhysicalPoint(new Point(position.X, position.Y));
                 }));
         }
         return CallNextHookEx(hook, code, message, data);
     }
 
-    internal void DismissOutside(Point physicalPoint)
+    internal void DismissPhysicalPoint(Point physicalPoint)
+    {
+        // Use one physical coordinate space even for outside points, for which
+        // PhysicalToLogicalPointForPerMonitorDPI can fail instead of converting.
+        if (!menu.IsOpen || PresentationSource.FromVisual(menu) is not HwndSource source) return;
+        var previous = SetThreadDpiAwarenessContext(new IntPtr(-4));
+        NativeRect bounds;
+        try { if (!GetWindowRect(source.Handle, out bounds)) return; }
+        finally { if (previous != IntPtr.Zero) SetThreadDpiAwarenessContext(previous); }
+        if (physicalPoint.X < bounds.Left || physicalPoint.X >= bounds.Right
+            || physicalPoint.Y < bounds.Top || physicalPoint.Y >= bounds.Bottom) menu.IsOpen = false;
+    }
+
+    internal void DismissOutside(Point screenPoint)
     {
         if (!menu.IsOpen || PresentationSource.FromVisual(menu) == null) return;
         var first = menu.PointToScreen(new Point(0, 0));
         var last = menu.PointToScreen(new Point(menu.ActualWidth, menu.ActualHeight));
-        if (!new Rect(first, last).Contains(physicalPoint)) menu.IsOpen = false;
+        if (!new Rect(first, last).Contains(screenPoint)) menu.IsOpen = false;
     }
 
     internal void Reset()
@@ -88,6 +102,7 @@ internal sealed class CompanionMenuDismissal : IDisposable
 
     private delegate IntPtr MouseCallback(int code, IntPtr message, IntPtr data);
     [StructLayout(LayoutKind.Sequential)] private struct NativePoint { public int X, Y; }
+    [StructLayout(LayoutKind.Sequential)] private struct NativeRect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)] private struct MouseData
     {
         public NativePoint Position;
@@ -97,6 +112,8 @@ internal sealed class CompanionMenuDismissal : IDisposable
     [DllImport("user32.dll", EntryPoint = "SetWindowsHookExW", SetLastError = true)]
     private static extern IntPtr SetWindowsHookEx(int kind, MouseCallback callback, IntPtr module, uint thread);
     [DllImport("user32.dll")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32.dll")] private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr context);
+    [DllImport("user32.dll")] private static extern bool GetWindowRect(IntPtr hwnd, out NativeRect rect);
     [DllImport("user32.dll")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(string? name);
 }

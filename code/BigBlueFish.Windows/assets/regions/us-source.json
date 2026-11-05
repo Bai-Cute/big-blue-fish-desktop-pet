@@ -1,0 +1,11 @@
+{
+  "source": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2026_Gazetteer/2026_Gaz_counties_national.zip",
+  "publisher": "US Census Bureau",
+  "vintage": "2026",
+  "license": "Public domain (US federal government work)",
+  "rows": 3274,
+  "inputSha256": {
+    "2026_Gaz_counties_national.txt": "0c9bb040b1cded73b77541cab8acae7b5851ff9c257ad97a1094c0d8adfab9c1"
+  },
+  "coordinateNote": "County internal points (INTPTLAT/INTPTLONG, WGS84). Not a street-level forecast."
+}

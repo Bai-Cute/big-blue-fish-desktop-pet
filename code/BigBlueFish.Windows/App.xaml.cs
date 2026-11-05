@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -31,7 +31,7 @@ public partial class App : Application
 
     private void RecordException(Exception exception, bool fatal)
     {
-        try { File.AppendAllText("companion-errors.log", DateTime.Now.ToString("s") + " " + exception + Environment.NewLine); }
+        try { DiagnosticLog.Write(DiagnosticEvent.AppFailed, state: fatal ? "exit" : "failed", error: exception); }
         catch { }
         if (fatal) Shutdown(1);
     }

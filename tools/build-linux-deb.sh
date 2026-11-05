@@ -33,8 +33,8 @@ Section: games
 Priority: optional
 Architecture: amd64
 Maintainer: Bai-Cute <Bai-Cute@users.noreply.github.com>
-Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libgomp1, libssl3, libicu74 | libicu72 | libicu76 | libicu78, libfontconfig1, libfreetype6, libx11-6, libxcomposite1, libxext6, libxss1, libxi6, libxcursor1, libxrandr2, libxrender1, libice6, libsm6, libdbus-1-3, libvulkan1, ffmpeg, tesseract-ocr, tesseract-ocr-chi-sim, tesseract-ocr-eng, fonts-noto-cjk, xdg-utils, pkexec | policykit-1
-Recommends: xdg-desktop-portal, xdg-desktop-portal-gtk
+Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libgomp1, libssl3, libicu74 | libicu72 | libicu76 | libicu78, libfontconfig1, libfreetype6, libx11-6, libxcomposite1, libxext6, libxss1, libxi6, libxcursor1, libxrandr2, libxrender1, libice6, libsm6, libdbus-1-3, libvulkan1, libgstreamer1.0-0, libgstreamer-plugins-base1.0-0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, ffmpeg, tesseract-ocr, tesseract-ocr-chi-sim, tesseract-ocr-eng, fonts-noto-cjk, xdg-utils, pkexec | policykit-1
+Recommends: xdg-desktop-portal, xdg-desktop-portal-gtk, gstreamer1.0-vaapi
 Conflicts: $conflict
 Replaces: $conflict
 Homepage: https://github.com/Bai-Cute/big-blue-fish-desktop-pet

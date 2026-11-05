@@ -24,6 +24,8 @@ public sealed class AcpConnection : IAsyncDisposable
     private readonly ProcessOwnership ownership;
     private readonly bool terminalAuthentication;
     public JsonElement Capabilities { get; private set; }
+    public bool SupportsImages => Capabilities.TryGetProperty("promptCapabilities", out var prompt)
+        && prompt.TryGetProperty("image", out var image) && image.ValueKind == JsonValueKind.True;
     public AgentAuthenticationMethod[] AuthenticationMethods { get; private set; } = [];
     public string AgentName { get; private set; } = "Agent";
     public string AgentVersion { get; private set; } = "";

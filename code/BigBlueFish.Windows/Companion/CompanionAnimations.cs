@@ -49,10 +49,14 @@ public partial class MainWindow
             HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Bottom,
             Stretch = Stretch.Fill };
         companionLayout.Children.Insert(0, videoImage);
+        ((CompanionSpriteImage)videoImage).NativeCaptureLost+=()=>
+        {
+            if(dragging){dragging=false;if(dragged)PublishMcpInteraction("drag_end",new{Left,Top,cancelled=true});FinishDragAnimation();}
+        };
         videoPlayer = new(videoImage);
         videoPlayer.Failed += error =>
         {
-            File.WriteAllText("companion-errors.log", "动画播放失败：" + error);
+            DiagnosticLog.Write(DiagnosticEvent.AnimationFailed, state: "failed");
             if (exitAnimation) { exitReady = true; base.Close(); return; }
             companionReady = false;
             ShowCompanionNotice("动画未能播放，请检查动画组件是否完整。");
@@ -70,6 +74,7 @@ public partial class MainWindow
     {
         if (!companionReady || companionClosed) return;
         if (phase is not ("Startup" or "Exit")) EndGreetingNotice();
+        DiagnosticLog.Write(DiagnosticEvent.AnimationStarted, kind: phase, action: rule.Id);
         currentAction = rule.Id; animationPhase = phase;
         bool suspendedDrag = phase == "Drag";
         videoPlayer!.Play(Path.Combine(AnimationDirectory, rule.File), mirror, AnimationFinished,
@@ -83,6 +88,7 @@ public partial class MainWindow
     }
     private void AnimationFinished()
     {
+        DiagnosticLog.Write(DiagnosticEvent.AnimationCompleted, kind: animationPhase, action: currentAction);
         if (companionClosed) return;
         if (exitAnimation) { exitReady = true; base.Close(); return; }
         if (!dragging && !hiddenByUser && !fullscreenHidden && PlayQueuedMcpAction()) return;

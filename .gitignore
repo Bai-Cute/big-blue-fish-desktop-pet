@@ -11,6 +11,7 @@
 **/models/
 **/runtime/
 **/media/*.exe
+**/media/gstreamer/
 **/preferences.json*
 **/model-selection.json*
 **/news-last-day.txt*

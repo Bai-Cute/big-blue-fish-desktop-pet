@@ -4,7 +4,8 @@
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-& "$PSScriptRoot/Setup-Media.ps1"
+& "$PSScriptRoot/Setup-Gstreamer.ps1"
+& "$PSScriptRoot/Build-Composition.ps1"
 $version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -InputMode $InputMode
 $destination = Join-Path $root ".work/BigBlueFish-v$version-$($InputMode.ToLowerInvariant())"
 & $SdkPath publish "$root/code/BigBlueFish.Windows/BigBlueFish.Windows.csproj" -c Release `

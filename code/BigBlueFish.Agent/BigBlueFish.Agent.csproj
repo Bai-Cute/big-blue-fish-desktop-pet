@@ -8,4 +8,5 @@
     <EmbeddedResource Include="Skills/SKILL.md" />
     <EmbeddedResource Include="Skills/persona.md" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../BigBlueFish.Diagnostics/BigBlueFish.Diagnostics.csproj" /></ItemGroup>
 </Project>

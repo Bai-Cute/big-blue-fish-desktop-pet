@@ -45,6 +45,7 @@ public partial class MainWindow
 
     private void InvalidateSpeechRequests(bool stopRunner = false)
     {
+        if (speechRequestPending || weatherRequestPending) DiagnosticLog.Write(DiagnosticEvent.SpeechCancelled);
         speechRequestVersion++;
         speechRequestPending = weatherRequestPending = false;
         if (stopRunner) brain.Stop(); else brain.CancelGeneration();
@@ -53,6 +54,7 @@ public partial class MainWindow
 
     private void RecoverCompanionSession()
     {
+        DiagnosticLog.Write(DiagnosticEvent.SessionRecovery);
         InvalidateSpeechRequests(true);
         companionMenuDismissal?.Reset();
         singleClickTimer?.Stop();
@@ -69,7 +71,9 @@ public partial class MainWindow
 
     private void UpdateCompanionVisibility()
     {
+        bool wasFullscreenHidden = fullscreenHidden;
         fullscreenHidden = preferences.HideOnFullscreen && CompanionNative.IsFullscreen();
+        if (wasFullscreenHidden != fullscreenHidden) DiagnosticLog.Write(DiagnosticEvent.VisibilityChanged, kind: "fullscreen", state: fullscreenHidden ? "hidden" : "visible");
         bool show = !hiddenByUser && !fullscreenHidden;
         if (show && !IsVisible) { Show(); ClampCompanion(); }
         else if (!show && IsVisible) { InvalidateSpeechRequests(); Hide(); }
@@ -98,7 +102,10 @@ public partial class MainWindow
         }
 
         instanceLock = File.Open("companion.lock", FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read);
+        DiagnosticLog.ConfigureDirectories(AppContext.BaseDirectory, Environment.CurrentDirectory);
+        DiagnosticLog.Write(DiagnosticEvent.AppStarted, kind: "Windows", directory: Environment.CurrentDirectory);
         preferences = CompanionPreferences.Read();
+        DiagnosticLog.ObserveSettings(preferences);
         if (CompanionNative.IsExternalForegroundCandidate(startupForeground))
             lastExternalForeground = startupForeground;
         brain = new CompanionBrain
@@ -256,7 +263,7 @@ public partial class MainWindow
         try { StartVideoAnimations(); }
         catch (Exception e)
         {
-            File.WriteAllText("companion-errors.log", e.ToString());
+            DiagnosticLog.Write(DiagnosticEvent.AnimationFailed, error: e);
             ShowCompanionNotice("动画未能加载，请检查文件是否完整。");
         }
         return Task.CompletedTask;
@@ -365,6 +372,7 @@ public partial class MainWindow
         try
         {
             preferences.Save();
+        DiagnosticLog.ObserveSettings(preferences);
         }
         catch
         {
@@ -392,12 +400,18 @@ public partial class MainWindow
         CompanionNative.GetCursorPos(out var p);
         dragStart = new Point(p.X, p.Y);
         windowStart = new Point(Left, Top);
-        CaptureMouse();
+        if(videoImage is not CompanionSpriteImage{IsNativeInput:true})CaptureMouse();
+    }
+
+    internal void TraceCompanionPointer(uint message,uint buttons)
+    {
+        if(App.Args.Contains("--test-mode"))File.AppendAllText("input-test.jsonl",System.Text.Json.JsonSerializer.Serialize(new{message,buttons,dragging,dragged,captured=IsMouseCaptured,Left,Top})+Environment.NewLine);
     }
 
     private void CompanionMove(object sender, MouseEventArgs e)
     {
-        if (!dragging || e.LeftButton != MouseButtonState.Pressed)
+        bool leftPressed=videoImage is CompanionSpriteImage{IsNativeInput:true} native?native.NativeLeftPressed:e.LeftButton==MouseButtonState.Pressed;
+        if (!dragging || !leftPressed)
             return;
         CompanionNative.GetCursorPos(out var p);
         var dpi = VisualTreeHelper.GetDpi(this);
@@ -424,7 +438,7 @@ public partial class MainWindow
             return;
         e.Handled = true;
         dragging = false;
-        ReleaseMouseCapture();
+        if(videoImage is not CompanionSpriteImage{IsNativeInput:true})ReleaseMouseCapture();
         ClampCompanion();
         anchor = new Point(Left, Top);
         SaveCompanion();
@@ -467,6 +481,7 @@ public partial class MainWindow
         externalBubble = false;
         bubbleIsModelReply = true;
         bubbleUntil = DateTime.MaxValue;
+        DiagnosticLog.Write(DiagnosticEvent.BubbleShown, kind: "local", chars: text.Length);
         speech.Show(text, true);
     }
 
@@ -487,6 +502,7 @@ public partial class MainWindow
 
     private void FinishCompanionPartial(string text, bool agentTriggered = false)
     {
+        DiagnosticLog.Write(DiagnosticEvent.BubbleShown, kind: "local", chars: text.Length);
         ShowCompanionPartial(text, agentTriggered: agentTriggered);
         ResetBubbleDeadline();
     }
@@ -516,6 +532,7 @@ public partial class MainWindow
         externalBubble = false;
         bubbleIsModelReply = false;
         bubbleUntil = DateTime.MaxValue;
+        DiagnosticLog.Write(DiagnosticEvent.BubbleShown, kind: "notice", chars: text.Length);
         speech.Show(text, animate);
     }
 
@@ -608,8 +625,9 @@ public partial class MainWindow
                         nextWarmup = DateTime.MinValue;
                         break;
                     case "render":
+                        var snapshot = await videoPlayer!.CaptureSnapshotAsync();
                         var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Width, (int)Height, 96, 96, PixelFormats.Pbgra32);
-                        bitmap.Render(companionLayout);
+                        videoPlayer.RenderSnapshot(bitmap,companionLayout,snapshot);
                         var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder();
                         encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
                         using (var stream = File.Create("test-render.png"))
@@ -653,7 +671,7 @@ public partial class MainWindow
         if (exitAnimation || hiddenByUser || fullscreenHidden || !companionReady || dragging)
             return;
         if (bubble.Visibility == Visibility.Visible && now > bubbleUntil)
-            bubble.Visibility = Visibility.Collapsed;
+        { DiagnosticLog.Write(DiagnosticEvent.BubbleClosed, state: "expired"); bubble.Visibility = Visibility.Collapsed; }
         if (PuppetActive || now < nextSpeech || companionSettings != null || modelInstaller != null
             || !HasScheduledMcpSpeech && !AgentDailyActive && (speechRequestPending || brain.Busy || weatherRequestPending || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower))
             return;
@@ -673,8 +691,15 @@ public partial class MainWindow
         var foregroundHandle = speechForegroundOverride
             ?? CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
         speechForegroundOverride = null;
+        DiagnosticLog.Write(DiagnosticEvent.SpeechRequested, kind: "local", state: agentTriggered ? "manual" : "automatic");
         if (PuppetActive && !agentTriggered || speechRequestPending || companionClosed || exitAnimation || modelInstaller != null || !preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)
+        {
+            DiagnosticLog.Write(DiagnosticEvent.SpeechSkipped, kind: "local", state: speechRequestPending ? "busy"
+                : companionClosed || exitAnimation ? "exit" : modelInstaller != null ? "blocked"
+                : !preferences.ModelEnabled ? "disabled" : !brain.ModelAvailable ? "model_missing"
+                : !brain.CanRunOnCurrentPower ? "power" : "puppet");
             return;
+        }
 
         speechRequestPending = true;
         long version = speechRequestVersion;
@@ -692,7 +717,7 @@ public partial class MainWindow
                 await Task.Delay(100);
             if (version != speechRequestVersion || brain.Busy || weatherRequestPending || companionClosed || exitAnimation || hiddenByUser || fullscreenHidden
                 || !preferences.ModelEnabled || !brain.CanRunOnCurrentPower)
-                return;
+            { DiagnosticLog.Write(DiagnosticEvent.SpeechSkipped, kind: "local", state: brain.Busy || weatherRequestPending ? "busy" : hiddenByUser || fullscreenHidden ? "hidden" : "cancelled"); return; }
             nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
             BeginModelSpeech(); // A preceding weather request may have ended its own loading indicator.
             text = await brain.Generate(preferences.PublicInfo, preferences.ForegroundEnabled, foregroundHandle, partial =>
@@ -748,6 +773,7 @@ public partial class MainWindow
 
     private void RestoreCompanion()
     {
+        DiagnosticLog.Write(DiagnosticEvent.VisibilityChanged, state: "visible", kind: "user");
         if (companionClosed || exitAnimation || exitReady) return;
         hiddenByUser = false;
         UpdateCompanionVisibility();
@@ -757,6 +783,7 @@ public partial class MainWindow
 
     private void HideCompanion()
     {
+        DiagnosticLog.Write(DiagnosticEvent.VisibilityChanged, state: "hidden", kind: "user");
         if (companionClosed || exitAnimation || exitReady) return;
         hiddenByUser = true;
         singleClickTimer?.Stop();
@@ -788,6 +815,7 @@ public partial class MainWindow
     {
         if (companionClosed)
             return;
+        DiagnosticLog.Write(DiagnosticEvent.AppStopped);
         companionClosed = true;
         modelInstaller?.RequestClose();
         updateWindow?.RequestClose();

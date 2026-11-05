@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using BigBlueFish.Windows;
+using BigBlueFish.Diagnostics;
 using Application = System.Windows.Application;
 using ComboBox = System.Windows.Controls.ComboBox;
 
@@ -14,7 +15,11 @@ internal static class SpeechFlowVerification
     const BindingFlags Access = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     static object? Field(object target, string name) => target.GetType().GetField(name, Access)!.GetValue(target);
     static void Set(object target, string name, object value) => target.GetType().GetField(name, Access)!.SetValue(target, value);
-    static object? Invoke(object target, string name, params object[] args) => target.GetType().GetMethod(name, Access)!.Invoke(target, args);
+    static object? Invoke(object target, string name, params object[] args)
+    {
+        var method = target.GetType().GetMethod(name, Access)!;
+        return method.Invoke(target, args.Concat(method.GetParameters().Skip(args.Length).Select(p => p.DefaultValue)).ToArray());
+    }
     static int checks;
     static void Check(bool value, string message)
     {
@@ -79,6 +84,17 @@ internal static class SpeechFlowVerification
             var brain = (CompanionBrain)Field(window, "brain")!;
             Invoke(window, "OpenCompanionSettings"); Pump(150);
             var settingsWindow = (Window)Field(window, "companionSettings")!;
+            Children<System.Windows.Controls.Button>(settingsWindow).Single(b => (string?)b.Content == "日志控制台")
+                .RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Button.ClickEvent)); Pump(350);
+            var logBox = Children<System.Windows.Controls.TextBox>(settingsWindow).Single(t => t.Name == "LogConsoleText");
+            Check(logBox.IsReadOnly && logBox.Text.Contains("SettingsOpened"), "real settings log page shows previous events as read-only text");
+            DiagnosticLog.Write(DiagnosticEvent.McpTool, kind: "say", state: "success"); Pump(350);
+            Check(logBox.Text.Contains("kind=say; state=success"), "real log console refreshes new metadata without reopening settings");
+            Check(Children<System.Windows.Controls.Button>(settingsWindow).Any(b => (string?)b.Content == "保存为 TXT…"), "TXT export control exists in settings");
+            var consoleImage = new System.Windows.Media.Imaging.RenderTargetBitmap((int)settingsWindow.ActualWidth, (int)settingsWindow.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            consoleImage.Render((Visual)settingsWindow.Content);
+            var encoder = new System.Windows.Media.Imaging.PngBitmapEncoder(); encoder.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(consoleImage));
+            using (var imageFile = File.Create("log-console.png")) encoder.Save(imageFile);
             var sliders = Children<Slider>(settingsWindow).ToArray();
             var scaleSlider = sliders.Single(s => s.Minimum == .5 && s.Maximum == 2.0
                 && System.Windows.Automation.AutomationProperties.GetName(s) != "文字气泡大小");
@@ -124,10 +140,13 @@ internal static class SpeechFlowVerification
             // A window disappearing between resolution and capture is a real capture failure.
             Set(window, "speechForegroundOverride", new IntPtr(-123));
             var failed = (Task)Invoke(window, "SpeechCountdownZeroAsync")!;
-            Wait(() => failed.IsCompleted, "shared countdown pipeline completes capture failure", 10);
+            Wait(() => failed.IsCompleted, "shared countdown pipeline generates real speech despite capture failure", 35);
             failed.GetAwaiter().GetResult();
-            Check(brain.Status.Contains("未能读取"), "fault injection reaches actual OCR capture failure");
-            Check(((Border)Field(window, "bubble")!).Visibility != Visibility.Visible, "capture failure produces no debug/error speech bubble");
+            Check(DiagnosticLog.Snapshot().Any(x => x.Code == "ScreenReadFallback"), "fault injection reaches actual OCR fallback");
+            var fallback = ((TextBlock)Field(window, "bubbleText")!).Text;
+            Check(fallback.Length > 0 && brain.Status == "本地模型就绪", "capture failure still generates and displays actual local-model speech");
+            Check(!fallback.Contains("未能") && !fallback.Contains("获取当前") && !fallback.Contains("读屏"), "fallback bubble does not report read-screen failure");
+            Console.WriteLine("REAL FALLBACK " + fallback);
             Check(!(bool)Field(window, "speechRequestPending")! && ((FrameworkElement)Field(window, "loadingIndicator")!).Visibility != Visibility.Visible,
                 "failure releases request gate and loading animation");
             var recovery = (Task)Invoke(window, "SpeakCompanionTest")!;
@@ -135,6 +154,33 @@ internal static class SpeechFlowVerification
             recovery.GetAwaiter().GetResult();
             Check(((TextBlock)Field(window, "bubbleText")!).Text.Length > 0 && brain.Status == "本地模型就绪", "subsequent real speech recovers without app restart");
             Console.WriteLine("REAL RECOVERY " + ((TextBlock)Field(window, "bubbleText")!).Text);
+#if !COMPANION_SAFE
+            prefs.AgentEnabled = true; prefs.AgentDailySpeech = true;
+            var weather = Field(brain, "weather")!;
+            var entries = (System.Collections.IDictionary)Field(weather, "entries")!;
+            entries[prefs.WeatherRegionCode] = new CompanionWeather.Entry(prefs.WeatherRegionCode, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "PRIVATE-WEATHER-CONTEXT");
+            Invoke(window, "ShowCompanionNotice", "unchanged existing bubble", false, true);
+            string prior = ((TextBlock)Field(window, "bubbleText")!).Text;
+            var handoff = (Task<bool>)Invoke(window, "TryManualAgentSpeech", true)!;
+            Wait(() => handoff.IsCompleted, "Agent weather preparation completes without a connected queue", 15);
+            Check(handoff.Result && ((TextBlock)Field(window, "bubbleText")!).Text == prior, "Agent weather queue failure has no intermediate/error bubble");
+            Check(DiagnosticLog.Snapshot().Any(x => x.Code == "AgentMaterials" && x.Details.Contains("kind=weather") && x.Details.Contains("state=blocked")), "silent weather handoff failure remains visible in diagnostics");
+            Check(!DiagnosticLog.ExportText().Contains("PRIVATE-WEATHER-CONTEXT"), "weather text is excluded from shareable logs");
+            using var agentProbe = new BigBlueFish.Agent.AgentCoordinator(Path.Combine(root, "agent-probe"), Path.Combine(root, "absent-bridge.exe"), "isolated-console-test", (_, _) => Task.FromResult<string?>(null), Path.Combine(root, "agent-workspace"));
+            agentProbe.Configure("codex", new(true, false, true));
+            Set(window, "agent", agentProbe);
+            var acceptedWeather = (Task<bool>)Invoke(window, "TryManualAgentSpeech", true)!;
+            Wait(() => acceptedWeather.IsCompleted, "Agent weather enters the real bounded event queue", 15);
+            Check(DiagnosticLog.Snapshot().Any(x => x.Code == "AgentMaterials" && x.Details.Contains("kind=weather") && x.Details.Contains("state=success")), "weather queue acceptance is recorded");
+            Check(((TextBlock)Field(window, "bubbleText")!).Text == prior, "accepted weather handoff does not replace the bubble");
+            agentProbe.Configure("codex", new(false, false, false)); Set(window, "agent", null!);
+            entries.Clear();
+            ((System.Collections.IDictionary)Field(weather, "attempts")!)[prefs.WeatherRegionCode] = DateTimeOffset.UtcNow;
+            var unavailableWeather = (Task<bool>)Invoke(window, "TryManualAgentSpeech", true)!;
+            Wait(() => unavailableWeather.IsCompleted, "unavailable weather returns through the silent error path", 15);
+            Check(((TextBlock)Field(window, "bubbleText")!).Text == prior && DiagnosticLog.Snapshot().Any(x => x.Code == "AgentFailed" && x.Details.Contains("kind=weather")), "weather preparation errors appear only in diagnostics");
+            prefs.AgentEnabled = false; prefs.AgentDailySpeech = false;
+#endif
             Console.WriteLine($"RESULT {checks} interval/scale/shared speech checks passed; real GPU model, no canned speech");
             return 0;
         }

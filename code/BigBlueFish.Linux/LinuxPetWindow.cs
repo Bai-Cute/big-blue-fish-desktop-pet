@@ -42,6 +42,7 @@ internal sealed partial class LinuxPetWindow : Window
     bool moveMirrored;
     Window? settings;
     bool modelInstalling;
+    bool agentWeatherPending;
     static readonly IBrush Hair = new SolidColorBrush(Color.FromRgb(80, 96, 152));
     internal bool Puppet => McpAvailable && Preferences.McpEnabled && Preferences.PuppetMode;
     double SpriteSize => 280 * Preferences.Scale;
@@ -50,6 +51,9 @@ internal sealed partial class LinuxPetWindow : Window
     {
         mutex = new Mutex(true, "BigBlueFish.Linux." + Environment.UserName, out var first);
         if (!first) Environment.Exit(0);
+        DiagnosticLog.ConfigureDirectories(AppContext.BaseDirectory, Environment.CurrentDirectory);
+        DiagnosticLog.Write(DiagnosticEvent.AppStarted, kind: "Linux", directory: Environment.CurrentDirectory);
+        DiagnosticLog.ObserveSettings(Preferences);
         brain = new() { UseGpu = Preferences.GpuEnabled, StopOnBattery = Preferences.StopModelOnBattery, WeatherRegionCode = Preferences.WeatherRegionCode };
         Title = "蓝色大肥鱼"; WindowDecorations = WindowDecorations.None; ShowInTaskbar = false; ShowActivated = false;
         Topmost = true; CanResize = false; Background = Brushes.Transparent; TransparencyLevelHint = [WindowTransparencyLevel.Transparent];
@@ -57,8 +61,8 @@ internal sealed partial class LinuxPetWindow : Window
         loading.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left; loading.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
         player = new(sprite); player.FramePresented += MoveWithAnimation;
         PositionChanged += (_, _) => MoveBubble();
-        player.PixelsPresented += (pixels, mirror) => CompanionNative.SetInputShape(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero, pixels, Width * DesktopScaling / 640, mirror);
-        player.Failed += error => { File.AppendAllText("companion-errors.log", DateTime.Now.ToString("s") + " " + error + "\n"); if (phase == "Exit") CloseImmediately(); };
+        player.PixelsPresented += (pixels,width,height,mirror) => CompanionNative.SetInputShape(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero,pixels,width,height,Width*DesktopScaling/width,mirror);
+        player.Failed += error => { DiagnosticLog.Write(DiagnosticEvent.AnimationFailed, state: "failed"); if (phase == "Exit") CloseImmediately(); };
         bubbleText.FontFamily = new FontFamily("avares://BigBlueFish.Linux/Assets#LemiXiaoNaiPaoTi");
         bubbleText.Foreground = Hair;
         var close = new Button { Content = "×", Padding = new Thickness(3), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top, Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
@@ -116,7 +120,7 @@ internal sealed partial class LinuxPetWindow : Window
             speechVersion++; brain.Stop(); moveRule = null; settings?.Close(); hidden = false; fullscreenHidden = false; Show(); player.Paused = false;
             Play(policy.Find("女仆屈膝礼仪"), "Exit"); ShowText("主人再见~鱼鱼喜欢主人哦", false, true);
         };
-        Closed += (_, _) => { closed = true; timer.Stop(); StopMcp(); brain.Dispose(); player.Dispose(); bubbleWindow.Close(); settings?.Close(); Save(); mutex.Dispose(); (Avalonia.Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Shutdown(); };
+        Closed += (_, _) => { DiagnosticLog.Write(DiagnosticEvent.AppStopped, kind: "Linux"); closed = true; timer.Stop(); StopMcp(); brain.Dispose(); player.Dispose(); bubbleWindow.Close(); settings?.Close(); Save(); mutex.Dispose(); (Avalonia.Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Shutdown(); };
         timer.Tick += async (_, _) => await Tick();
     }
     CompanionAnimationContext Context() => new(DateTime.Now, BreakfastHour: Preferences.BreakfastHour, LunchHour: Preferences.LunchHour, DinnerHour: Preferences.DinnerHour);
@@ -133,11 +137,12 @@ internal sealed partial class LinuxPetWindow : Window
         var result = new PixelPoint((int)Math.Clamp(target.X, area.X - left, Math.Max(area.X - left, area.Right - right)), (int)Math.Clamp(target.Y, area.Y - top, Math.Max(area.Y - top, area.Bottom - bottom)));
         Position = result; MoveBubble(); return result;
     }
-    void Save() { if (closed) return; Preferences.Left = Position.X; Preferences.Top = Position.Y; Preferences.Save(); }
+    void Save() { if (closed) return; Preferences.Left = Position.X; Preferences.Top = Position.Y; Preferences.Save(); DiagnosticLog.ObserveSettings(Preferences); }
     void Play(CompanionAnimationRule rule, string nextPhase, bool mirror = false)
     {
         if (closed) return;
         if (phase == "Startup" && nextPhase != "Startup") EndWelcome();
+        DiagnosticLog.Write(DiagnosticEvent.AnimationStarted, kind: nextPhase, action: rule.Id);
         currentAction = rule.Id; phase = nextPhase;
         player.Play(Path.Combine(AppContext.BaseDirectory, "assets/fish", rule.File), mirror, Finished,
             nextPhase == "Drag" ? 1.5 : 0, nextPhase == "Drag" ? 6 : null, rule.Pool == "Greeting" ? 1.5 : 1);
@@ -146,6 +151,7 @@ internal sealed partial class LinuxPetWindow : Window
     bool PlayQueued() { if (externalActions.Count == 0) return false; moveRule = null; Play(policy.Find(externalActions.Dequeue()), "External"); return true; }
     void Finished()
     {
+        DiagnosticLog.Write(DiagnosticEvent.AnimationCompleted, kind: phase, action: currentAction);
         if (closed) return;
         if (phase == "Exit") { CloseImmediately(); return; }
         if (!dragging && !hidden && !fullscreenHidden && PlayQueued()) return;
@@ -185,6 +191,7 @@ internal sealed partial class LinuxPetWindow : Window
     void ShowText(string text, bool external, bool immediate = false, bool fromModel = false)
     {
         greetingNoticeActive = false;
+        DiagnosticLog.Write(DiagnosticEvent.BubbleShown, kind: external ? "agent" : fromModel ? "local" : "notice", chars: text.Length);
         fullText = text; textBoundaries = StringInfo.ParseCombiningCharacters(text); externalSpeech = external; modelReply = fromModel;
         typing = !immediate && textBoundaries.Length > 1; typingClock.Restart(); bubbleUntil = DateTime.MaxValue;
         bubbleText.Text = typing ? text[..textBoundaries[1]] : text;
@@ -247,7 +254,8 @@ internal sealed partial class LinuxPetWindow : Window
     }
     async Task Speak(bool weather, bool agentTriggered = false)
     {
-        if (Puppet && !agentTriggered || generating || closed || phase == "Exit" || modelInstalling) return;
+        DiagnosticLog.Write(DiagnosticEvent.SpeechRequested, kind: weather ? "weather" : "local", state: agentTriggered ? "manual" : "automatic");
+        if (Puppet && !agentTriggered || generating || closed || phase == "Exit" || modelInstalling) { DiagnosticLog.Write(DiagnosticEvent.SpeechSkipped, state: "blocked"); return; }
         if (!brain.ModelAvailable) { await InstallModel(); return; }
         if (!Preferences.ModelEnabled) { ShowText("主人，请先在设置里启用本地大模型哦~", false); return; }
         if (!brain.CanRunOnCurrentPower) { ShowText("主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。", false); return; }
@@ -269,17 +277,23 @@ internal sealed partial class LinuxPetWindow : Window
     async Task SpeakManual(bool weather)
     {
         if (closed || phase == "Exit") return;
+        if (weather && agentWeatherPending) return;
+        DiagnosticLog.Write(DiagnosticEvent.SpeechRequested, kind: weather ? "weather" : "test");
         if (hidden || fullscreenHidden) { hidden = false; fullscreenHidden = false; Show(); }
 #if !COMPANION_SAFE
         if (AgentDailyActive)
         {
             try
             {
-                ShowText(weather ? "主人，正在准备天气资料交给 Agent～" : "主人，正在请 Agent 回应这次吐字测试～", false);
+                if (weather) { agentWeatherPending = true; loading.IsVisible = true; }
+                else ShowText("主人，正在请 Agent 回应这次吐字测试～", false);
                 string context = weather ? await brain.GetWeatherContext(CancellationToken.None) : "";
-                if (agent?.ManualSpeech(weather, context) != true) ShowText("主人，Agent 请求尚未就绪或队列已满，请查看连接状态后重试～", false);
+                bool accepted = agent?.ManualSpeech(weather, context) == true;
+                DiagnosticLog.Write(DiagnosticEvent.AgentMaterials, kind: weather ? "weather" : "test", state: accepted ? "success" : "blocked");
+                if (!accepted && !weather) ShowText("主人，Agent 请求尚未就绪或队列已满，请查看连接状态后重试～", false);
             }
-            catch (Exception error) { ShowText("主人，" + error.Message, false); }
+            catch (Exception error) { DiagnosticLog.Write(DiagnosticEvent.AgentFailed, kind: weather ? "weather" : "test", error: error); if (!weather) ShowText("主人，" + error.Message, false); }
+            finally { agentWeatherPending = false; if (agent?.AwaitingSpeech != true) loading.IsVisible = false; }
             return;
         }
 #endif

@@ -81,19 +81,16 @@ internal sealed class CompanionTrayIcon : IDisposable
         if (Registered && IsPresent()) return;
         var data = Data();
         Registered = Send(0, ref data);
+        if (Registered) DiagnosticLog.Write(DiagnosticEvent.TrayState, state: "ready");
         if (!Registered) Registered = Send(1, ref data);
         if (Registered) { data.Timeout = 3; Send(4, ref data); }
         if (!Registered && !failureReported)
         {
             failureReported = true;
-            Record("Windows 未接受托盘图标，将在后台重试。Win32=" + Marshal.GetLastWin32Error());
+            DiagnosticLog.Write(DiagnosticEvent.TrayState, state: "failed", error: new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()));
         }
-        else if (Registered && failureReported) { failureReported = false; Record("托盘图标已恢复。"); }
+        else if (Registered && failureReported) { failureReported = false; DiagnosticLog.Write(DiagnosticEvent.TrayState, state: "ready"); }
         retry.Interval = TimeSpan.FromSeconds(Registered ? 30 : 3);
-    }
-    static void Record(string message)
-    {
-        try { File.AppendAllText("companion-errors.log", DateTime.Now.ToString("s") + " " + message + Environment.NewLine); } catch { }
     }
     internal void ShowBalloonTip(int timeout, string title, string text, Forms.ToolTipIcon icon)
     {

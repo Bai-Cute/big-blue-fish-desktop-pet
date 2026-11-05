@@ -21,7 +21,7 @@ internal sealed partial class LinuxPetWindow
     bool DispatchAgentDaily() => false;
     void InitializeMcp() { Preferences.McpEnabled = false; Preferences.PuppetMode = false; Preferences.McpWakeEnabled = false; }
     void StopMcp() { }
-    void PublishInteraction(string kind, object detail) { }
+    void PublishInteraction(string kind, object detail) { DiagnosticLog.Write(DiagnosticEvent.Interaction, kind: kind); }
     bool TryOpenMcpInput() => false;
 #else
     static bool McpAvailable => true;
@@ -29,11 +29,27 @@ internal sealed partial class LinuxPetWindow
     AgentCoordinator? agent;
     readonly string agentPipe = ControlTools.PipeName + "." + Guid.NewGuid().ToString("N");
     bool AgentDailyActive => Preferences.AgentEnabled && Preferences.AgentDailySpeech;
+    async Task<AgentSpeechBrief> BuildAgentSpeechBrief(string kind, CancellationToken token)
+    {
+        bool publicInfo = Preferences.PublicInfo;
+        var material = await brain.AgentSpeechBrief(kind == "weather_request", publicInfo, token);
+        if (!material.ObserveScreen) return new(material.Text);
+        if (!Preferences.ForegroundEnabled) return new(material.Text + "\n本轮未启用读取前台内容，按已有情境自然关心主人。");
+        var handle = CompanionNative.ResolveForeground(CompanionNative.GetForegroundWindow(), lastForeground);
+        try
+        {
+            var image = await LinuxCapture.CaptureAsync(handle, 2560, false, token);
+            token.ThrowIfCancellationRequested();
+            return new(material.Text + "\n本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。", AgentPromptImage.FromDataUrl(image.DataUrl));
+        }
+        catch (IOException) { return new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。"); }
+    }
+
     void ConfigureAgent() { agent?.Configure(Preferences.AgentHarnessId, new(Preferences.AgentEnabled, Preferences.PuppetMode, Preferences.AgentDailySpeech)); if (!AgentDailyActive) nextWarmup = DateTime.MinValue; }
     void TickAgent(DateTime now)
     {
         agent?.Tick(new DateTimeOffset(now), !hidden && !fullscreenHidden && !dragging && !closed && phase != "Exit");
-        if (!generating) loading.IsVisible = agent?.AwaitingSpeech == true && !hidden && !fullscreenHidden;
+        if (!generating && !agentWeatherPending) loading.IsVisible = agent?.AwaitingSpeech == true && !hidden && !fullscreenHidden;
     }
     bool DispatchAgentDaily()
     {
@@ -50,12 +66,14 @@ internal sealed partial class LinuxPetWindow
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
         if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
+        agent.SpeechBrief = (kind, token) => Dispatcher.UIThread.InvokeAsync(() => BuildAgentSpeechBrief(kind, token));
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();
     }
     void StopMcp() { consentWindow?.Close(); mcpInput?.Close(); agent?.Dispose(); agent = null; mcpServer?.Dispose(); mcpServer = null; externalActions.Clear(); nextExternalText = null; }
     void PublishInteraction(string kind, object detail)
     {
+        DiagnosticLog.Write(DiagnosticEvent.Interaction, kind: kind);
         mcpServer?.Publish(kind, detail);
         if (kind == "click" && Preferences.AgentRespondToClick || kind == "drag_end" && Preferences.AgentRespondToDrag) agent?.Interaction(kind, detail);
     }

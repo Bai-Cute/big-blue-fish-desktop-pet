@@ -190,10 +190,15 @@ public sealed class ControlServer : IDisposable
                 var name = args.GetProperty("name").GetString()!;
                 if (!ControlTools.Definitions.Any(t => JsonSerializer.SerializeToElement(t).GetProperty("name").GetString() == name)) throw new ArgumentException("未知工具。");
                 var parameters = args.TryGetProperty("arguments", out var a) ? a : JsonSerializer.SerializeToElement(new { });
-                Result(id, await owner.execute(name, parameters, cancel.Token));
+                DiagnosticLog.Write(DiagnosticEvent.McpTool, kind: name, state: "start");
+                var result = await owner.execute(name, parameters, cancel.Token);
+                bool failed = result is JsonElement json ? json.TryGetProperty("isError", out var flag) && flag.ValueKind == JsonValueKind.True
+                    : result.GetType().GetProperty("isError")?.GetValue(result) is true;
+                DiagnosticLog.Write(DiagnosticEvent.McpTool, kind: name, state: failed ? "failed" : "success");
+                Result(id, result);
             }
-            catch (OperationCanceledException) { Result(id, ControlTools.Error("操作已取消。")); }
-            catch (Exception e) { Result(id, ControlTools.Error(e.Message)); }
+            catch (OperationCanceledException) { DiagnosticLog.Write(DiagnosticEvent.McpTool, state: "cancelled"); Result(id, ControlTools.Error("操作已取消。")); }
+            catch (Exception e) { DiagnosticLog.Write(DiagnosticEvent.McpTool, error: e); Result(id, ControlTools.Error(e.Message)); }
             finally { requests.TryRemove(id.ToString(), out _); }
         }
         public void Dispose()

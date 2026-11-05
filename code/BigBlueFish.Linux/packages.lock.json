@@ -189,9 +189,18 @@
         "contentHash": "11YMr7FnAbL83bQmVxlhbIKHvSLxjO81D12Ej0QMSGXMDTxNA9MTOa4MQxx43nv5el/efuPHwzyrj6a5ha2gug=="
       },
       "bigbluefish.agent": {
-        "type": "Project"
+        "type": "Project",
+        "dependencies": {
+          "BigBlueFish.Diagnostics": "[1.1.1, )"
+        }
       },
       "bigbluefish.control": {
+        "type": "Project",
+        "dependencies": {
+          "BigBlueFish.Diagnostics": "[1.1.1, )"
+        }
+      },
+      "bigbluefish.diagnostics": {
         "type": "Project"
       }
     },

@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows10.0.26100.0</TargetFramework><SupportedOSPlatformVersion>10.0.19041.0</SupportedOSPlatformVersion><UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><PlatformTarget>x64</PlatformTarget></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../BigBlueFish.Windows/BigBlueFish.Windows.csproj" /></ItemGroup>
+  <ItemGroup Condition="Exists('../../BigBlueFish.Windows/media/ffmpeg.exe')"><Content Include="../../BigBlueFish.Windows/media/ffmpeg.exe" Link="media/ffmpeg.exe" CopyToOutputDirectory="PreserveNewest" /><Content Include="../../BigBlueFish.Windows/media/FFmpeg-LICENSE.txt" Link="media/FFmpeg-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+</Project>

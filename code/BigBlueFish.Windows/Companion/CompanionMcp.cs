@@ -29,7 +29,7 @@ public partial class MainWindow
     private void InitializeMcp() { preferences.McpEnabled = false; preferences.PuppetMode = false; preferences.McpWakeEnabled = false; }
     private void StopMcp() { }
     private bool PlayQueuedMcpAction() => false;
-    private void PublishMcpInteraction(string kind, object detail) { }
+    private void PublishMcpInteraction(string kind, object detail) { DiagnosticLog.Write(DiagnosticEvent.Interaction, kind: kind); }
     private bool ConsumeMcpSpeech() => false;
     private Action? AddMcpSettings(StackPanel panel, Window owner) => null;
     private bool TryOpenMcpInput() => false;
@@ -46,6 +46,19 @@ public partial class MainWindow
     private bool PuppetActive => preferences.AgentEnabled && preferences.PuppetMode;
     private bool HasScheduledMcpSpeech => mcpNextSpeech != null;
     private bool AgentDailyActive => preferences.AgentEnabled && preferences.AgentDailySpeech;
+    private async Task<AgentSpeechBrief> BuildAgentSpeechBrief(string kind, CancellationToken token)
+    {
+        bool publicInfo = preferences.PublicInfo;
+        var material = await brain.AgentSpeechBrief(kind == "weather_request", publicInfo, token);
+        if (!material.ObserveScreen) return new(material.Text);
+        if (!preferences.ForegroundEnabled) return new(material.Text + "\n本轮未启用读取前台内容，按已有情境自然关心主人。");
+        var handle = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+        var image = await Task.Run(() => { token.ThrowIfCancellationRequested(); return CompanionScreenCapture.Capture(handle, 2560, true); }, token);
+        token.ThrowIfCancellationRequested();
+        return image == null ? new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。")
+            : new(material.Text + "\n本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。", AgentPromptImage.FromDataUrl(image.DataUrl));
+    }
+
     private void ConfigureAgent()
     {
         agent?.Configure(preferences.AgentHarnessId, new(preferences.AgentEnabled, preferences.PuppetMode, preferences.AgentDailySpeech));
@@ -77,6 +90,7 @@ public partial class MainWindow
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
         if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.InvokeAsync(() => RequestAgentLocalSpeech(token)).Task.Unwrap();
+        agent.SpeechBrief = (kind, token) => Dispatcher.InvokeAsync(() => BuildAgentSpeechBrief(kind, token)).Task.Unwrap();
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();
     }
@@ -114,6 +128,7 @@ public partial class MainWindow
     }
     private void PublishMcpInteraction(string kind, object detail)
     {
+        DiagnosticLog.Write(DiagnosticEvent.Interaction, kind: kind);
         mcpServer?.Publish(kind, detail);
         if (kind == "user_message") return; // User submission uses the bounded ACP queue and only clears accepted text.
         if (kind == "click" && preferences.AgentRespondToClick || kind == "drag_end" && preferences.AgentRespondToDrag)

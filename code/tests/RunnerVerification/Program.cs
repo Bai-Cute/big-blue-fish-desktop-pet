@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Net;
@@ -33,9 +33,18 @@ internal static class Program
 
     static async Task<int> Main(string[] args)
     {
+        if (args.Length == 2 && args[0] == "--agent-brief-export")
+        {
+            Directory.CreateDirectory(args[1]);
+            using var source = new CompanionBrain(Process.Start, TimeSpan.FromSeconds(60), newsRoll: () => 1);
+            var material = await source.AgentSpeechBrief(false, false, CancellationToken.None);
+            File.WriteAllText(Path.Combine(args[1], "normal.txt"), material.Text);
+            Console.WriteLine("Exported actual host-built Agent brief, without OCR or model inference."); return 0;
+        }
         if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2], args.Length < 4 || args[3] == "gpu");
         try
         {
+            if (args[0] == "--diagnostics") return DiagnosticVerification.Run(args[1]);
             if (args[0] == "--device-live") return await InferenceDeviceVerification.Live(args[1]);
             InferenceDeviceVerification.Rules();
             if (args[0] == "--performance-export") return PerformanceVerification.Export(args[1]);
@@ -199,6 +208,16 @@ internal static class Program
             Check(CompanionBrain.BuildMessages(CompanionBrain.Persona, request, new CompanionWindowImage("data:image/jpeg;base64,AA==", 1, 1))[1].content is object[] { Length: 2 },
                 "vision content keeps image and screen text in the user role");
             Check(CompanionBrain.Persona.Contains("当前活动") && CompanionBrain.Persona.Contains("桌面、新标签页、主页"), "Persona matches current content and entry-screen behavior");
+            using (var briefBrain = new CompanionBrain(Process.Start, TimeSpan.FromSeconds(60), newsRoll: () => 1))
+            {
+                var briefs = new HashSet<string>();
+                for (int i = 0; i < 60; i++) briefs.Add((await briefBrain.AgentSpeechBrief(false, false, CancellationToken.None)).Text);
+                var brief = briefs.First();
+                Check(brief.Contains(CompanionBrain.FixedSpeechInstructions(CompanionBrain.Persona))
+                    && brief.Contains("屏幕资料结束") && !brief.Contains(CompanionDialogue.OcrObserverGuidance), "Agent brief carries the local fixed persona and screen material");
+                Check(briefs.Count >= 2 && briefs.All(b => b.Contains("这一回可以")), "Agent brief rolls the same random reaction hint per event");
+                Check((await briefBrain.AgentSpeechBrief(true, false, CancellationToken.None)).Text.Contains(CompanionBrain.WeatherPersona), "Agent weather brief uses the weather persona");
+            }
             Console.WriteLine($"RESULT {checks} runner/prompt checks passed ({CompanionBrain.InputMode}); child responses are fault fixtures, not real model evaluation");
             return 0;
         }

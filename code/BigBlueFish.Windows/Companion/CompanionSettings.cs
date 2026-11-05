@@ -41,12 +41,14 @@ public partial class MainWindow
         w.Resources.MergedDictionaries.Add(new ResourceDictionary
         { Source = new Uri("/BigBlueFish;component/Companion/CompanionSettingsStyles.xaml", UriKind.Relative) });
         companionSettings = w;
+        DiagnosticLog.Write(DiagnosticEvent.SettingsOpened);
         BuildCompanionSettingsContent(w);
         w.Closed += (_, _) =>
         {
             disposeCompanionSettingsContent?.Invoke();
             disposeCompanionSettingsContent = refreshCompanionSettings = null;
             companionSettings = null;
+            DiagnosticLog.Write(DiagnosticEvent.SettingsClosed);
             SaveCompanion();
         };
         ActivateCompanionSettings(w);
@@ -70,9 +72,9 @@ public partial class MainWindow
 #endif
         sidebar.Children.Add(new TextBlock { Text = version + " · 陪伴设置", Foreground = Brushes.SlateGray, Margin = new Thickness(5, 0, 0, 28) });
 #if COMPANION_SAFE
-        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电" };
+        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电", "日志控制台" };
 #else
-        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电", "连接 Agent" };
+        var titles = new[] { "陪伴与外观", "说话与天气", "模型与供电", "连接 Agent", "日志控制台" };
 #endif
         var pages = new StackPanel[titles.Length];
         var views = new ScrollViewer[titles.Length];
@@ -151,7 +153,11 @@ public partial class MainWindow
         Toggle("启动时检查更新", preferences.CheckUpdatesOnStartup, v => preferences.CheckUpdatesOnStartup = v);
         p = pages[1];
         Toggle("自动获取天气和科技新闻", preferences.PublicInfo, v => preferences.PublicInfo = v);
-        Toggle("感知当前应用（仅在本机处理）", preferences.ForegroundEnabled, v => preferences.ForegroundEnabled = v);
+        Toggle("感知当前应用", preferences.ForegroundEnabled, v => preferences.ForegroundEnabled = v);
+#if !COMPANION_SAFE
+        p.Children.Add(new TextBlock { Text = "本地吐字在本机读取屏幕；由 Agent 编写日常关心时，会向它提供前台截图。", FontSize = 11,
+            Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 4) });
+#endif
         AddCompanionRegionSelectors(p);
         p = pages[0];
         var label = new TextBlock
@@ -333,9 +339,10 @@ public partial class MainWindow
             w.Close();
             base.Close();
         });
-        Action? disposeMcpSettings = pages.Length > 3 ? AddMcpSettings(pages[3], w) : null;
+        Action? disposeMcpSettings = titles.Contains("连接 Agent") ? AddMcpSettings(pages[3], w) : null;
+        Action disposeLog = BuildLogConsole(pages[^1], w, () => views[^1].Visibility == Visibility.Visible);
         foreach (var panel in pages) Card(panel);
-        disposeCompanionSettingsContent = () => { timer.Stop(); disposeMcpSettings?.Invoke(); };
+        disposeCompanionSettingsContent = () => { timer.Stop(); disposeMcpSettings?.Invoke(); disposeLog(); };
         refreshCompanionSettings = () => BuildCompanionSettingsContent(w, selectedPage, views.Select(v => v.VerticalOffset).ToArray());
         if (scrollOffsets != null) w.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, (Action)(() =>
         {
