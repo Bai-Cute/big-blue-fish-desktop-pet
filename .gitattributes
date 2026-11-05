@@ -10,3 +10,4 @@
 *.dll binary
 *.zip binary
 *.sh text eol=lf
+.githooks/* text eol=lf
