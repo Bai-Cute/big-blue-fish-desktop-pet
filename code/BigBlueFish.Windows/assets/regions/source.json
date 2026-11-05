@@ -8,5 +8,9 @@
     "level3.csv": "dd5a1594565b65fa3fea5ce4b9935e0b28908226949ae44f07ebfd533428e8ff",
     "geo.csv": "ac2641b1cb137d099779f49b21b965919591af9d82a29a911f6270530fef8ed7"
   },
-  "coordinateNote": "District centers; mainland GCJ-02 approximately converted to WGS84. Not a street-level forecast."
+  "coordinateNote": "District centers; mainland GCJ-02 approximately converted to WGS84. Not a street-level forecast.",
+  "taiwanCoordinates": {
+    "note": "台湾省 cities and districts use their city/county seat point from GeoNames cities15000 (CC BY 4.0); Pingtung uses a fixed city centre.",
+    "cities15000Sha256": "d5279a10a5c02beab103602f8900babadb2fbfea8b9e4c905c5573b3b291732b"
+  }
 }

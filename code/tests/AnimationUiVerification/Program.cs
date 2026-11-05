@@ -299,6 +299,9 @@ internal static class Program
             countyBox.SelectedValue="US-06037";Pump(100);
             Check(Property<string>(prefs,"WeatherRegionCode")=="US-06037","US county selection saved");
             Render((Visual)settings.Content,"settings-weather-us.png",(int)settings.ActualWidth,(int)settings.ActualHeight);
+            country.SelectedItem=CompanionRegions.Countries.Single(c=>c.Code=="JP");Pump(100);
+            stateBox.SelectedValue="JP.40";Pump(100);countyBox.SelectedValue="JP-1850147";Pump(100);
+            Check(Property<string>(prefs,"WeatherRegionCode")=="JP-1850147"&&!districtBox.IsVisible,"world city selection saved");
             country.SelectedItem=CompanionRegions.China;Pump(100);
             Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&districtBox.IsVisible,"switching back to China restores default district");
             navigation[0].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(50);

@@ -1,0 +1,14 @@
+{
+  "geonames": "https://download.geonames.org/export/dump/ (cities15000, admin1CodesASCII, countryInfo)",
+  "geonamesLicense": "CC BY 4.0, GeoNames (https://www.geonames.org/)",
+  "countryNames": "Unicode CLDR 47.0.0 zh territories (Unicode License v3)",
+  "countries": 238,
+  "rows": 31098,
+  "inputSha256": {
+    "cities15000.txt": "d5279a10a5c02beab103602f8900babadb2fbfea8b9e4c905c5573b3b291732b",
+    "admin1CodesASCII.txt": "2e4867f5397acb056ea26377601b57af37cb4c81399770225018e9e439e91ad3",
+    "countryInfo.txt": "79f8f59ea01cbb40438bf1856dd6c2ff201f03f8fc72d0530b2646aaf603ef04",
+    "territories.json": "539c540399611f96c574ee3f19c9d6abec7b8ff71c6cb651e4e1c1cd3ed3bed8"
+  },
+  "coordinateNote": "City points from GeoNames (WGS84), cities with population over 15000 plus capitals. Not a street-level forecast."
+}
