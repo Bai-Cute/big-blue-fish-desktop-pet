@@ -60,6 +60,9 @@ public partial class MainWindow
         var puppet = new CheckBox { Content = ControlTools.BehaviorControlLabel, IsChecked = preferences.PuppetMode, Margin = new(0, 10, 0, 5) };
         extra.Children.Add(puppet); extra.Children.Add(ModernUI.Text(ControlTools.BehaviorControlDescription));
         var wake = ModernUI.Text(""); extra.Children.Add(wake);
+        var chatLogAll = new CheckBox { Content = "聊天记录显示鱼鱼说过的所有话", IsChecked = preferences.ChatLogShowAll, Margin = new(0, 10, 0, 5) };
+        extra.Children.Add(chatLogAll); extra.Children.Add(ModernUI.Text("在输入框上向上滚动可查看聊天记录。默认只显示主人说的话，以及它前后鱼鱼的那一句。"));
+        chatLogAll.Click += (_, _) => { preferences.ChatLogShowAll = chatLogAll.IsChecked == true; SaveCompanion(); };
         extra.Children.Add(ModernUI.Button("编辑人设", () => EditAgentPersona(owner)));
         var details = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray };
         extra.Children.Add(new Expander { Header = "连接详情", Content = details, Margin = new(0, 10, 0, 8) });

@@ -154,6 +154,7 @@ public partial class MainWindow
         bubbleIsModelReply = false;
         bubbleUntil = DateTime.MaxValue;
         speech.Show(text, true);
+        chatLog.Add(false, text);
     }
     private bool ConsumeMcpSpeech()
     {
@@ -319,7 +320,11 @@ public partial class MainWindow
         var editor = new Grid(); editor.Children.Add(text); editor.Children.Add(placeholder);
         var status = new TextBlock { Text = "Ctrl+Enter 发送", Foreground = Brushes.SlateGray, FontSize = 11,
             VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 8, 0) };
-        var content = new StackPanel(); content.Children.Add(editor);
+        // Scrolling up over the input box reveals the chat log above it; scrolling down past its end hides it again.
+        var history = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 13, Foreground = blue, Margin = new Thickness(2, 0, 6, 0) };
+        var historyView = new ScrollViewer { Content = history, Height = 220, Margin = new Thickness(0, 0, 0, 8),
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Visibility = Visibility.Collapsed };
+        var content = new StackPanel(); content.Children.Add(historyView); content.Children.Add(editor);
         var frame = new Border { Background = new SolidColorBrush(Color.FromRgb(255, 251, 244)), BorderBrush = blue,
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14), Padding = new Thickness(12), Child = content };
         var window = new Window { Title = "蓝色大肥鱼 · 输入", Width = 354, Height = 120, WindowStyle = WindowStyle.None,
@@ -340,6 +345,7 @@ public partial class MainWindow
             if (!McpInputAvailable || string.IsNullOrWhiteSpace(text.Text)) return;
             if (agent?.Connected != true || !agent.SendUser(text.Text)) { status.Text = agent?.Detail ?? "Agent 尚未连接"; return; }
             PublishMcpInteraction("user_message", new { text = text.Text });
+            chatLog.Add(true, text.Text);
             text.Clear(); status.Text = "已发送给 Agent"; text.Focus();
         }
         var send = ModernUI.Button("发送", Send, true); send.MinWidth = 58; send.MinHeight = 0; send.Margin = new Thickness(0); send.Padding = new Thickness(12, 5, 12, 5); send.FontSize = 12;
@@ -368,6 +374,31 @@ public partial class MainWindow
                 if (!window.IsVisible) window.Show();
             } finally { positioning = false; }
         }
+        (int, bool)? historyShown = null;
+        void FillHistory()
+        {
+            if (historyShown == (chatLog.Version, preferences.ChatLogShowAll)) return;
+            historyShown = (chatLog.Version, preferences.ChatLogShowAll);
+            history.Inlines.Clear();
+            foreach (var (user, line) in chatLog.Lines(preferences.ChatLogShowAll))
+            {
+                if (history.Inlines.Count > 0) { history.Inlines.Add(new System.Windows.Documents.LineBreak()); history.Inlines.Add(new System.Windows.Documents.LineBreak()); }
+                history.Inlines.Add(new System.Windows.Documents.Run(user ? "主人：" : "鱼鱼：") { FontWeight = FontWeights.SemiBold });
+                history.Inlines.Add(new System.Windows.Documents.Run(line) { Foreground = user ? Brushes.SlateGray : blue });
+            }
+            if (history.Inlines.Count == 0) history.Inlines.Add(new System.Windows.Documents.Run("还没有聊天记录") { Foreground = Brushes.Gray });
+            historyView.ScrollToEnd();
+        }
+        void ShowHistory(bool show)
+        {
+            if ((historyView.Visibility == Visibility.Visible) == show) return;
+            historyView.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            window.Height += (show ? 1 : -1) * (historyView.Height + historyView.Margin.Bottom);
+            if (show) { historyShown = null; FillHistory(); }
+            Follow();
+        }
+        window.PreviewMouseWheel += (_, e) => { if (e.Delta > 0 && historyView.Visibility != Visibility.Visible) { e.Handled = true; ShowHistory(true); } };
+        historyView.PreviewMouseWheel += (_, e) => { if (e.Delta < 0 && historyView.VerticalOffset >= historyView.ScrollableHeight) { e.Handled = true; ShowHistory(false); } };
         EventHandler moved = (_, _) => Follow();
         SizeChangedEventHandler resized = (_, _) => Follow();
         DependencyPropertyChangedEventHandler visibility = (_, _) => Follow();
@@ -377,6 +408,7 @@ public partial class MainWindow
         clock.Tick += (_, _) => {
             if (!preferences.McpEnabled || !preferences.McpChatEnabled) { window.Close(); return; }
             Follow();
+            if (historyView.Visibility == Visibility.Visible) FillHistory();
             send.IsEnabled = agent?.Connected == true && !string.IsNullOrWhiteSpace(text.Text);
             if (agent?.Connected != true) status.Text = agent?.Status ?? "Agent 尚未连接";
             else if (status.Text != "已发送给 Agent") status.Text = agent.Busy ? "Agent 正在处理…" : "Ctrl+Enter 发送";
