@@ -556,29 +556,15 @@ internal sealed class CompanionBrain : IDisposable
 
     // Same persona, random tone and material rolls as Generate, for an Agent that writes the line itself.
     private static string AgentBrief(string persona, string request = "") => "【鱼鱼说话要求】\n" + persona + "\n【说话要求结束】" + (request.Length > 0 ? "\n" + request : "");
-    internal async Task<string> AgentSpeechBrief(bool weather, bool usePublic, bool useForeground, IntPtr foregroundHandle, CancellationToken token)
+    internal async Task<string> AgentSpeechBrief(bool weather, bool usePublic, bool useForeground, CancellationToken token)
     {
         if (weather) return AgentBrief(WeatherPersona); // weather data already travels in the event payload
         var news = usePublic && CompanionNews.ShouldSelect(newsRoll()) ? await NewsItem(token) : null;
         if (news != null) { lastNewsTitle = news.Title; return AgentBrief(NewsPersona, NewsRequest(news.Context)); }
-        string context = $"现在是{DateTime.Now:yyyy年M月d日 HH:mm}。";
-        bool ocrRead = false;
-        if (useForeground)
-        {
-#if COMPANION_OCR
-            try
-            {
-                var handle = foregroundHandle == IntPtr.Zero ? CompanionNative.GetForegroundWindow() : foregroundHandle;
-                context += "\n" + (await CompanionOcr.ReadAsync(handle, token)).Context; ocrRead = true;
-            }
-            catch (Exception e) when (e is not OperationCanceledException) { context += "用户正在使用电脑。"; }
-#else
-            context += CompanionNative.ForegroundContext(foregroundHandle);
-#endif
-        }
-        else context += "用户正在使用电脑。";
+        // The Agent reads the screen from a real screenshot; OCR only exists for the local model's speed.
+        string context = $"现在是{DateTime.Now:yyyy年M月d日 HH:mm}。" + (useForeground ? "屏幕资料请调用 capture_foreground 获取前台截图。" : "用户正在使用电脑。");
         if (usePublic && Random.Shared.NextDouble() < .15) context += "\n" + WeatherContext();
-        return AgentBrief(FixedSpeechInstructions(ocrRead ? OcrPersona : Persona) + CompanionDialogue.ReactionHint(), SpeechRequest(context));
+        return AgentBrief(FixedSpeechInstructions(Persona) + CompanionDialogue.ReactionHint(), SpeechRequest(context));
     }
 
     internal async Task<string> Generate(bool usePublic, bool useForeground, IntPtr foregroundHandle = default, Action<string>? onPartial = null)
