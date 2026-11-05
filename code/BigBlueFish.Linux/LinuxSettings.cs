@@ -106,18 +106,26 @@ internal sealed partial class LinuxPetWindow
             body.Children.Add(Paragraph(Puppet ? "日常关心的触发时机已交给 Agent，此时说话间隔不可调节。关闭接管触发后恢复使用此设置。" : AgentDailyActive ? "鱼鱼按此间隔触发日常关心，由 Agent 编写吐字。" : "鱼鱼按此间隔触发日常关心，由本地模型编写吐字。"));
             body.Children.Add(new TextBlock { Text = "天气地区", Margin = new Thickness(0,12,0,4) });
             var regions = new StackPanel { Spacing = 8 }; body.Children.Add(regions);
-            ComboBox province = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch }, city = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch }, district = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch };
-            regions.Children.Add(province); regions.Children.Add(city); regions.Children.Add(district);
-            var selected = CompanionRegions.District(Preferences.WeatherRegionCode); var provinces = CompanionRegions.All.Where(r => r.Level == 0).ToArray();
-            CompanionRegion[] cities = [], districts = []; bool changing = true;
-            void PopulateCity(CompanionRegion choice, string? keep = null) { cities = CompanionRegions.Children(choice.Code); city.ItemsSource = cities.Select(r => r.Name).ToArray(); city.SelectedIndex = Math.Max(0, Array.FindIndex(cities,r => r.Code == keep)); }
-            void PopulateDistrict(CompanionRegion choice, string? keep = null) { districts = CompanionRegions.Children(choice.Code); district.ItemsSource = districts.Select(r => r.Name).ToArray(); district.SelectedIndex = Math.Max(0, Array.FindIndex(districts,r => r.Code == keep)); }
-            province.ItemsSource = provinces.Select(r => r.Name).ToArray(); province.SelectedIndex = Array.FindIndex(provinces,r => r.Code == CompanionRegions.Parent(CompanionRegions.Parent(selected)).Code);
-            PopulateCity(provinces[province.SelectedIndex], CompanionRegions.Parent(selected).Code); PopulateDistrict(cities[city.SelectedIndex], selected.Code); changing = false;
-            void RegionChanged() { if (district.SelectedIndex >= 0 && district.SelectedIndex < districts.Length) { Preferences.WeatherRegionCode = districts[district.SelectedIndex].Code; ApplySettings(); } }
-            province.SelectionChanged += (_,_) => { if(changing || province.SelectedIndex < 0) return; changing = true; PopulateCity(provinces[province.SelectedIndex]); PopulateDistrict(cities[city.SelectedIndex]); changing = false; RegionChanged(); };
-            city.SelectionChanged += (_,_) => { if(changing || city.SelectedIndex < 0) return; changing = true; PopulateDistrict(cities[city.SelectedIndex]); changing = false; RegionChanged(); };
-            district.SelectionChanged += (_,_) => { if(!changing) RegionChanged(); };
+            var country = new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = CompanionRegions.Countries.Select(c => c.Name).ToArray() };
+            regions.Children.Add(country);
+            var levels = Enumerable.Range(0, 3).Select(_ => new ComboBox { HorizontalAlignment = HorizontalAlignment.Stretch }).ToArray();
+            foreach (var level in levels) regions.Children.Add(level);
+            var options = new CompanionRegion[levels.Length][];
+            var selected = CompanionRegions.District(Preferences.WeatherRegionCode); var current = CompanionRegions.Country(selected); bool changing = true;
+            void Fill(int from, string parentCode, CompanionRegion[] keep) {
+                for (int i = from; i < levels.Length; i++) {
+                    levels[i].IsVisible = i <= current.LeafLevel;
+                    options[i] = i <= current.LeafLevel ? CompanionRegions.Children(parentCode) : [];
+                    levels[i].ItemsSource = options[i].Select(r => r.Name).ToArray();
+                    levels[i].SelectedIndex = options[i].Length == 0 ? -1 : Math.Max(0, Array.FindIndex(options[i], r => i < keep.Length && r.Code == keep[i].Code));
+                    if (levels[i].SelectedIndex >= 0) parentCode = options[i][levels[i].SelectedIndex].Code;
+                }
+            }
+            country.SelectedIndex = Array.IndexOf(CompanionRegions.Countries, current); Fill(0, current.Root, CompanionRegions.Chain(selected)); changing = false;
+            void RegionChanged() { var leaf = levels[current.LeafLevel]; if (leaf.SelectedIndex >= 0 && leaf.SelectedIndex < options[current.LeafLevel].Length) { Preferences.WeatherRegionCode = options[current.LeafLevel][leaf.SelectedIndex].Code; ApplySettings(); } }
+            country.SelectionChanged += (_,_) => { if (changing || country.SelectedIndex < 0 || CompanionRegions.Countries[country.SelectedIndex] == current) return; changing = true; current = CompanionRegions.Countries[country.SelectedIndex]; Fill(0, current.Root, current == CompanionRegions.China ? CompanionRegions.Chain(CompanionRegions.District(CompanionRegions.DefaultCode)) : []); changing = false; RegionChanged(); };
+            for (int level = 0; level < levels.Length; level++) { var at = level; levels[at].SelectionChanged += (_,_) => { if (changing || levels[at].SelectedIndex < 0) return; changing = true; if (at < current.LeafLevel) Fill(at + 1, options[at][levels[at].SelectedIndex].Code, []); changing = false; RegionChanged(); }; }
+            body.Children.Add(Paragraph("天气来自 Open-Meteo（Weather data by Open-Meteo.com）；美国地点使用华氏度和英里/小时。海外城市数据来自 GeoNames（CC BY 4.0）。"));
         }
         void Animation() {
             Title("动作与作息"); Slider("动作触发间隔（秒）", Preferences.AnimationIntervalSeconds, 30, 300, value => { Preferences.AnimationIntervalSeconds = (int)value; nextEvent = DateTime.UtcNow.AddSeconds(value); });

@@ -143,61 +143,91 @@ public partial class MainWindow
     {
         panel.Children.Add(new TextBlock { Text = "天气地点", Margin = new Thickness(0, 10, 0, 4) });
         var grid = new Grid();
-        for (int i = 0; i < 3; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
-        ComboBox Selector(string name, string caption, int column)
+        for (int i = 0; i < 4; i++) grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(i == 0 ? 0.7 : 1, GridUnitType.Star) });
+        (ComboBox Combo, TextBlock Caption, StackPanel Column) Selector(string name, string caption, int column)
         {
             var columnPanel = new StackPanel { Margin = new Thickness(column == 0 ? 0 : 6, 0, 0, 0) };
-            columnPanel.Children.Add(new TextBlock { Text = caption, FontSize = 12, Margin = new Thickness(0, 0, 0, 4) });
+            var label = new TextBlock { Text = caption, FontSize = 12, Margin = new Thickness(0, 0, 0, 4) };
+            columnPanel.Children.Add(label);
             var combo = new ComboBox { Name = name, DisplayMemberPath = "Name", SelectedValuePath = "Code", MinHeight = 30 };
             System.Windows.Automation.AutomationProperties.SetName(combo, caption);
             columnPanel.Children.Add(combo);
             Grid.SetColumn(columnPanel, column);
             grid.Children.Add(columnPanel);
-            return combo;
+            return (combo, label, columnPanel);
         }
-        var province = Selector("WeatherProvince", "省 / 自治区 / 直辖市", 0);
-        var city = Selector("WeatherCity", "市 / 州", 1);
-        var district = Selector("WeatherDistrict", "县 / 区", 2);
-        var selected = CompanionRegions.District(preferences.WeatherRegionCode);
-        var selectedCity = CompanionRegions.Parent(selected);
-        province.ItemsSource = CompanionRegions.Children("0");
-        province.SelectedValue = selectedCity.ParentCode;
-        city.ItemsSource = CompanionRegions.Children(selectedCity.ParentCode);
-        city.SelectedValue = selectedCity.Code;
-        district.ItemsSource = CompanionRegions.Children(selectedCity.Code);
-        district.SelectedValue = selected.Code;
+        var country = Selector("WeatherCountry", "国家", 0).Combo;
+        var levels = new[]
+        {
+            Selector("WeatherProvince", "省 / 自治区 / 直辖市", 1),
+            Selector("WeatherCity", "市 / 州", 2),
+            Selector("WeatherDistrict", "县 / 区", 3),
+        };
         bool changing = false;
+        CompanionCountry current = CompanionRegions.China;
+        void Configure(CompanionCountry target)
+        {
+            current = target;
+            for (int i = 0; i < levels.Length; i++)
+            {
+                var visible = i <= target.LeafLevel;
+                levels[i].Column.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+                levels[i].Caption.Text = visible ? target.Captions[i] : "";
+                System.Windows.Automation.AutomationProperties.SetName(levels[i].Combo, levels[i].Caption.Text);
+            }
+            // The leaf column absorbs the space of hidden levels.
+            for (int i = 1; i < 4; i++) grid.ColumnDefinitions[i].Width = new GridLength(i - 1 <= target.LeafLevel ? 1 : 0, GridUnitType.Star);
+        }
+        // Fill level `from` and below; keep the matching chain entry when present, else the first item.
+        void Fill(int from, string parentCode, CompanionRegion[] keep)
+        {
+            for (int i = from; i <= current.LeafLevel; i++)
+            {
+                var items = CompanionRegions.Children(parentCode);
+                levels[i].Combo.ItemsSource = items;
+                var index = Array.FindIndex(items, x => i < keep.Length && x.Code == keep[i].Code);
+                levels[i].Combo.SelectedIndex = items.Length == 0 ? -1 : Math.Max(0, index);
+                if (levels[i].Combo.SelectedItem is not CompanionRegion chosen) break;
+                parentCode = chosen.Code;
+            }
+            for (int i = current.LeafLevel + 1; i < levels.Length; i++) levels[i].Combo.ItemsSource = Array.Empty<CompanionRegion>();
+        }
         void SaveRegion()
         {
-            if (district.SelectedItem is not CompanionRegion region) return;
+            if (levels[current.LeafLevel].Combo.SelectedItem is not CompanionRegion region) return;
             if (preferences.WeatherRegionCode != region.Code) InvalidateSpeechRequests();
             preferences.WeatherRegionCode = region.Code;
             brain.WeatherRegionCode = region.Code;
             SaveCompanion();
         }
-        province.SelectionChanged += (_, _) =>
+        var selected = CompanionRegions.District(preferences.WeatherRegionCode);
+        country.ItemsSource = CompanionRegions.Countries;
+        country.SelectedItem = CompanionRegions.Country(selected);
+        Configure(CompanionRegions.Country(selected));
+        Fill(0, current.Root, CompanionRegions.Chain(selected));
+        country.SelectionChanged += (_, _) =>
         {
-            if (changing || province.SelectedItem is not CompanionRegion region) return;
+            if (changing || country.SelectedItem is not CompanionCountry target || target == current) return;
             changing = true;
-            city.ItemsSource = CompanionRegions.Children(region.Code);
-            city.SelectedIndex = 0;
-            district.ItemsSource = city.SelectedItem is CompanionRegion c ? CompanionRegions.Children(c.Code) : Array.Empty<CompanionRegion>();
-            district.SelectedIndex = 0;
+            Configure(target);
+            Fill(0, target.Root, target == CompanionRegions.China ? CompanionRegions.Chain(CompanionRegions.District(CompanionRegions.DefaultCode)) : []);
             changing = false;
             SaveRegion();
         };
-        city.SelectionChanged += (_, _) =>
+        for (int level = 0; level < levels.Length; level++)
         {
-            if (changing || city.SelectedItem is not CompanionRegion region) return;
-            changing = true;
-            district.ItemsSource = CompanionRegions.Children(region.Code);
-            district.SelectedIndex = 0;
-            changing = false;
-            SaveRegion();
-        };
-        district.SelectionChanged += (_, _) => { if (!changing) SaveRegion(); };
+            var at = level;
+            levels[at].Combo.SelectionChanged += (_, _) =>
+            {
+                if (changing || levels[at].Combo.SelectedItem is not CompanionRegion region) return;
+                changing = true;
+                if (at < current.LeafLevel) Fill(at + 1, region.Code, []);
+                changing = false;
+                SaveRegion();
+            };
+        }
         panel.Children.Add(grid);
-        panel.Children.Add(new TextBlock { Text = "天气来自 Open-Meteo，按所选区县中心附近估算。", FontSize = 11,
+        panel.Children.Add(new TextBlock { Text = "天气来自 Open-Meteo（Weather data by Open-Meteo.com），按所选地点中心附近估算；美国地点使用华氏度和英里/小时。海外城市数据来自 GeoNames（CC BY 4.0）。", FontSize = 11,
             Foreground = System.Windows.Media.Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 4) });
     }
 }
