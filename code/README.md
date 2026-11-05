@@ -38,7 +38,7 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 | `BigBlueFish.Windows/Companion/CompanionWindow.cs` | 生命周期、拖动、动画、设置和电源事件 |
 | `BigBlueFish.Windows/Companion/CompanionMenus.cs` | 右键菜单、国家与地点选择和手动天气播报 |
 | `BigBlueFish.Windows/Companion/CompanionPreferences.cs` | 设置默认值、校验和原子保存 |
-| `BigBlueFish.Windows/Companion/CompanionRegions.cs` | 中国省市区、美国州县层级与定位 |
+| `BigBlueFish.Windows/Companion/CompanionRegions.cs` | 中国省市区、美国州县、其他国家一级行政区与城市层级与定位 |
 | `BigBlueFish.Windows/Companion/CompanionWeather.cs` | 天气请求、天气代码中文映射和按地点缓存 |
 | `BigBlueFish.Windows/Companion/CompanionBrain.cs` | 模型启动、推理、电池策略和提示词 |
 | `BigBlueFish.Windows/Companion/CompanionSpeech.cs` | 所有模型回复的逐字显示、Unicode 字符边界、替换和取消 |
@@ -51,7 +51,7 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 | `tests/InstallerVerification/` | 下载故障、模型安装交互、更新事务和完整安装卸载验证 |
 | `tests/RunnerVerification/` | 当前提示词、真实子进程故障恢复及本地模型验证 |
 
-地区数据由 MIT 许可的 [AreaCity](https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov) `2025.251231.260403` 版本生成，包含 34 个省级项、392 个市级项、3209 个县区级项。上游部分台湾地区没有坐标；保留选择，查询时明确提示。
+地区数据由 MIT 许可的 [AreaCity](https://github.com/xiangyuecn/AreaCity-JsSpider-StatsGov) `2025.251231.260403` 版本生成，包含 34 个省级项、392 个市级项、3209 个县区级项。上游台湾地区没有坐标，已按市、县治所补齐。
 
 更新时下载对应的 `ok_data_level3.csv`、`ok_geo.csv`，运行：
 
@@ -59,10 +59,22 @@ OCR 版生成目录为 `BigBlueFish.Windows/bin/x64/Release/net10.0-windows10.0.
 python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 ```
 
+上游没有台湾省的坐标。导入后再运行下面的命令，用 GeoNames `cities15000.txt` 中各市、县治所的坐标补齐（地名和代码不变，天气按市县中心估算）：
+
+```powershell
+python ./tools/fill-taiwan-coordinates.py "cities15000.txt"
+```
+
 美国地区数据来自美国人口普查局 2026 年 Gazetteer 县级文件（公有领域），共 52 个州级项（50 州、哥伦比亚特区、波多黎各）和 3222 个县级项，代码为 `US-` 加 FIPS。下载 `2026_Gaz_counties_national.zip` 并解压后运行：
 
 ```powershell
 python ./tools/import-us-regions.py "2026_Gaz_counties_national.txt"
+```
+
+其他国家的数据来自 GeoNames（CC BY 4.0）的 `cities15000.txt`、`admin1CodesASCII.txt`、`countryInfo.txt`，中文国名来自 CLDR 47 的 `zh/territories.json`。四个文件放在同一目录后运行（中国、美国及台湾、香港、澳门、波多黎各已由上面两份数据覆盖，会被跳过）：
+
+```powershell
+python ./tools/import-world-regions.py "<目录>"
 ```
 
 脚本只保留区划和中心点；大陆中心点由 GCJ-02 近似转换为 WGS84。更换版本时同步更新脚本中的版本、提交和许可信息。

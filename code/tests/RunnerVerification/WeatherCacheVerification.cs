@@ -97,7 +97,7 @@ internal static class WeatherCacheVerification
         now = now.AddDays(-1);
         Check(corrupt.CachedContext("350622") == "", "clock rollback rejects future-dated cache");
         var la = CompanionRegions.District("US-06037");
-        Check(la.Code == "US-06037" && CompanionRegions.FullName(la) == "美国 · 加利福尼亚州 CA · Los Angeles County", "US county is a valid weather leaf");
+        Check(la.Code == "US-06037" && CompanionRegions.FullName(la) == "美国 United States · 加利福尼亚州 CA · Los Angeles County", "US county is a valid weather leaf");
         Check(CompanionRegions.District("US-06").Code == CompanionRegions.DefaultCode && CompanionRegions.District("340100").Code == CompanionRegions.DefaultCode, "state and city codes fall back to default");
         Check(CompanionRegions.Children("0").All(r => !CompanionRegions.IsUs(r)) && CompanionRegions.Children("US").Length == 52, "China provinces and 52 US states stay separate");
         Check(CompanionRegions.Children("US").All(s => CompanionRegions.Children(s.Code).Length > 0 && CompanionRegions.Children(s.Code).All(c => c.Latitude != null)), "every US state has located counties");
@@ -106,6 +106,21 @@ internal static class WeatherCacheVerification
         var us = corrupt.CachedContext("US-06037");
         Check(feed.LastUrl.Contains("temperature_unit=fahrenheit") && feed.LastUrl.Contains("wind_speed_unit=mph") && feed.LastUrl.Contains("timezone=auto"), "US request asks for imperial units and local time zone");
         Check(us.Contains("21℉") && us.Contains("英里/小时") && us.Contains("当地时间") && us.Contains("Los Angeles County"), "US weather context uses Fahrenheit, mph and local time");
+        var countries = CompanionRegions.Countries;
+        Check(countries[0] == CompanionRegions.China && countries.Length == 240 && countries.Contains(CompanionRegions.UnitedStates)
+            && countries.Skip(1).All(c => c.Code is not ("TW" or "HK" or "MO" or "PR")), "China first, then 239 other countries without duplicating China or US data");
+        Check(new[] { "71", "81", "82" }.All(code => CompanionRegions.Children("0").Any(r => r.Code == code))
+            && CompanionRegions.All.All(r => r.Code[..2] is not ("TW" or "HK" or "MO")), "Taiwan, Hong Kong and Macau are provinces of China only");
+        await corrupt.RefreshIfDue("710101");
+        Check(CompanionRegions.All.Where(r => r.Code.StartsWith("71")).All(r => r.Latitude != null) && corrupt.CachedContext("710101").Contains("台湾省")
+            && corrupt.CachedContext("710101").Contains("北京时间"), "Taiwan districts have coordinates and get China-style weather");
+        var tokyo = CompanionRegions.District("JP-1850147");
+        Check(tokyo.Code == "JP-1850147" && CompanionRegions.FullName(tokyo).StartsWith("日本 Japan · ") && CompanionRegions.District("JP.40").Code == CompanionRegions.DefaultCode, "world city is a valid leaf and divisions fall back");
+        Check(countries.Where(c => c != CompanionRegions.China && c != CompanionRegions.UnitedStates).All(c => CompanionRegions.Children(c.Root).Length > 0
+            && CompanionRegions.Children(c.Root).All(d => CompanionRegions.Children(d.Code).All(x => x.Latitude != null))), "every world country has located cities");
+        await corrupt.RefreshIfDue("JP-1850147");
+        var world = corrupt.CachedContext("JP-1850147");
+        Check(feed.LastUrl.Contains("timezone=auto") && !feed.LastUrl.Contains("fahrenheit") && world.Contains("21℃") && world.Contains("当地时间") && world.Contains("公里/小时"), "world weather uses Celsius, km/h and local time");
         await corrupt.RefreshIfDue("350623");
         Check(corrupt.CachedContext("350623").Contains("℃") && feed.LastUrl.Contains("Asia%2FShanghai"), "China weather keeps Celsius and Beijing time");
         if (live)
@@ -122,6 +137,9 @@ internal static class WeatherCacheVerification
             var actualUs = await actual.Context("US-36061", default);
             Check(actualUs.Contains("℉") && actualUs.Contains("New York County"), "live Open-Meteo US fetch is parsed");
             Console.WriteLine("LIVE " + actualUs);
+            var actualLondon = await actual.Context("GB-2643743", default);
+            Check(actualLondon.Contains("℃") && actualLondon.Contains("London"), "live Open-Meteo world fetch is parsed");
+            Console.WriteLine("LIVE " + actualLondon);
         }
         Console.WriteLine($"RESULT {checks} weather cache checks passed ({CompanionBrain.InputMode})");
         return 0;

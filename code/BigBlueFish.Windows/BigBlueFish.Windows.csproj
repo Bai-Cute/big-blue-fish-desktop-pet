@@ -34,6 +34,8 @@
     <Content Include="media/FFmpeg-LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <EmbeddedResource Include="assets/regions/china-regions.json" />
     <EmbeddedResource Include="assets/regions/us-regions.json" />
+    <EmbeddedResource Include="assets/regions/world-regions.json" />
+    <EmbeddedResource Include="assets/regions/world-countries.json" />
   </ItemGroup>
   <Target Name="EnsureAnimationDecoder" BeforeTargets="PrepareForBuild" Condition="!Exists('$(MSBuildProjectDirectory)/media/ffmpeg.exe')">
     <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Setup-Media.ps1&quot;" />

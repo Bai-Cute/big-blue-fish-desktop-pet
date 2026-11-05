@@ -32,7 +32,7 @@ public static class ControlTools
           "StopModelOnBattery":{"type":"boolean","description":"离电时暂停并卸载内置模型；不限制外部文字。"},
           "HideOnFullscreen":{"type":"boolean","description":"外部全屏时隐藏桌宠；不限制 MCP 截图。"},
           "CheckUpdatesOnStartup":{"type":"boolean","description":"启动时检查更新。"},
-          "WeatherRegionCode":{"type":"string","pattern":"^([0-9]{6}|US-[0-9]{5})$","description":"内置地区表中存在的县区代码：中国为6位区县代码如340104，美国为US-加5位县FIPS如US-06037；不是城市名、省级、州级或市级代码。"},
+          "WeatherRegionCode":{"type":"string","pattern":"^([0-9]{6}|[A-Z]{2}-[0-9]+)$","description":"内置地区表中存在的叶级地点代码：中国为6位区县代码如340104，美国为US-加5位县FIPS如US-06037，其他国家为国家代码-GeoNames城市ID如JP-1850147；不是城市名、省级、州级或一级行政区代码。"},
           "Scale":{"type":"number","minimum":0.5,"maximum":2,"description":"角色大小倍率；1为100%。"},
           "BubbleScale":{"type":"number","minimum":0.5,"maximum":2,"description":"独立气泡大小倍率；不改变角色大小。"},
           "SpeechMinMinutes":{"type":"integer","enum":[2,3,5,10,15,20],"description":"说话区间档位：2对应2–3分钟，3对应3–5，5对应5–8，10对应10–16，15对应15–23，20对应20–30；不是任意分钟数。"},

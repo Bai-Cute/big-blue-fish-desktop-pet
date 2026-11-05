@@ -227,7 +227,7 @@ public partial class MainWindow
             };
         }
         panel.Children.Add(grid);
-        panel.Children.Add(new TextBlock { Text = "天气来自 Open-Meteo（Weather data by Open-Meteo.com），按所选区县中心附近估算；美国地点使用华氏度和英里/小时。", FontSize = 11,
+        panel.Children.Add(new TextBlock { Text = "天气来自 Open-Meteo（Weather data by Open-Meteo.com），按所选地点中心附近估算；美国地点使用华氏度和英里/小时。海外城市数据来自 GeoNames（CC BY 4.0）。", FontSize = 11,
             Foreground = System.Windows.Media.Brushes.SlateGray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 5, 0, 4) });
     }
 }
