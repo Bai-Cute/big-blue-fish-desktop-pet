@@ -199,6 +199,16 @@ internal static class Program
             Check(CompanionBrain.BuildMessages(CompanionBrain.Persona, request, new CompanionWindowImage("data:image/jpeg;base64,AA==", 1, 1))[1].content is object[] { Length: 2 },
                 "vision content keeps image and screen text in the user role");
             Check(CompanionBrain.Persona.Contains("当前活动") && CompanionBrain.Persona.Contains("桌面、新标签页、主页"), "Persona matches current content and entry-screen behavior");
+            using (var briefBrain = new CompanionBrain(Process.Start, TimeSpan.FromSeconds(60), newsRoll: () => 1))
+            {
+                var briefs = new HashSet<string>();
+                for (int i = 0; i < 60; i++) briefs.Add(await briefBrain.AgentSpeechBrief(false, false, false, IntPtr.Zero, CancellationToken.None));
+                var brief = briefs.First();
+                Check(brief.Contains(CompanionBrain.FixedSpeechInstructions(CompanionBrain.Persona))
+                    && brief.Contains("屏幕资料结束") && brief.Contains("用户正在使用电脑"), "Agent brief carries the local fixed persona and screen material");
+                Check(briefs.Count >= 2 && briefs.All(b => b.Contains("这一回可以")), "Agent brief rolls the same random reaction hint per event");
+                Check((await briefBrain.AgentSpeechBrief(true, false, false, IntPtr.Zero, CancellationToken.None)).Contains(CompanionBrain.WeatherPersona), "Agent weather brief uses the weather persona");
+            }
             Console.WriteLine($"RESULT {checks} runner/prompt checks passed ({CompanionBrain.InputMode}); child responses are fault fixtures, not real model evaluation");
             return 0;
         }

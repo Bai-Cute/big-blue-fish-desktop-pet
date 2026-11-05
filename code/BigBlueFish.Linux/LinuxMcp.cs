@@ -50,6 +50,7 @@ internal sealed partial class LinuxPetWindow
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
         if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
+        agent.SpeechBrief = (kind, token) => Dispatcher.UIThread.InvokeAsync(() => brain.AgentSpeechBrief(kind == "weather_request", Preferences.PublicInfo, Preferences.ForegroundEnabled, lastForeground, token));
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();
     }
