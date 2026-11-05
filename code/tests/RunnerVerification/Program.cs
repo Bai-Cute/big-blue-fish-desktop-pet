@@ -202,12 +202,13 @@ internal static class Program
             using (var briefBrain = new CompanionBrain(Process.Start, TimeSpan.FromSeconds(60), newsRoll: () => 1))
             {
                 var briefs = new HashSet<string>();
-                for (int i = 0; i < 60; i++) briefs.Add(await briefBrain.AgentSpeechBrief(false, false, false, IntPtr.Zero, CancellationToken.None));
+                for (int i = 0; i < 60; i++) briefs.Add(await briefBrain.AgentSpeechBrief(false, false, false, CancellationToken.None));
                 var brief = briefs.First();
                 Check(brief.Contains(CompanionBrain.FixedSpeechInstructions(CompanionBrain.Persona))
-                    && brief.Contains("屏幕资料结束") && brief.Contains("用户正在使用电脑"), "Agent brief carries the local fixed persona and screen material");
+                    && brief.Contains("用户正在使用电脑"), "Agent brief carries the local fixed persona and material");
+                Check((await briefBrain.AgentSpeechBrief(false, false, true, CancellationToken.None)).Contains("capture_foreground"), "Agent brief points screen reading at a screenshot");
                 Check(briefs.Count >= 2 && briefs.All(b => b.Contains("这一回可以")), "Agent brief rolls the same random reaction hint per event");
-                Check((await briefBrain.AgentSpeechBrief(true, false, false, IntPtr.Zero, CancellationToken.None)).Contains(CompanionBrain.WeatherPersona), "Agent weather brief uses the weather persona");
+                Check((await briefBrain.AgentSpeechBrief(true, false, false, CancellationToken.None)).Contains(CompanionBrain.WeatherPersona), "Agent weather brief uses the weather persona");
             }
             Console.WriteLine($"RESULT {checks} runner/prompt checks passed ({CompanionBrain.InputMode}); child responses are fault fixtures, not real model evaluation");
             return 0;

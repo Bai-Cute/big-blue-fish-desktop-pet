@@ -77,8 +77,7 @@ public partial class MainWindow
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
         if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.InvokeAsync(() => RequestAgentLocalSpeech(token)).Task.Unwrap();
-        agent.SpeechBrief = (kind, token) => Dispatcher.InvokeAsync(() => brain.AgentSpeechBrief(kind == "weather_request", preferences.PublicInfo, preferences.ForegroundEnabled,
-            CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground), token)).Task.Unwrap();
+        agent.SpeechBrief = (kind, token) => Dispatcher.InvokeAsync(() => brain.AgentSpeechBrief(kind == "weather_request", preferences.PublicInfo, preferences.ForegroundEnabled, token)).Task.Unwrap();
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();
     }
