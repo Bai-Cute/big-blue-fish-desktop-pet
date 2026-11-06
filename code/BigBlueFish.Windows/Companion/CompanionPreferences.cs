@@ -18,6 +18,7 @@ internal sealed class CompanionPreferences
     public bool AgentDailySpeech { get; set; }
     public bool AgentRespondToClick { get; set; }
     public bool AgentRespondToDrag { get; set; }
+    public bool ChatLogShowAll { get; set; }
     // Old UI/animation helpers use this internal alias. Legacy MCP settings do not turn on a new CLI connection.
     [JsonIgnore] public bool McpEnabled { get => AgentEnabled; set => AgentEnabled = value; }
     public bool PuppetMode { get; set; }

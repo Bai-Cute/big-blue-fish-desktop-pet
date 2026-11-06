@@ -13,6 +13,7 @@
 **/media/*.exe
 **/media/gstreamer/
 **/preferences.json*
+**/chat-log*.json*
 **/model-selection.json*
 **/news-last-day.txt*
 **/companion.lock

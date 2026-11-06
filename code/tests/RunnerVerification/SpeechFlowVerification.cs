@@ -77,6 +77,11 @@ internal static class SpeechFlowVerification
             }
             Check(CompanionPreferences.NormalizeSpeechMinimum(8) == 10 && CompanionPreferences.NormalizeSpeechMinimum(30) == 20,
                 "old interval settings migrate to supported ranges");
+            var chat = new CompanionChatLog("chat-log-check.json");
+            foreach (var (user, line) in new[] { (false, "a"), (false, "b"), (true, "u1"), (false, "c"), (false, "d"), (true, "u2"), (true, "u3"), (false, "e"), (false, "f") }) chat.Add(user, line);
+            Check(string.Join(",", chat.Lines(false).Select(l => l.Text)) == "b,u1,c,d,u2,u3,e" && chat.Lines(true).Count() == 9,
+                "chat log default keeps owner messages with the pet line before and after; all mode keeps everything");
+            Check(new CompanionChatLog("chat-log-check.json").Lines(true).SequenceEqual(chat.Lines(true)), "chat log survives a restart");
             window = new MainWindow(); window.Show();
             Wait(() => (bool)Field(window, "companionReady")!, "actual animations load", 15);
             ((DispatcherTimer)Field(window, "companionTimer")!).Stop();

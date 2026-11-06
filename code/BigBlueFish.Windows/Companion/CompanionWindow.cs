@@ -23,6 +23,7 @@ public partial class MainWindow
     private Border loadingIndicator = null !;
     private CompanionLoadingRing loadingSpinner = null !;
     private CompanionSpeech speech = null!;
+    private readonly CompanionChatLog chatLog = new();
     private bool bubbleIsModelReply;
     private long speechRequestVersion;
     private Grid companionLayout = null !;
@@ -483,6 +484,7 @@ public partial class MainWindow
         bubbleUntil = DateTime.MaxValue;
         DiagnosticLog.Write(DiagnosticEvent.BubbleShown, kind: "local", chars: text.Length);
         speech.Show(text, true);
+        chatLog.Add(false, text);
     }
 
     private void ShowCompanionPartial(string text, long? expectedVersion = null, bool agentTriggered = false)
@@ -505,6 +507,7 @@ public partial class MainWindow
         DiagnosticLog.Write(DiagnosticEvent.BubbleShown, kind: "local", chars: text.Length);
         ShowCompanionPartial(text, agentTriggered: agentTriggered);
         ResetBubbleDeadline();
+        if (speech.FullText == text) chatLog.Add(false, text);
     }
 
     private void BeginModelSpeech()
