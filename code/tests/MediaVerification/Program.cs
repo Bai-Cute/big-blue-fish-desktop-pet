@@ -18,6 +18,18 @@ static class Program
         var app=new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};
         var image=new CompanionSpriteImage{Width=480,Height=270,Stretch=Stretch.Fill};var window=new Window{Title="1.1.1 animation verification",Width=520,Height=330,Content=image,Background=Brushes.Lime};
         using var player=new CompanionVideoPlayer(image);string? error=null;player.Failed+=e=>error=e;bool ended=false;
+        if(args.Contains("--region-check"))
+        {
+            try
+            {
+                window.Show();Pump(100);string regionFile=Path.Combine(AppContext.BaseDirectory,"assets/fish/待机呼吸休闲.webm");
+                player.Play(regionFile,false,()=>{});Wait(()=>player.Frames>10||error!=null,12);Check(error==null,"region check uses actual GPU player");CompositionRegionVerification.Check(image,false);
+                player.Play(regionFile,true,()=>{});Wait(()=>player.Frames>10||error!=null,12);Check(error==null,"mirrored region uses actual GPU player");CompositionRegionVerification.Check(image,true);
+                image.Width=360;image.Height=202.5;var before=player.Frames;Wait(()=>player.Frames>before+2||error!=null,5);CompositionRegionVerification.Check(image,true);
+                Console.WriteLine("RESULT actual GPU HWND region verified at normal, mirrored and resized layouts");return 0;
+            }
+            finally{player.Dispose();window.Close();Pump(200);app.Shutdown();}
+        }
         if(args.Contains("--bench-only")||args.Contains("--baseline"))
         {window.WindowStyle=WindowStyle.None;window.AllowsTransparency=true;window.Background=Brushes.Transparent;window.ShowInTaskbar=false;window.ShowActivated=false;window.Topmost=true;}
         if(args.Contains("--bench-only"))
@@ -76,7 +88,7 @@ static class Program
             Check(rgba.Where((_,i)=>i%4==3).Any(v=>v==0)&&rgba.Where((_,i)=>i%4==3).Any(v=>v==255),"GPU-decoded snapshot retains actual transparency");
             player.Paused=true;Pump(250);var position=player.PositionSeconds;var count=player.Frames;Pump(500);Check(player.Frames==count&&player.PositionSeconds==position,"pause stops frame and time advancement");
             player.Paused=false;Wait(()=>player.PositionSeconds>=position+.5,3);Check(player.PositionSeconds>position+.4,"resume advances media time");
-            int completions=0;var segmentWatch=Stopwatch.StartNew();player.Play(file,false,()=>completions++,1.5,3,1.5);Wait(()=>completions==1||error!=null,5);Check(error==null&&player.PositionSeconds>=2.9&&player.PositionSeconds<3,"trimmed segment exact media end");Check(segmentWatch.Elapsed.TotalSeconds>=.9&&segmentWatch.Elapsed.TotalSeconds<2.2,"trimmed 1.5x wall duration");
+            int completions=0;var segmentWatch=Stopwatch.StartNew();player.Play(file,false,()=>completions++,1.5,3,1.5);Wait(()=>completions==1||error!=null,5);Check(error==null&&player.PositionSeconds>=2.9&&player.PositionSeconds<3,$"trimmed segment exact media end: position={player.PositionSeconds}, error={error}");Check(segmentWatch.Elapsed.TotalSeconds>=.9&&segmentWatch.Elapsed.TotalSeconds<2.2,"trimmed 1.5x wall duration");
             var held=player.Frames;Pump(350);Check(player.Frames==held,"completed segment holds last frame");
             player.Play(file,false,()=>completions++);Wait(()=>player.Frames>10,3);player.Play(file,true,()=>completions++);Wait(()=>player.Frames>10,3);Check(((ScaleTransform)image.RenderTransform).ScaleX==-1,"mirror preserved");
             player.Stop();Pump(300);count=player.Frames;Pump(200);Check(player.Frames==count,"cancelled decoder cannot publish stale frames");

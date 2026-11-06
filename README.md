@@ -4,7 +4,7 @@
 
 鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版还能通过 ACP 一键连接 21 款主流 CLI Agent，陪主人进行稳定的长对话。
 
-当前版本为 **1.1.1**，安装包请前往 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载。
+当前版本为 **1.1.2**，安装包请前往 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载。
 
 <p align="center">
   <img src="docs/images/bigbluefish-rest-transparent.png" width="38%" alt="蓝色大肥鱼休息状态" />
@@ -61,15 +61,15 @@
 
 | 平台 | 标准版 | 无ACP版 |
 | --- | --- | --- |
-| Windows x64 | `BigBlueFish-v1.1.1-OCR-Setup.exe` | `BigBlueFish-v1.1.1-Safe-OCR-Setup.exe` |
-| Ubuntu／Debian x64 | `BigBlueFish-v1.1.1-Linux-x64.deb` | `BigBlueFish-v1.1.1-Safe-Linux-x64.deb` |
+| Windows x64 | `BigBlueFish-v1.1.2-OCR-Setup.exe` | `BigBlueFish-v1.1.2-Safe-OCR-Setup.exe` |
+| Ubuntu／Debian x64 | `BigBlueFish-v1.1.2-Linux-x64.deb` | `BigBlueFish-v1.1.2-Safe-Linux-x64.deb` |
 
 在 Windows 上，双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时一并安装好，默认位置是 `Program Files` 下的“蓝色大肥鱼”文件夹，并创建桌面和开始菜单快捷方式。随后安装器会请主人选择模型的准备方式：Hugging Face（推荐）、国内源（稳定）或手动安装。自动下载的模型约 2.7 GB，下载完成后会经过 SHA-256 校验，中途断开也能从已有进度继续。下载时如果想改用手动安装，可以选择“放弃并转为手动安装”；手动安装会显示模型应放入的文件夹，并打开模型来源页面，也可以直接选择已经下载好的 GGUF 文件。卸载时可以在卸载界面勾选“保留模型和设置”。
 
 在 Ubuntu／Debian 上，下载对应的 `.deb` 后，在其所在目录执行：
 
 ```bash
-sudo apt install ./BigBlueFish-v1.1.1-Linux-x64.deb
+sudo apt install ./BigBlueFish-v1.1.2-Linux-x64.deb
 ```
 
 安装无ACP版时换成对应的文件名即可。安装完成后，可以从应用菜单或 `bigbluefish` 命令启动鱼鱼，再到设置的“模型与信息”中点击“安装模型”，为她准备本地模型。
@@ -127,9 +127,9 @@ Claude Code、Codex CLI 和 Pi 需要经过 ACP 适配器连接。电脑上还�
 - 让鱼鱼说出 Agent 写好的话，或者请本地模型按当前情境说一句；
 - 预约、查看和取消日常关心。
 
-即使接入了 AI Agent，鱼鱼在这条连接中做的事情也始终很简单：向 Agent 传入 Agent 主动要求的截图、主人主动输入的文字，以及按主人开启的设置发出的交互事件和日常关心请求，再接收 Agent 发来的文字、动作和设置等控制。电脑操控、云端对话等各种操作能力，实际都由 Agent 自己执行。
+即使接入了 AI Agent，鱼鱼在这条连接中做的事情也始终很简单：向 Agent 传入按主人开启的设置准备的读屏画面、Agent 主动请求的截图、主人主动输入的文字，以及按主人开启的设置发出的交互事件和日常关心请求，再接收 Agent 发来的文字、动作和设置等控制。电脑操控、云端对话等各种操作能力，实际都由 Agent 自己执行。
 
-**风险提醒：** 连接 Agent 后，截屏会被传递给所连接的 Agent，其处理方式由 Agent 决定，可能导致主人的信息被上传或保存。开启连接时确认的权限对所选 Agent 统一生效，Agent 可以使用上面列出的全部能力，不按工具分别授权。设置中的“感知当前应用”开关只控制内置模型自己读屏，Agent 请求的截图不受这个开关影响。Agent 连接默认关闭，开启前软件会弹窗说明这些权限，请只连接你信任的 Agent。
+**风险提醒：** 连接 Agent 后，截屏会被传递给所连接的 Agent，其处理方式由 Agent 决定，可能导致主人的信息被上传或保存。开启连接时确认的权限对所选 Agent 统一生效，Agent 可以使用上面列出的全部能力，不按工具分别授权。设置中的“感知当前应用”开关控制日常关心时的自动读屏，Agent 通过工具主动请求的截图不受这个开关影响。Agent 连接默认关闭，开启前软件会弹窗说明这些权限，请只连接你信任的 Agent。
 
 适配方式、登录、工作区和会话的完整说明见[连接本机 CLI Harness](docs/ACP.md)，内部工具的参数见[内部工具参考](docs/MCP.md)。
 
@@ -182,10 +182,10 @@ dotnet build ./code/BigBlueFish.Windows/BigBlueFish.Windows.csproj -c Release -p
 
 本项目以 [Apache License 2.0](LICENSE) 发布。鱼鱼的形象来自对 DeepSeek 的二创虚拟形象“蓝色大肥鱼”；项目使用的动画、模型、运行时、字体和数据分别来自以下项目，各自遵循其原有许可：
 
-- 角色动画：106 段透明 WebM 动画来自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，MIT 许可，保留原有颜色、透明度与 24 帧时序，动作的选择与触发逻辑为本项目定制；
+- 角色动画：106 段透明 WebM 动画来自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，MIT 许可，播放素材经本项目提升至 1280×720、60 帧/秒，并保留原始分辨率与帧率的兼容素材，动作的选择与触发逻辑为本项目定制；
 - 本地模型：Qwen3.5-4B 及其衍生的 heretic 版本与 GGUF 转换，Apache-2.0 许可，模型文件由用户另行下载；
 - 推理与运行环境：llama.cpp（MIT）、.NET 10 运行时（MIT）、Microsoft Visual C++ 运行库（Microsoft 再分发条款）；
-- 动画解码：Windows 版使用 FFmpeg 9.0.1（GPL-3.0-or-later），作为独立进程运行；Linux 版使用系统的 FFmpeg；
+- 动画解码：Windows 版使用随包提供的 GStreamer 组件及本项目的 DirectComposition 显示组件，Linux 版使用系统 GStreamer；
 - Linux 界面：Avalonia、MicroCom.Runtime、Tmds.DBus.Protocol、SkiaSharp、HarfBuzzSharp（MIT）；
 - 文字识别：Windows 版使用系统提供的 Windows.Media.Ocr，Linux 版使用 Tesseract；
 - 气泡字体：乐米小奶泡体，按其公布的免费商用条款内嵌；

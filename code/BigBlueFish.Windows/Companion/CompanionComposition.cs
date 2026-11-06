@@ -49,7 +49,7 @@ internal sealed class CompanionComposition : IDisposable
     internal void Attach(IntPtr swapchain,bool mirror)
     {mirrored=mirror;Check(AttachNative(handle,swapchain));image.Opacity=0;Update();}
     internal void Present(CompanionMediaFrame frame)
-    {Update();Shape(handle,frame.Data,frame.Width,frame.Height,frame.Stride,mirrored?1:0);ready=true;SetVisible(owner.IsVisible);}
+    {Update();Check(Shape(handle,frame.Data,frame.Width,frame.Height,frame.Stride,mirrored?1:0));ready=true;SetVisible(owner.IsVisible);}
     void Layout(object? sender,EventArgs e)=>Update();
     void VisibilityChanged(object sender,DependencyPropertyChangedEventArgs e)=>Update();
     void Update()
@@ -74,7 +74,7 @@ internal sealed class CompanionComposition : IDisposable
     [DllImport(Library,EntryPoint="surface_create",CallingConvention=CallingConvention.Cdecl)]static extern int Create(IntPtr owner,InputCallback callback,out IntPtr surface);
     [DllImport(Library,EntryPoint="surface_attach",CallingConvention=CallingConvention.Cdecl)]static extern int AttachNative(IntPtr surface,IntPtr swapchain);
     [DllImport(Library,EntryPoint="surface_bounds",CallingConvention=CallingConvention.Cdecl)]static extern void Bounds(IntPtr surface,int x,int y,int width,int height,int mirror);
-    [DllImport(Library,EntryPoint="surface_shape",CallingConvention=CallingConvention.Cdecl)]static extern void Shape(IntPtr surface,IntPtr pixels,int width,int height,int stride,int mirror);
+    [DllImport(Library,EntryPoint="surface_shape",CallingConvention=CallingConvention.Cdecl)]static extern int Shape(IntPtr surface,IntPtr pixels,int width,int height,int stride,int mirror);
     [DllImport(Library,EntryPoint="surface_show",CallingConvention=CallingConvention.Cdecl)]static extern void Show(IntPtr surface,int visible);
     [DllImport(Library,EntryPoint="surface_destroy",CallingConvention=CallingConvention.Cdecl)]static extern void Destroy(IntPtr surface);
 }

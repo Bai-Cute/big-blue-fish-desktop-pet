@@ -25,12 +25,15 @@ internal static class CompanionOcr
         {
             token.ThrowIfCancellationRequested();
             var watch = Stopwatch.StartNew();
-            var image = CompanionScreenCapture.Capture(handle, Math.Min(2560, (int)OcrEngine.MaxImageDimension), true)
-                ?? throw new IOException("未能读取当前窗口画面");
-            var identity = CompanionNative.ForegroundIdentity(handle);
+            int maximum = Math.Min(2560, (int)OcrEngine.MaxImageDimension);
+            var captured = await CompanionCaptureFallback.ReadAsync(
+                () => Task.FromResult(CompanionScreenCapture.Capture(handle, maximum, true)),
+                () => Task.FromResult(CompanionScreenCapture.CaptureScreen(maximum)), token).ConfigureAwait(false);
+            var image = captured.Image ?? throw new IOException("未能取得可用读屏画面");
+            var identity = captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : CompanionNative.ForegroundIdentity(handle);
             double captureMs = watch.Elapsed.TotalMilliseconds;
-            var result = await RecognizeAsync(image, identity, captureMs, token, CompanionNative.IsDesktopWindow(handle)).ConfigureAwait(false);
-            return result with { WindowHandle = handle.ToInt64() };
+            var result = await RecognizeAsync(image, identity, captureMs, token, !captured.FullScreen && CompanionNative.IsDesktopWindow(handle)).ConfigureAwait(false);
+            return result with { WindowHandle = captured.FullScreen ? 0 : handle.ToInt64() };
         }, token).ConfigureAwait(false);
     }
 

@@ -195,15 +195,26 @@ internal sealed partial class LinuxPetWindow : Window
         fullText = text; textBoundaries = StringInfo.ParseCombiningCharacters(text); externalSpeech = external; modelReply = fromModel;
         typing = !immediate && textBoundaries.Length > 1; typingClock.Restart(); bubbleUntil = DateTime.MaxValue;
         bubbleText.Text = typing ? text[..textBoundaries[1]] : text;
-        MoveBubble(); if (!hidden && !fullscreenHidden) bubbleWindow.Show(); if (!typing && phase is not ("Startup" or "Exit")) ResetDwell();
+        MoveBubble(); if (!hidden && !fullscreenHidden) ShowBubble(); if (!typing && phase is not ("Startup" or "Exit")) ResetDwell();
     }
     void Partial(string text, long expectedVersion, bool agentTriggered = false)
     {
         Dispatcher.UIThread.Post(() => {
             if (expectedVersion != speechVersion || Puppet && !agentTriggered || closed || hidden || fullscreenHidden || !Preferences.ModelEnabled || !brain.CanRunOnCurrentPower) return;
             greetingNoticeActive = false; streamed = true; fullText = text; typing = false; externalSpeech = false; modelReply = true; bubbleText.Text = text; bubbleUntil = DateTime.MaxValue;
-            MoveBubble(); bubbleWindow.Show();
+            MoveBubble(); ShowBubble();
         });
+    }
+    void ShowBubble()
+    {
+        if (bubbleWindow.IsVisible) return;
+        bubbleWindow.Show(this);
+        // Some X11 WMs discard ABOVE when a window is withdrawn. Reassert it
+        // after mapping, without activating the bubble or raising it per letter.
+        bubbleWindow.Topmost = false;
+        bubbleWindow.Topmost = true;
+        bubbleWindow.ShowInTaskbar = true;
+        bubbleWindow.ShowInTaskbar = false;
     }
     void ResetDwell() { int duration = CompanionPreferences.BubbleDurations[Preferences.BubbleDurationIndex]; bubbleUntil = duration == 0 ? DateTime.MaxValue : DateTime.UtcNow.AddSeconds(duration); }
     void MoveBubble()

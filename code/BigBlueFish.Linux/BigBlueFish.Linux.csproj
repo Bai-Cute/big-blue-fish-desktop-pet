@@ -2,6 +2,7 @@
   <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><RuntimeIdentifier>linux-x64</RuntimeIdentifier><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AssemblyName>BigBlueFish.Linux</AssemblyName><DefineConstants>$(DefineConstants);COMPANION_OCR;COMPANION_LINUX</DefineConstants></PropertyGroup>
   <PropertyGroup Condition="'$(CompanionEdition)' == 'Safe'"><NuGetLockFilePath>packages.safe.lock.json</NuGetLockFilePath></PropertyGroup>
   <ItemGroup>
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionCaptureFallback.cs" Link="Shared/CompanionCaptureFallback.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionMedia.cs" Link="Shared/CompanionMedia.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionAnimationMask.cs" Link="Shared/CompanionAnimationMask.cs" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />

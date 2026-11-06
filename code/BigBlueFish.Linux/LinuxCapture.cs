@@ -227,7 +227,10 @@ internal static class CompanionOcr
     internal static async Task<CompanionOcrSnapshot> ReadAsync(IntPtr handle, CancellationToken token)
     {
         var clock = Stopwatch.StartNew();
-        var image = await LinuxCapture.CaptureAsync(handle, 2560, false, token);
+        var captured = await CompanionCaptureFallback.ReadAsync<CompanionWindowImage>(
+            async () => await LinuxCapture.CaptureAsync(handle, 2560, false, token),
+            async () => await LinuxCapture.CaptureAsync(handle, 2560, true, token), token);
+        var image = captured.Image ?? throw new IOException("未能取得可用读屏画面");
         double captureTime = clock.Elapsed.TotalMilliseconds;
         var bytes = Convert.FromBase64String(image.DataUrl[(image.DataUrl.IndexOf(',') + 1)..]);
         var start = new ProcessStartInfo("/usr/bin/tesseract") { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
@@ -244,9 +247,10 @@ internal static class CompanionOcr
             var cells = line.TrimEnd('\r').Split('\t'); if (cells.Length < 12 || cells[0] != "5" || string.IsNullOrWhiteSpace(cells[11])) continue;
             if (double.TryParse(cells[6], out var x) && double.TryParse(cells[7], out var y) && double.TryParse(cells[8], out var width) && double.TryParse(cells[9], out var height)) words.Add(new(cells[11], x, y, width, height));
         }
-        bool desktop = !CompanionNative.Wayland && CompanionNative.IsDesktopWindow(handle);
-        string context = (CompanionNative.Wayland ? "当前桌面授权的前台窗口" : CompanionNative.ForegroundIdentity(handle)) + "\n" + (desktop ? "画面是壁纸与快捷方式图标，没有展开的应用正文。" : CompanionOcrLayout.Format(words, image.Width, image.Height));
-        return new(context, "chi_sim+eng", image.Width, image.Height, words.Count, captureTime, clock.Elapsed.TotalMilliseconds - captureTime, words.ToArray(), handle.ToInt64(), desktop);
+        bool desktop = !captured.FullScreen && !CompanionNative.Wayland && CompanionNative.IsDesktopWindow(handle);
+        string identity = captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : CompanionNative.Wayland ? "当前桌面授权的前台窗口" : CompanionNative.ForegroundIdentity(handle);
+        string context = identity + "\n" + (desktop ? "画面是壁纸与快捷方式图标，没有展开的应用正文。" : CompanionOcrLayout.Format(words, image.Width, image.Height));
+        return new(context, "chi_sim+eng", image.Width, image.Height, words.Count, captureTime, clock.Elapsed.TotalMilliseconds - captureTime, words.ToArray(), captured.FullScreen ? 0 : handle.ToInt64(), desktop);
     }
 }
 

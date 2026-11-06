@@ -53,10 +53,13 @@ public partial class MainWindow
         if (!material.ObserveScreen) return new(material.Text);
         if (!preferences.ForegroundEnabled) return new(material.Text + "\n本轮未启用读取前台内容，按已有情境自然关心主人。");
         var handle = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
-        var image = await Task.Run(() => { token.ThrowIfCancellationRequested(); return CompanionScreenCapture.Capture(handle, 2560, true); }, token);
+        var captured = await Task.Run(() => CompanionCaptureFallback.ReadAsync(
+            () => Task.FromResult(CompanionScreenCapture.Capture(handle, 2560, true)),
+            () => Task.FromResult(CompanionScreenCapture.CaptureScreen(2560)), token), token);
+        var image = captured.Image;
         token.ThrowIfCancellationRequested();
         return image == null ? new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。")
-            : new(material.Text + "\n本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。", AgentPromptImage.FromDataUrl(image.DataUrl));
+            : new(material.Text + "\n" + (captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : "本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。"), AgentPromptImage.FromDataUrl(image.DataUrl));
     }
 
     private void ConfigureAgent()

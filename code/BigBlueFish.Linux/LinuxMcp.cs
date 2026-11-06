@@ -38,9 +38,13 @@ internal sealed partial class LinuxPetWindow
         var handle = CompanionNative.ResolveForeground(CompanionNative.GetForegroundWindow(), lastForeground);
         try
         {
-            var image = await LinuxCapture.CaptureAsync(handle, 2560, false, token);
+            var captured = await CompanionCaptureFallback.ReadAsync<CompanionWindowImage>(
+                async () => await LinuxCapture.CaptureAsync(handle, 2560, false, token),
+                async () => await LinuxCapture.CaptureAsync(handle, 2560, true, token), token);
+            var image = captured.Image;
             token.ThrowIfCancellationRequested();
-            return new(material.Text + "\n本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。", AgentPromptImage.FromDataUrl(image.DataUrl));
+            if (image == null) return new(material.Text + "\n本轮未取得有效截图，按已有情境自然关心主人。");
+            return new(material.Text + "\n" + (captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : "本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。"), AgentPromptImage.FromDataUrl(image.DataUrl));
         }
         catch (IOException) { return new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。"); }
     }

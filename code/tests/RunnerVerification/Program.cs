@@ -44,6 +44,7 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--fake-runner") return await FakeRunner(int.Parse(args[1]), args[2], args.Length < 4 || args[3] == "gpu");
         try
         {
+            if (args[0] == "--capture-fallback") return await CaptureFallbackVerification.Run(args.Contains("--live"));
             if (args[0] == "--diagnostics") return DiagnosticVerification.Run(args[1]);
             if (args[0] == "--device-live") return await InferenceDeviceVerification.Live(args[1]);
             InferenceDeviceVerification.Rules();
