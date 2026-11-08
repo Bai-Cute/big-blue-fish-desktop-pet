@@ -1,5 +1,4 @@
 #if !COMPANION_SAFE
-using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Platform.Storage;
@@ -51,7 +50,7 @@ internal sealed partial class LinuxPetWindow
             if (selected != null) await Run(() => current.OpenWorkspace(selected));
         }));
         buttons.Children.Add(ActionButton("查看文件夹", () => {
-            try { if (agent != null) { agent.Workspaces.EnsureCurrent(); Process.Start(new ProcessStartInfo("xdg-open") { ArgumentList = { agent.Workspaces.Current } }); } }
+            try { if (agent != null) { agent.Workspaces.EnsureCurrent(); OpenUrl(agent.Workspaces.Current); } }
             catch (Exception error) { AgentError("无法打开文件夹", error); }
         }));
         buttons.Children.Add(ActionButton("清空工作区", async () => {

@@ -76,7 +76,7 @@ internal sealed class CompanionBrain : IDisposable
     internal static bool StreamingResponses { get; set; } = true;
 
     internal CompanionBrain() : this(
-#if COMPANION_LINUX
+#if COMPANION_LINUX || COMPANION_MAC
         LinuxProcesses.Start,
 #else
         Process.Start,
@@ -113,7 +113,7 @@ internal sealed class CompanionBrain : IDisposable
         Process? probe = null;
         try
         {
-#if COMPANION_LINUX
+#if COMPANION_LINUX || COMPANION_MAC
             probe = LinuxProcesses.Start(start);
 #else
             probe = Process.Start(start);

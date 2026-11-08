@@ -17,13 +17,16 @@ internal sealed partial class LinuxPetWindow
     Window? consentWindow;
     Action? refreshLinuxSettings;
     Action? disposeLogConsole;
-    static string AutostartFile => Path.Combine(Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config"), "autostart/bigbluefish.desktop");
+    static string AutostartFile => OperatingSystem.IsMacOS() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Library/LaunchAgents/io.github.bai-cute.bigbluefish.plist")
+        : Path.Combine(Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config"), "autostart/bigbluefish.desktop");
     bool StartupEnabled => File.Exists(AutostartFile);
     void SetStartup(bool on)
     {
         if (!on) { File.Delete(AutostartFile); return; }
         Directory.CreateDirectory(Path.GetDirectoryName(AutostartFile)!);
-        File.WriteAllText(AutostartFile, "[Desktop Entry]\nType=Application\nName=蓝色大肥鱼\nExec=\"" + Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Linux").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"\nTerminal=false\n");
+        if (OperatingSystem.IsMacOS()) File.WriteAllText(AutostartFile, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>io.github.bai-cute.bigbluefish</string><key>ProgramArguments</key><array><string>"
+            + System.Security.SecurityElement.Escape(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mac")) + "</string></array><key>RunAtLoad</key><true/><key>ProcessType</key><string>Interactive</string></dict></plist>\n");
+        else File.WriteAllText(AutostartFile, "[Desktop Entry]\nType=Application\nName=蓝色大肥鱼\nExec=\"" + Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Linux").Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"\nTerminal=false\n");
     }
     void ApplySettings(PixelPoint? requestedPosition = null)
     {

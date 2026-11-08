@@ -1,5 +1,4 @@
 #if !COMPANION_SAFE
-using System.Diagnostics;
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Threading;
@@ -29,7 +28,7 @@ internal sealed partial class LinuxPetWindow
         }
         Detect(); extra.Children.Add(select);
         var buttons = new WrapPanel(); buttons.Children.Add(ActionButton("重新检测", Detect));
-        buttons.Children.Add(ActionButton("安装与登录说明", () => Process.Start(new ProcessStartInfo("xdg-open") { ArgumentList = { HarnessCatalog.Get(Preferences.AgentHarnessId).Website } })));
+        buttons.Children.Add(ActionButton("安装与登录说明", () => OpenUrl(HarnessCatalog.Get(Preferences.AgentHarnessId).Website)));
         extra.Children.Add(buttons);
         var state = Paragraph(""); extra.Children.Add(state);
         var actions = new WrapPanel();

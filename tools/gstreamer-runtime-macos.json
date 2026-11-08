@@ -1,0 +1,161 @@
+{
+  "version": "1.29.2",
+  "archives": [
+    {
+      "package": "gstreamer-plugins",
+      "url": "https://files.pythonhosted.org/packages/0b/e4/a2c018b1d36d3f8ec524c4b3021dbc8556a5e991afdf915ac19cea3a3402/gstreamer_plugins-1.29.2a0-cp39-abi3-macosx_10_13_universal2.whl",
+      "sha256": "533091135472633e266a21941bcc16d8b2596ed065de4030291e39488d4092eb",
+      "files": [
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstapp.dylib",
+          "target": "plugins/libgstapp.dylib",
+          "sha256": "b3074fe21e1688398c02cb702381729a08c267b65004141ef6c16627adeb0d9c"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstcodecalpha.dylib",
+          "target": "plugins/libgstcodecalpha.dylib",
+          "sha256": "0d085d70cec27205da630d5b6a5b37724ec5b925ee456810a9335633bf31d6ac"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstcoreelements.dylib",
+          "target": "plugins/libgstcoreelements.dylib",
+          "sha256": "09d3f867606e9d6b8e9e4edf39f25918efcc3b93a0824f6175c019879f3e3d55"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstmatroska.dylib",
+          "target": "plugins/libgstmatroska.dylib",
+          "sha256": "82c8b3dc8bcbfcf458fa284096636158d8c82403e25b71ed46dec3ac24eb2cb5"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstvideoconvertscale.dylib",
+          "target": "plugins/libgstvideoconvertscale.dylib",
+          "sha256": "bba0779bae739a2a3038af58ac3fbec347efc68d1496d925e0d0784be5f2729f"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstvideoparsersbad.dylib",
+          "target": "plugins/libgstvideoparsersbad.dylib",
+          "sha256": "2265f154e273e77783f77a649a5140473c9fb87924ed8863ab4bbfbbb1cb54db"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstvideorate.dylib",
+          "target": "plugins/libgstvideorate.dylib",
+          "sha256": "c7967086137febadf464f506639862f71423da3bf7700d0108b5249e1fa83e99"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstvpx.dylib",
+          "target": "plugins/libgstvpx.dylib",
+          "sha256": "442b0a687b181c007314858fdf0697def5b7a1cb5b7dbbb5da319c0b4c82ff1d"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/libgstreamer-1.0.0.dylib",
+          "target": "lib/libgstreamer-1.0.0.dylib",
+          "sha256": "3af556688ae5800f71f840fd10d4eb68a4b9223cf2d0ca9bb305698d3e64705f"
+        }
+      ]
+    },
+    {
+      "package": "gstreamer-libs",
+      "url": "https://files.pythonhosted.org/packages/23/17/9b8e15a1235a7f6b54b6591c0e93f83a36e251f588d59a26cf455a38687f/gstreamer_libs-1.29.2a0-cp39-abi3-macosx_10_13_universal2.whl",
+      "sha256": "b513f2fd9f51a99193db1c85556e6251bcfcdf27e692c8e4ffc5e72f4150c4b1",
+      "files": [
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libbz2.1.dylib",
+          "target": "lib/libbz2.1.dylib",
+          "sha256": "b690a7df6eeedc099e60960f36f9718ad0a61e80ec917ea5037241014913367e"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libffi.7.dylib",
+          "target": "lib/libffi.7.dylib",
+          "sha256": "f3a382ab46a0e70e5bb8f0e8b3a5ef25ebb2884734e8b7eb3b9c5e81ffa2eb44"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libglib-2.0.0.dylib",
+          "target": "lib/libglib-2.0.0.dylib",
+          "sha256": "630edbc5a24893befbbfa922d3fdddd5809835a35bed04025544fdebb50b74dc"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgmodule-2.0.0.dylib",
+          "target": "lib/libgmodule-2.0.0.dylib",
+          "sha256": "8a88a0c35a8f3579e63ca1ec980c5c541b258496abbda6d0b2608311cad35080"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgobject-2.0.0.dylib",
+          "target": "lib/libgobject-2.0.0.dylib",
+          "sha256": "4de650d9ad183491edcb34d969ac74674e66b3ea74669fbec75dbcd72c0c288d"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstapp-1.0.0.dylib",
+          "target": "lib/libgstapp-1.0.0.dylib",
+          "sha256": "4c0b324d4c431248d60b54a6c6a8e8a9cbf42dbe1f07d2321457028ee010c346"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstaudio-1.0.0.dylib",
+          "target": "lib/libgstaudio-1.0.0.dylib",
+          "sha256": "0936b408c562ff8c7be102bf09d8b9bb7015fabd5adb9bfd195f342e9d56bc9e"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstbase-1.0.0.dylib",
+          "target": "lib/libgstbase-1.0.0.dylib",
+          "sha256": "ce87bcd3bc2497427be31f502384ac4d747b9b939619ec9d13a0a959cec4070c"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstcodecparsers-1.0.0.dylib",
+          "target": "lib/libgstcodecparsers-1.0.0.dylib",
+          "sha256": "fd2b2830dd296e57b728ae8f7be2b07674732b386a9093389406aa377381af26"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstpbutils-1.0.0.dylib",
+          "target": "lib/libgstpbutils-1.0.0.dylib",
+          "sha256": "9c911637cb2e0d6ce012da9ab3f8be9bcad3761fdfb505cf231c28f31a5f7b82"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstriff-1.0.0.dylib",
+          "target": "lib/libgstriff-1.0.0.dylib",
+          "sha256": "323529822e22ac60a4ab38db13efcb13c426a95e80ff9a8afc57fe972870b37f"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgsttag-1.0.0.dylib",
+          "target": "lib/libgsttag-1.0.0.dylib",
+          "sha256": "09fbe5f4c8e7067136f41dd02b2c7326d3efb3803230157827790b615a76e8a9"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstvideo-1.0.0.dylib",
+          "target": "lib/libgstvideo-1.0.0.dylib",
+          "sha256": "d128e9c2e9b4eeb2de00dcc20ace2ba01d9ecb7745c80ef1a6c7fb2d7814b519"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libintl.8.dylib",
+          "target": "lib/libintl.8.dylib",
+          "sha256": "cb2fa55fb005cad622c83ca17d4f6ebf200e57dfd212fdcfba26e49929cd9523"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/liborc-0.4.0.dylib",
+          "target": "lib/liborc-0.4.0.dylib",
+          "sha256": "af15e3669f6bb2a2476896b12525068837e24a54295bc7f5c2b8b806af62aee5"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libpcre2-8.0.dylib",
+          "target": "lib/libpcre2-8.0.dylib",
+          "sha256": "b93f519ccba7c8563d61f1207136f8525566d113d559d9e7a31ba611e6032a9f"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libz.1.dylib",
+          "target": "lib/libz.1.dylib",
+          "sha256": "dfff49663a8b04874a86b83e50308cc78789d5b0a3d01c2da765fee219166189"
+        }
+      ]
+    },
+    {
+      "package": "gstreamer-plugins-libs",
+      "url": "https://files.pythonhosted.org/packages/52/66/721baa450a9d96f959709c773e9ab8db0080d7f15495ef94749e8add1424/gstreamer_plugins_libs-1.29.2a0-cp39-abi3-macosx_10_13_universal2.whl",
+      "sha256": "36a8884c45c173242cbc538d75c78470c25b6e6cb683535f9b09795284af7540",
+      "files": [
+        {
+          "source": "gstreamer_plugins_libs-1.29.2a0.data/purelib/gstreamer_plugins_libs/lib/libvpx.9.dylib",
+          "target": "lib/libvpx.9.dylib",
+          "sha256": "5c23eb4fc7a6e644e86f801c96b4e9ece97cd72f4928ada7f96876e064e10fb8"
+        }
+      ]
+    }
+  ]
+}
