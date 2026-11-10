@@ -46,20 +46,53 @@ public partial class MainWindow
     private bool PuppetActive => preferences.AgentEnabled && preferences.PuppetMode;
     private bool HasScheduledMcpSpeech => mcpNextSpeech != null;
     private bool AgentDailyActive => preferences.AgentEnabled && preferences.AgentDailySpeech;
-    private async Task<AgentSpeechBrief> BuildAgentSpeechBrief(string kind, CancellationToken token)
+    private async Task<AgentSpeechBrief> BuildAgentSpeechBrief(string kind, bool allowImages, CancellationToken token)
     {
         bool publicInfo = preferences.PublicInfo;
         var material = await brain.AgentSpeechBrief(kind == "weather_request", publicInfo, token);
         if (!material.ObserveScreen) return new(material.Text);
         if (!preferences.ForegroundEnabled) return new(material.Text + "\n本轮未启用读取前台内容，按已有情境自然关心主人。");
         var handle = CompanionNative.ResolveSpeechForeground(CompanionNative.GetForegroundWindow(), lastExternalForeground);
+        if (!allowImages)
+        {
+#if COMPANION_OCR
+            DiagnosticLog.Write(DiagnosticEvent.ScreenReadStarted, kind: "ocr");
+            try
+            {
+                var ocr = await CompanionOcr.ReadAsync(handle, token);
+                token.ThrowIfCancellationRequested();
+                DiagnosticLog.Write(DiagnosticEvent.ScreenReadCompleted, kind: "ocr", count: ocr.WordCount,
+                    elapsedMs: ocr.CaptureMilliseconds + ocr.RecognizeMilliseconds);
+                return new(CompanionBrain.CompleteAgentScreenBrief(material, ocr.Context, true)
+                    + "\n当前 Agent 未启用图片输入，已改用本地文字识别提供前台内容。", null, "ocr");
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "ocr", error: error);
+                return new(material.Text + "\n本轮未取得可用读屏内容，按已有情境自然关心主人。");
+            }
+#else
+            try
+            {
+                var context = await Task.Run(() => CompanionNative.ForegroundContext(handle), token);
+                token.ThrowIfCancellationRequested();
+                return new(CompanionBrain.CompleteAgentScreenBrief(material, context, false)
+                    + "\n当前 Agent 未启用图片输入，已改用前台窗口文字线索提供当前情境。");
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "text", error: error);
+                return new(material.Text + "\n本轮未取得可用读屏内容，按已有情境自然关心主人。");
+            }
+#endif
+        }
         var captured = await Task.Run(() => CompanionCaptureFallback.ReadAsync(
             () => Task.FromResult(CompanionScreenCapture.Capture(handle, 2560, true)),
             () => Task.FromResult(CompanionScreenCapture.CaptureScreen(2560)), token), token);
         var image = captured.Image;
         token.ThrowIfCancellationRequested();
         return image == null ? new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。")
-            : new(material.Text + "\n" + (captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : "本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。"), AgentPromptImage.FromDataUrl(image.DataUrl));
+            : new(material.Text + "\n" + (captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : "本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。"), AgentPromptImage.FromDataUrl(image.DataUrl), "image");
     }
 
     private void ConfigureAgent()
@@ -93,7 +126,7 @@ public partial class MainWindow
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
         if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.InvokeAsync(() => RequestAgentLocalSpeech(token)).Task.Unwrap();
-        agent.SpeechBrief = (kind, token) => Dispatcher.InvokeAsync(() => BuildAgentSpeechBrief(kind, token)).Task.Unwrap();
+        agent.SpeechBrief = (kind, allowImages, token) => Dispatcher.InvokeAsync(() => BuildAgentSpeechBrief(kind, allowImages, token)).Task.Unwrap();
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();
     }
@@ -198,6 +231,16 @@ public partial class MainWindow
                     token.ThrowIfCancellationRequested();
                     if (!preferences.McpEnabled) throw new OperationCanceledException();
                     if (image == null) throw new IOException("未能截取屏幕。");
+                    if (agent?.Connected == true && !agent.SupportsImages)
+                    {
+#if COMPANION_OCR
+                        var ocr = await CompanionOcr.RecognizeAsync(image, identity, 0, token, name == "capture_foreground" && CompanionNative.IsDesktopWindow(handle));
+                        return ControlTools.Text(new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow, mode = "ocr", text = ocr.Context });
+#else
+                        var context = await Task.Run(() => CompanionNative.ForegroundContext(handle), token);
+                        return ControlTools.Text(new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow, mode = "text", text = context });
+#endif
+                    }
                     return ControlTools.Image(image.DataUrl, new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow });
                 case "play_action": case "interrupt_action":
                     var action = ControlTools.RequiredText(args, "action", 200);

@@ -185,7 +185,7 @@ dotnet build ./code/BigBlueFish.Windows/BigBlueFish.Windows.csproj -c Release -p
 - 角色动画：106 段透明 WebM 动画来自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，MIT 许可，播放素材经本项目提升至 1280×720、60 帧/秒，并保留原始分辨率与帧率的兼容素材，动作的选择与触发逻辑为本项目定制；
 - 本地模型：Qwen3.5-4B 及其衍生的 heretic 版本与 GGUF 转换，Apache-2.0 许可，模型文件由用户另行下载；
 - 推理与运行环境：llama.cpp（MIT）、.NET 10 运行时（MIT）、Microsoft Visual C++ 运行库（Microsoft 再分发条款）；
-- 动画解码：Windows 版使用随包提供的 GStreamer 组件及本项目的 DirectComposition 显示组件，Linux 版使用系统 GStreamer；
+- 动画解码：Windows 版使用随包提供的 GStreamer 组件（D3D12 VP9 硬解与软件兼容解码），Linux 版使用系统 GStreamer；
 - Linux 界面：Avalonia、MicroCom.Runtime、Tmds.DBus.Protocol、SkiaSharp、HarfBuzzSharp（MIT）；
 - 文字识别：Windows 版使用系统提供的 Windows.Media.Ocr，Linux 版使用 Tesseract；
 - 气泡字体：乐米小奶泡体，按其公布的免费商用条款内嵌；

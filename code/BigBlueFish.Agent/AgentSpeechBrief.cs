@@ -12,4 +12,4 @@ public sealed record AgentPromptImage(string MimeType, string Data)
     }
 }
 
-public sealed record AgentSpeechBrief(string Text, AgentPromptImage? Image = null);
+public sealed record AgentSpeechBrief(string Text, AgentPromptImage? Image = null, string? MaterialKind = null);

@@ -309,15 +309,19 @@ internal static partial class Program
             Check(File.ReadAllText("preferences.json").Contains("\"AnimationIntervalSeconds\": 70"),"interval persisted");
             Check(Property<string>(prefs,"WeatherRegionCode")=="340104"&&Property<int>(prefs,"BubbleDurationIndex")==5,"settings opening preserved choices");
             Set(prefs,"ForegroundEnabled",true);
-            var visualBrief=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",System.Threading.CancellationToken.None)!;
+            var visualBrief=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",true,System.Threading.CancellationToken.None)!;
             Wait(()=>visualBrief.IsCompleted,15,"host finishes actual foreground screenshot preparation");
             var actualBrief=visualBrief.GetAwaiter().GetResult();
             Check(actualBrief.Image!=null&&actualBrief.Image.MimeType=="image/png"&&!actualBrief.Text.Contains("本机OCR"),"Agent host supplies real screenshot without OCR instruction");
             using(var agentImageBytes=new MemoryStream(Convert.FromBase64String(actualBrief.Image!.Data)))
             {var decoded=BitmapFrame.Create(agentImageBytes,BitmapCreateOptions.None,BitmapCacheOption.OnLoad);Check(decoded.PixelWidth>100&&decoded.PixelHeight>100,"actual host screenshot bytes decode to a real image");}
             File.WriteAllBytes("agent-foreground.png",Convert.FromBase64String(actualBrief.Image.Data));
+            var nonImageBrief=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",false,System.Threading.CancellationToken.None)!;
+            Wait(()=>nonImageBrief.IsCompleted,15,"host finishes non-image screen fallback preparation");
+            var degradedBrief=nonImageBrief.GetAwaiter().GetResult();
+            Check(degradedBrief.Image==null&&degradedBrief.Text.Contains("【鱼鱼说话要求】"),"non-image Agent brief omits image block cleanly");
             Set(prefs,"ForegroundEnabled",false);
-            var noScreen=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",System.Threading.CancellationToken.None)!;
+            var noScreen=(Task<BigBlueFish.Agent.AgentSpeechBrief>)Invoke(w,"BuildAgentSpeechBrief","speech_test",true,System.Threading.CancellationToken.None)!;
             Wait(()=>noScreen.IsCompleted,5,"disabled screen preparation completes");
             Check(noScreen.Result.Image==null,"disabled foreground setting suppresses automatic Agent image");
             navigation[1].RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump(100);

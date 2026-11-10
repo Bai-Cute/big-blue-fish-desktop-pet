@@ -4,7 +4,7 @@ using BigBlueFish.Control;
 
 static class LiveProbe
 {
-    public static async Task<int> Run(string id, string root, bool prompt, bool configure = false)
+    public static async Task<int> Run(string id, string root, bool prompt, bool configure = false, bool wakeup = false)
     {
         root = Path.GetFullPath(root); Directory.CreateDirectory(root);
         string pipe = "BigBlueFish.LiveProbe." + Guid.NewGuid().ToString("N");
@@ -71,6 +71,36 @@ static class LiveProbe
             while (DateTime.UtcNow < limit && said == 0 && !host.Status.Contains("失败") && !host.Status.StartsWith("需要登录") && !host.Detail.StartsWith("本轮")) await Task.Delay(100);
             if (said == 0) { Console.WriteLine("RESULT no say tool call; real reply path not verified. guide calls=" + guide); return Finish(4, "No say tool call"); }
             while (host.Busy && DateTime.UtcNow < limit) await Task.Delay(100);
+            if (wakeup)
+            {
+                bool observedAllowImages = true;
+                host.SpeechBrief = (kind, allowImages, _) =>
+                {
+                    observedAllowImages = allowImages;
+                    Console.WriteLine($"SPEECH_BRIEF kind={kind} allowImages={allowImages} supportsImages={host.SupportsImages}");
+                    return Task.FromResult(allowImages
+                        ? new AgentSpeechBrief("【鱼鱼说话要求】用温柔简短的中文说一句关心主人的话，只调用一次say。【说话要求结束】\n【本轮屏幕资料】现在是测试时刻，主人正在阅读技术文档。【屏幕资料结束】",
+                            new("image/png", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jB9sAAAAASUVORK5CYII="), "image")
+                        : new AgentSpeechBrief("【鱼鱼说话要求】用温柔简短的中文说一句关心主人的话，只调用一次say。【说话要求结束】\n【本轮屏幕资料】现在是测试时刻，前台窗口：VS Code — 正在查看蓝色大肥鱼项目代码。【屏幕资料结束】\n当前 Agent 未启用图片输入，已改用本地文字识别提供前台内容。",
+                            null, "ocr"));
+                };
+                host.Configure(id, new(true, true, true));
+                await Task.Delay(300);
+                while (host.Busy && DateTime.UtcNow < limit) await Task.Delay(100);
+                int beforeWake = said;
+                bool briefCalled = false;
+                var origBrief = host.SpeechBrief;
+                host.SpeechBrief = async (k, a, t) => { briefCalled = true; return await origBrief!(k, a, t); };
+                host.Wakeups.Clear();
+                host.Wakeups.Schedule(id, host.SessionId, "定时关心主人", 30, null, null, DateTimeOffset.Now.AddMinutes(-1));
+                host.Tick(DateTimeOffset.Now, true);
+                limit = DateTime.UtcNow.AddMinutes(3);
+                while (DateTime.UtcNow < limit && !briefCalled && !host.Status.Contains("失败")) await Task.Delay(100);
+                while (DateTime.UtcNow < limit && host.Busy) await Task.Delay(100);
+                if (said <= beforeWake || observedAllowImages != host.SupportsImages)
+                { Console.WriteLine($"RESULT wakeup failed; said={said} before={beforeWake} allowImages={observedAllowImages}"); return Finish(5, "Wakeup care failed"); }
+                Console.WriteLine("WAKEUP care verified via real say tool; allowImages=" + observedAllowImages);
+            }
             Console.WriteLine("RESULT real Agent tool-only reply verified; guide calls=" + guide); return Finish(0, "Real Agent say tool reply");
         }
     }

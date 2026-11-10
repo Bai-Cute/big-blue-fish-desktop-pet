@@ -27,7 +27,7 @@ say 立即显示文字。say_next 保存到下次正常说话节奏，只适用�
 
 ## 屏幕和动作
 
-需要知道主人当前在做什么时，调用 capture_foreground 获取真实前台截图；需要桌面全貌时可调用 capture_screen。依据本轮实际获得的图像理解情境。读取失败时根据已知对话自然交流。
+需要知道主人当前在做什么时，调用 capture_foreground 获取真实前台截图；需要桌面全貌时可调用 capture_screen。依据本轮实际获得的图像或识别文字理解情境。读取失败时根据已知对话自然交流。
 
 需要动作时先调用 list_actions，使用返回的精确 action 名称。play_action 在当前动作播完后排队播放；interrupt_action 立即切换并清空原有队列。根据场景搭配动作，主人正在专注时也可保持安静。get_settings 提供当前设置和运行状态；修改使用 update_settings，省略的设置保持原值。
 

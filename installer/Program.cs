@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -190,6 +191,8 @@ internal sealed class InstallerForm : ModernWindow
         CreateShortcut(desktop, target);
         CreateShortcut(startMenu, target);
         CreateShortcut(uninstallMenu, target, InstallationLifecycle.UninstallerName, $"--uninstall \"{target}\"");
+        if (File.Exists(legacyStartMenu)) CreateShortcut(legacyStartMenu, target);
+        try { SHChangeNotify(0x08000000, 0, IntPtr.Zero, IntPtr.Zero); } catch { }
         ApplicationData.Prepare(target);
         InstallationLifecycle.GrantUserAccess(target);
     }
@@ -259,6 +262,9 @@ internal sealed class InstallerForm : ModernWindow
         return new LimitedStream(stream, length);
     }
 
+    [DllImport("shell32.dll")]
+    private static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
     private static void CreateShortcut(string shortcutPath, string target, string executableName = "BigBlueFish.exe", string arguments = "")
     {
         try
@@ -270,7 +276,7 @@ internal sealed class InstallerForm : ModernWindow
             shortcut.TargetPath = Path.Combine(target, executableName);
             shortcut.Arguments = arguments;
             shortcut.WorkingDirectory = target;
-            shortcut.IconLocation = "\"" + Path.Combine(target, "BigBlueFish.ico") + "\",0";
+            shortcut.IconLocation = Path.Combine(target, "BigBlueFish.ico") + ",0";
             shortcut.Description = "蓝色大肥鱼桌宠";
             shortcut.Save();
         }

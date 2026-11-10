@@ -62,7 +62,13 @@ public partial class MainWindow
         if (IsMouseCaptured) ReleaseMouseCapture();
         dragging = false;
         CancelMovement();
-        if (companionReady && !exitAnimation) PlayIdle();
+        if (videoPlayer != null && !companionClosed && !exitAnimation)
+        {
+            consecutiveAnimationFailures = 0;
+            videoPlayer.ResetHardwareFallback();
+            companionReady = true;
+            PlayIdle();
+        }
         notifyIcon?.EnsureRegistered();
         nextWarmup = DateTime.MinValue;
         nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
@@ -302,7 +308,10 @@ public partial class MainWindow
             if (companionClosed)
                 return;
             if (e.Mode == PowerModes.Suspend)
+            {
+                if (videoPlayer != null) videoPlayer.Paused = true;
                 InvalidateSpeechRequests(true);
+            }
             else if (e.Mode == PowerModes.Resume)
                 RecoverCompanionSession();
             ApplyCompanionPowerPolicy();
@@ -400,18 +409,17 @@ public partial class MainWindow
         CompanionNative.GetCursorPos(out var p);
         dragStart = new Point(p.X, p.Y);
         windowStart = new Point(Left, Top);
-        if(videoImage is not CompanionSpriteImage{IsNativeInput:true})CaptureMouse();
+        CaptureMouse();
     }
 
-    internal void TraceCompanionPointer(uint message,uint buttons)
+    internal void TraceCompanionPointer(uint message, uint buttons)
     {
-        if(App.Args.Contains("--test-mode"))File.AppendAllText("input-test.jsonl",System.Text.Json.JsonSerializer.Serialize(new{message,buttons,dragging,dragged,captured=IsMouseCaptured,Left,Top})+Environment.NewLine);
+        if (App.Args.Contains("--test-mode")) File.AppendAllText("input-test.jsonl", System.Text.Json.JsonSerializer.Serialize(new { message, buttons, dragging, dragged, captured = IsMouseCaptured, Left, Top }) + Environment.NewLine);
     }
 
     private void CompanionMove(object sender, MouseEventArgs e)
     {
-        bool leftPressed=videoImage is CompanionSpriteImage{IsNativeInput:true} native?native.NativeLeftPressed:e.LeftButton==MouseButtonState.Pressed;
-        if (!dragging || !leftPressed)
+        if (!dragging || e.LeftButton != MouseButtonState.Pressed)
             return;
         CompanionNative.GetCursorPos(out var p);
         var dpi = VisualTreeHelper.GetDpi(this);
@@ -438,7 +446,7 @@ public partial class MainWindow
             return;
         e.Handled = true;
         dragging = false;
-        if(videoImage is not CompanionSpriteImage{IsNativeInput:true})ReleaseMouseCapture();
+        ReleaseMouseCapture();
         ClampCompanion();
         anchor = new Point(Left, Top);
         SaveCompanion();

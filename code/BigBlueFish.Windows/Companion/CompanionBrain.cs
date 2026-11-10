@@ -563,8 +563,14 @@ internal sealed class CompanionBrain : IDisposable
         return candidates.Length == 0 ? null : candidates[Random.Shared.Next(candidates.Length)];
     }
 
-    internal sealed record AgentBriefMaterial(string Text, bool ObserveScreen);
+    internal sealed record AgentBriefMaterial(string Text, bool ObserveScreen, string ScreenContext = "", string ReactionHint = "");
     private static string AgentBrief(string persona, string request = "") => "【鱼鱼说话要求】\n" + persona + "\n【说话要求结束】" + (request.Length > 0 ? "\n" + request : "");
+    internal static string CompleteAgentScreenBrief(AgentBriefMaterial material, string? screenObservation, bool ocrMode)
+    {
+        if (!material.ObserveScreen || string.IsNullOrWhiteSpace(screenObservation)) return material.Text;
+        return AgentBrief(FixedSpeechInstructions(ocrMode ? OcrPersona : Persona) + material.ReactionHint,
+            SpeechRequest(material.ScreenContext + "\n" + screenObservation));
+    }
     internal async Task<AgentBriefMaterial> AgentSpeechBrief(bool weatherRequest, bool usePublic, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
@@ -574,8 +580,9 @@ internal sealed class CompanionBrain : IDisposable
         if (news != null) { DiagnosticLog.Write(DiagnosticEvent.AgentMaterials, kind: "news"); lastNewsTitle = news.Title; return new(AgentBrief(NewsPersona, NewsRequest(news.Context)), false); }
         string context = $"现在是{DateTime.Now:yyyy年M月d日 HH:mm}。";
         if (usePublic && Random.Shared.NextDouble() < .15) context += "\n" + WeatherContext();
+        string hint = CompanionDialogue.ReactionHint();
         DiagnosticLog.Write(DiagnosticEvent.AgentMaterials, kind: "persona");
-        return new(AgentBrief(FixedSpeechInstructions(Persona) + CompanionDialogue.ReactionHint(), SpeechRequest(context)), true);
+        return new(AgentBrief(FixedSpeechInstructions(Persona) + hint, SpeechRequest(context)), true, context, hint);
     }
 
     internal async Task<string> Generate(bool usePublic, bool useForeground, IntPtr foregroundHandle = default, Action<string>? onPartial = null)

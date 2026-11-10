@@ -29,13 +29,31 @@ internal sealed partial class LinuxPetWindow
     AgentCoordinator? agent;
     readonly string agentPipe = ControlTools.PipeName + "." + Guid.NewGuid().ToString("N");
     bool AgentDailyActive => Preferences.AgentEnabled && Preferences.AgentDailySpeech;
-    async Task<AgentSpeechBrief> BuildAgentSpeechBrief(string kind, CancellationToken token)
+    async Task<AgentSpeechBrief> BuildAgentSpeechBrief(string kind, bool allowImages, CancellationToken token)
     {
         bool publicInfo = Preferences.PublicInfo;
         var material = await brain.AgentSpeechBrief(kind == "weather_request", publicInfo, token);
         if (!material.ObserveScreen) return new(material.Text);
         if (!Preferences.ForegroundEnabled) return new(material.Text + "\n本轮未启用读取前台内容，按已有情境自然关心主人。");
         var handle = CompanionNative.ResolveForeground(CompanionNative.GetForegroundWindow(), lastForeground);
+        if (!allowImages)
+        {
+            DiagnosticLog.Write(DiagnosticEvent.ScreenReadStarted, kind: "ocr");
+            try
+            {
+                var ocr = await CompanionOcr.ReadAsync(handle, token);
+                token.ThrowIfCancellationRequested();
+                DiagnosticLog.Write(DiagnosticEvent.ScreenReadCompleted, kind: "ocr", count: ocr.WordCount,
+                    elapsedMs: ocr.CaptureMilliseconds + ocr.RecognizeMilliseconds);
+                return new(CompanionBrain.CompleteAgentScreenBrief(material, ocr.Context, true)
+                    + "\n当前 Agent 未启用图片输入，已改用本地文字识别提供前台内容。", null, "ocr");
+            }
+            catch (Exception error) when (error is not OperationCanceledException)
+            {
+                DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "ocr", error: error);
+                return new(material.Text + "\n本轮未取得可用读屏内容，按已有情境自然关心主人。");
+            }
+        }
         try
         {
             var captured = await CompanionCaptureFallback.ReadAsync<CompanionWindowImage>(
@@ -44,7 +62,7 @@ internal sealed partial class LinuxPetWindow
             var image = captured.Image;
             token.ThrowIfCancellationRequested();
             if (image == null) return new(material.Text + "\n本轮未取得有效截图，按已有情境自然关心主人。");
-            return new(material.Text + "\n" + (captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : "本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。"), AgentPromptImage.FromDataUrl(image.DataUrl));
+            return new(material.Text + "\n" + (captured.FullScreen ? CompanionCaptureFallback.ScreenIdentity : "本轮附图是按桌宠前台规则取得的当前界面，用于理解主人眼前的活动。"), AgentPromptImage.FromDataUrl(image.DataUrl), "image");
         }
         catch (IOException) { return new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。"); }
     }
@@ -70,7 +88,7 @@ internal sealed partial class LinuxPetWindow
             App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
         if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
-        agent.SpeechBrief = (kind, token) => Dispatcher.UIThread.InvokeAsync(() => BuildAgentSpeechBrief(kind, token));
+        agent.SpeechBrief = (kind, allowImages, token) => Dispatcher.UIThread.InvokeAsync(() => BuildAgentSpeechBrief(kind, allowImages, token));
         ConfigureAgent();
         if (AgentDailyActive) brain.Stop();
     }
@@ -121,6 +139,11 @@ internal sealed partial class LinuxPetWindow
                     var image = await LinuxCapture.CaptureAsync(handle, limit, name == "capture_screen", token);
                     token.ThrowIfCancellationRequested();
                     if (!Preferences.McpEnabled) throw new OperationCanceledException();
+                    if (agent?.Connected == true && !agent.SupportsImages)
+                    {
+                        var ocr = await CompanionOcr.RecognizeAsync(image, identity, 0, token, name == "capture_foreground" && !CompanionNative.Wayland && CompanionNative.IsDesktopWindow(handle));
+                        return ControlTools.Text(new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow, mode = "ocr", text = ocr.Context });
+                    }
                     return ControlTools.Image(image.DataUrl, new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow });
                 case "play_action": case "interrupt_action":
                     string action = ControlTools.RequiredText(args, "action", 200);

@@ -134,8 +134,15 @@ internal static class CompanionScreenCapture
         if (bounds.Width <= 0 || bounds.Height <= 0 || (long)bounds.Width * bounds.Height > 150_000_000)
             throw new IOException("屏幕尺寸无效或超过可用截图范围。");
         using var bitmap = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format32bppArgb);
-        using (var graphics = Graphics.FromImage(bitmap))
+        try
+        {
+            using var graphics = Graphics.FromImage(bitmap);
             graphics.CopyFromScreen(bounds.Left, bounds.Top, 0, 0, bounds.Size, CopyPixelOperation.SourceCopy);
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or ExternalException)
+        {
+            return null;
+        }
         using var normalized = Resize(bitmap, maxDimension);
         using var output = new MemoryStream();
         normalized.Save(output, ImageFormat.Png);

@@ -6,18 +6,27 @@ using System.Windows.Media.Imaging;
 namespace BigBlueFish.Windows;
 internal sealed class CompanionSpriteImage : Image
 {
-    internal byte[]? InputPixels;
-    internal int InputWidth,InputHeight;
-    internal bool IsNativeInput,NativeLeftPressed;
-    internal event System.Action? NativeCaptureLost;
-    internal void CancelNativeCapture()=>NativeCaptureLost?.Invoke();
+    private byte[]? framePixels;
+    private int frameWidth, frameHeight;
+
+    internal void UpdatePixels(byte[]? pixels, int width, int height)
+    {
+        frameWidth = width;
+        frameHeight = height;
+        framePixels = pixels;
+    }
+
     protected override HitTestResult? HitTestCore(PointHitTestParameters parameters)
     {
-        if(ActualWidth<=0||ActualHeight<=0)return null;
-        if(InputPixels!=null)
+        if (ActualWidth <= 0 || ActualHeight <= 0) return null;
+        var pixels = framePixels;
+        int w = frameWidth, h = frameHeight;
+        if (pixels != null && w > 0 && h > 0 && pixels.Length >= w * h * 4)
         {
-            int mx=(int)(parameters.HitPoint.X*InputWidth/ActualWidth),my=(int)(parameters.HitPoint.Y*InputHeight/ActualHeight);
-            return mx>=0&&my>=0&&mx<InputWidth&&my<InputHeight&&InputPixels[(my*InputWidth+mx)*4+3]>=16?new PointHitTestResult(this,parameters.HitPoint):null;
+            int px = (int)(parameters.HitPoint.X * w / ActualWidth);
+            int py = (int)(parameters.HitPoint.Y * h / ActualHeight);
+            return px >= 0 && py >= 0 && px < w && py < h && pixels[(py * w + px) * 4 + 3] >= 16
+                ? new PointHitTestResult(this, parameters.HitPoint) : null;
         }
         if (Source is not BitmapSource bitmap) return null;
         int x = (int)(parameters.HitPoint.X * bitmap.PixelWidth / ActualWidth);

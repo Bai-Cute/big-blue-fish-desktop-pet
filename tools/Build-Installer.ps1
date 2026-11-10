@@ -11,7 +11,6 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 & "$PSScriptRoot/Setup-Gstreamer.ps1"
-& "$PSScriptRoot/Build-Composition.ps1"
 $Version = & "$PSScriptRoot/Get-ProjectVersion.ps1" -Version $Version
 $sdk = & "$root/code/tools/Resolve-Sdk.ps1" -SdkPath $SdkPath
 if (!$WorkDirectory) { $WorkDirectory = Join-Path $root '.work' }
@@ -57,7 +56,18 @@ New-Item -ItemType Directory -Force -Path (Join-Path $payload 'data/models') | O
 & $sdk publish "$root/uninstaller/BigBlueFish.Uninstall.csproj" -c Release -r win-x64 --self-contained true "-p:CompanionEdition=$Edition" -p:RestoreLockedMode=true "-p:Version=$Version" -o $uninstaller --nologo
 if ($LASTEXITCODE -ne 0) { throw '卸载器编译失败。' }
 Copy-Item -LiteralPath (Join-Path $uninstaller 'Uninstall.exe') -Destination $payload
-Compress-Archive -Path (Join-Path $payload '*') -DestinationPath $payloadZip -CompressionLevel Optimal
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$zipStream = [IO.File]::Open($payloadZip, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+try {
+    $zip = New-Object IO.Compression.ZipArchive($zipStream, [IO.Compression.ZipArchiveMode]::Create, $false)
+    try {
+        $prefix = $payload.TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+        foreach ($item in Get-ChildItem -LiteralPath $payload -Recurse -Force -File) {
+            $rel = $item.FullName.Substring($prefix.Length).Replace('\','/')
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $item.FullName, $rel, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+        }
+    } finally { $zip.Dispose() }
+} finally { $zipStream.Dispose() }
 New-Item -ItemType Directory -Force -Path $stub | Out-Null
 & $sdk publish "$root/installer/BigBlueFish.Setup.csproj" -c Release "-p:CompanionEdition=$Edition" "-p:CompanionInputMode=$InputMode" -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:RestoreLockedMode=true "-p:Version=$Version" -o $stub --nologo
 if ($LASTEXITCODE -ne 0) { throw '安装器编译失败。' }

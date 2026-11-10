@@ -48,12 +48,13 @@ internal static class Program
     {
         Wait(() => (long)Read("videoPlayer").GetType().GetProperty("Frames",Access)!.GetValue(Read("videoPlayer"))! > 3 && pet.IsVisible,8,"Visible decoded frame ready for physical pointer test");
         var bitmap=(BitmapSource)Read("videoPlayer").GetType().GetField("bitmap",Access)!.GetValue(Read("videoPlayer"))!;
-        var pixels=new byte[640*360*4];bitmap.CopyPixels(pixels,640*4,0);
-        var candidates=from y in Enumerable.Range(100,170) from x in Enumerable.Range(240,160)
-                       where pixels[(y*640+x)*4+3]>220 && pixels[((y+3)*640+x+3)*4+3]>220 && pixels[((y-3)*640+x-3)*4+3]>220
-                       orderby Math.Abs(x-320)+Math.Abs(y-190) select new System.Windows.Point(x,y);
+        int bw=bitmap.PixelWidth,bh=bitmap.PixelHeight,step=Math.Max(1,bw/200);
+        var pixels=new byte[bw*bh*4];bitmap.CopyPixels(pixels,bw*4,0);
+        var candidates=from y in Enumerable.Range(bh*100/360,bh*170/360) from x in Enumerable.Range(bw*240/640,bw*160/640)
+                       where pixels[(y*bw+x)*4+3]>220 && pixels[((y+step)*bw+x+step)*4+3]>220 && pixels[((y-step)*bw+x-step)*4+3]>220
+                       orderby Math.Abs(x-bw/2)+Math.Abs(y-bh*190/360) select new System.Windows.Point(x,y);
         var pixel=candidates.First();var image=(System.Windows.Controls.Image)Read("videoImage");
-        return image.PointToScreen(new System.Windows.Point(pixel.X*image.ActualWidth/640,pixel.Y*image.ActualHeight/360));
+        return image.PointToScreen(new System.Windows.Point(pixel.X*image.ActualWidth/bw,pixel.Y*image.ActualHeight/bh));
     }
     static void ClickFixture(IntPtr handle)
     {

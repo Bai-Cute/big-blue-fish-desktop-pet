@@ -21,7 +21,7 @@ if (args.Length >= 3 && args[0] == "--auth-inventory")
     Console.WriteLine(JsonSerializer.Serialize(new {harness = harness.Id, agent = client.AgentName, version = client.AgentVersion, methods = client.AuthenticationMethods}));
     return;
 }
-if (args.Length >= 3 && args[0] == "--probe") { Environment.ExitCode = await LiveProbe.Run(args[1], args[2], args.Contains("--prompt"), args.Contains("--configure")); return; }
+if (args.Length >= 3 && args[0] == "--probe") { Environment.ExitCode = await LiveProbe.Run(args[1], args[2], args.Contains("--prompt"), args.Contains("--configure"), args.Contains("--wakeup")); return; }
 int passed = 0;
 void Check(bool condition, string label) { if (!condition) throw new Exception("FAIL " + label); passed++; Console.WriteLine("PASS " + label); }
 async Task Until(Func<bool> predicate, string label, int seconds = 15)
@@ -139,7 +139,7 @@ try
     await Until(() => said.Count > before && !host.Busy, "ordinary host daily rhythm can delegate to Agent");
     host.Configure("opencode", new(true, true, true));
     await Until(() => !host.Busy && host.Wakeups.List("opencode", host.SessionId).Length == 1, "Agent trigger mode ready for manual entry tests");
-    host.SpeechBrief = (kind, _) => Task.FromResult(new AgentSpeechBrief("host brief for " + kind));
+    host.SpeechBrief = (kind, _, _) => Task.FromResult(new AgentSpeechBrief("host brief for " + kind));
     int manualBefore = said.Count;
     Check(host.ManualSpeech(false), "manual Agent speech test accepted while automatic timing is controlled by Agent");
     await Until(() => said.Count == manualBefore + 1 && !host.Busy, "manual Agent speech test reaches say tool");
@@ -152,7 +152,9 @@ try
     await Until(() => said.Count == manualBefore + 3 && !host.Busy, "user message completes after speech brief");
     Check(!File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host brief"), "user conversation does not receive the spontaneous speech brief");
     const string samplePng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jB9sAAAAASUVORK5CYII=";
-    host.SpeechBrief = (kind, _) => Task.FromResult(new AgentSpeechBrief("host visual brief", new("image/png", samplePng)));
+    host.SpeechBrief = (kind, allowImages, _) => Task.FromResult(allowImages
+        ? new AgentSpeechBrief("host visual brief", new("image/png", samplePng), "image")
+        : new AgentSpeechBrief("host ocr fallback brief for " + kind, null, "ocr"));
     int visualBefore = said.Count;
     Check(host.ManualSpeech(false), "visual care accepted");
     await Until(() => said.Count == visualBefore + 1 && !host.Busy, "visual care completes through say");
@@ -165,24 +167,43 @@ try
     }
     File.WriteAllText(Path.Combine(host.Workspaces.Current, "fixture-no-images"), ""); host.Reconnect();
     await Until(() => host.Connected && !host.SupportsImages && !host.Busy, "reconnect observes missing image capability");
-    string lastVisual = File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json"));
-    Check(host.ManualSpeech(false), "unsupported image request enters host validation");
-    await Until(() => !host.Busy && host.Detail.Contains("图片输入"), "unsupported image capability gives an explicit failure");
-    Check(said.Count == visualBefore + 1 && File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json")) == lastVisual, "unsupported image is not silently dropped or replaced with OCR");
+    int fallbackBefore = said.Count;
+    Check(host.ManualSpeech(false), "non-image Agent speech test degrades automatically");
+    await Until(() => said.Count == fallbackBefore + 1 && !host.Busy, "non-image Agent completes speech test via text/OCR brief");
+    using (var noImgDoc = JsonDocument.Parse(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json"))))
+    {
+        var prompt = noImgDoc.RootElement.GetProperty("prompt");
+        Check(prompt.GetArrayLength() == 1 && prompt[0].GetProperty("text").GetString()!.Contains("host ocr fallback brief for speech_test"), "missing image capability uses non-image brief without IOException");
+    }
+    host.SpeechBrief = (_, _, _) => Task.FromResult(new AgentSpeechBrief("forced visual brief", new("image/png", samplePng)));
+    host.Wakeups.Clear();
+    host.Wakeups.Schedule("opencode", host.SessionId, "dsh style wakeup", 30, null, null, DateTimeOffset.Now.AddMinutes(-1));
+    host.Tick(DateTimeOffset.Now, true);
+    await Until(() => said.Count == fallbackBefore + 2 && !host.Busy, "wakeup with forced image brief strips unsupported image and delivers event");
     File.Delete(Path.Combine(host.Workspaces.Current, "fixture-no-images")); host.Reconnect();
     await Until(() => host.Connected && host.SupportsImages && !host.Busy, "image capability restored");
+    File.WriteAllText(Path.Combine(host.Workspaces.Current, "fixture-reject-images"), "");
+    host.SpeechBrief = (kind, allowImages, _) => Task.FromResult(allowImages
+        ? new AgentSpeechBrief("host visual brief", new("image/png", samplePng), "image")
+        : new AgentSpeechBrief("host retry fallback brief for " + kind, null, "ocr"));
+    int rejectBefore = said.Count;
+    Check(host.ManualSpeech(false), "runtime image-rejection fallback accepted");
+    await Until(() => said.Count == rejectBefore + 1 && !host.Busy, "runtime image error retries with text/OCR brief and completes say");
+    Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host retry fallback brief for speech_test"), "runtime image rejection retried using non-image brief");
+    File.Delete(Path.Combine(host.Workspaces.Current, "fixture-reject-images"));
+    string lastVisual = File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json"));
     var preparation = new TaskCompletionSource<AgentSpeechBrief>(TaskCreationOptions.RunContinuationsAsynchronously);
-    host.SpeechBrief = (_, _) => preparation.Task;
+    host.SpeechBrief = (_, _, _) => preparation.Task;
     Check(host.ManualSpeech(false), "slow material preparation accepted");
     await Until(() => host.Busy && host.AwaitingSpeech, "preparing a screenshot activates loading status");
     host.Cancel(); await Until(() => !host.Busy && host.Status == "请求已取消", "material preparation is cancellable before prompt dispatch");
     preparation.SetResult(new("abandoned material", new("image/png", samplePng)));
     await Task.Delay(100);
     Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json")) == lastVisual, "cancelled screenshot preparation never leaks into the next turn");
-    host.SpeechBrief = (_, _) => throw new IOException("material fixture failure");
+    host.SpeechBrief = (_, _, _) => throw new IOException("material fixture failure");
     Check(host.ManualSpeech(false), "failed material preparation accepted for validation");
     await Until(() => !host.Busy && host.Detail == "material fixture failure", "preparation failures are reported instead of swallowed");
-    host.SpeechBrief = (kind, _) => Task.FromResult(new AgentSpeechBrief("host brief for " + kind));
+    host.SpeechBrief = (kind, _, _) => Task.FromResult(new AgentSpeechBrief("host brief for " + kind));
     host.Configure("opencode", new(true, false, true));
     string previous = host.SessionId; host.NewConversation();
     await Until(() => host.Connected && host.SessionId != previous && !host.Busy, "new conversation receives different ID");
@@ -323,6 +344,8 @@ static class Fixture
                 case "session/prompt":
                     File.WriteAllText("fixture-last-prompt.json", p.GetRawText());
                     File.WriteAllText("fixture-last-prompt.txt", p.GetProperty("prompt")[0].GetProperty("text").GetString());
+                    if (File.Exists("fixture-reject-images") && p.GetProperty("prompt").EnumerateArray().Any(b => b.GetProperty("type").GetString() == "image"))
+                    { await Send(new { jsonrpc = "2.0", id, error = new { code = -32602, message = "Upstream model does not support image content blocks" } }); break; }
                     if (File.Exists("fixture-prompt-auth") && !File.Exists("fixture-prompt-auth-used"))
                     { File.WriteAllText("fixture-prompt-auth-used", ""); await Send(new {jsonrpc="2.0",id,error=new {code=-32000,message="Authentication required"}}); break; }
                     string text = p.GetProperty("prompt")[0].GetProperty("text").GetString()!;

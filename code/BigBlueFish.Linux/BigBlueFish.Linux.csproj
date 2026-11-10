@@ -4,7 +4,6 @@
   <ItemGroup>
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionCaptureFallback.cs" Link="Shared/CompanionCaptureFallback.cs" />
     <Compile Include="../BigBlueFish.Windows/Companion/CompanionMedia.cs" Link="Shared/CompanionMedia.cs" />
-    <Compile Include="../BigBlueFish.Windows/Companion/CompanionAnimationMask.cs" Link="Shared/CompanionAnimationMask.cs" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
     <ProjectReference Include="../BigBlueFish.Control/BigBlueFish.Control.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />

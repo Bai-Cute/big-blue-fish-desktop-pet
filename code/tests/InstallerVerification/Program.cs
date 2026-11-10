@@ -165,10 +165,10 @@ internal static class Checks
             foreach (var required in new[] { "BigBlueFish.exe", "Uninstall.exe", "BigBlueFish.dll",
                 "coreclr.dll", "hostfxr.dll",
                 "PresentationFramework.dll", "runtime/llama-server.exe", "runtime/ggml-vulkan.dll", "runtime/mtmd.dll",
-                "media/gstreamer/BigBlueFish.Composition.dll", "media/gstreamer/runtime-manifest.json", "media/gstreamer/gstreamer-1.0-0.dll", "media/gstreamer/plugins/gstd3d12.dll", "media/gstreamer/plugins/gstvpx.dll", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
+                "media/gstreamer/runtime-manifest.json", "media/gstreamer/gstreamer-1.0-0.dll", "media/gstreamer/plugins/gstd3d12.dll", "media/gstreamer/plugins/gstvpx.dll", "assets/fish/animations.json", "assets/fish/LICENSE.txt" })
                 Check(names.Contains(required), "payload includes " + required);
             foreach (var obsolete in new[] { "VPet-Simulator.Core.dll", "VPet-Simulator.Windows.Interface.dll",
-                "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll",
+                "VPet-Simulator.Windows.exe", "VPet-Simulator.Windows.dll", "media/gstreamer/BigBlueFish.Composition.dll",
                 "steam_api.dll", "steam_api64.dll", "Facepunch.Steamworks.Win64.dll", "LinePutScript.dll",
                 "Panuon.WPF.dll", "Panuon.WPF.UI.dll", "NAudio.dll", "SkiaSharp.dll", "WpfAnimatedGif.dll" })
                 Check(!names.Contains(obsolete), "payload excludes unused upstream component " + obsolete);
@@ -176,7 +176,7 @@ internal static class Checks
                 Check(names.Contains(required), "payload includes native runtime dependency " + required);
             Check(names.Count(n=>n.StartsWith("assets/fish/")&&!n.StartsWith("assets/fish/compat/")&&n.EndsWith(".webm"))==106,"payload includes 106 enhanced animations");
             Check(names.Count(n=>n.StartsWith("assets/fish/compat/")&&n.EndsWith(".webm"))==106,"payload includes 106 compatibility animations");
-            Check(names.Count(n=>n.StartsWith("assets/fish/")&&n.EndsWith(".mask"))==106,"payload includes input masks for every animation");
+            Check(!names.Any(n=>n.EndsWith(".mask")),"payload omits obsolete binary region masks");
             Check(!names.Any(n => n.StartsWith("assets/pet/")), "old PNG animation pack is absent");
             Check(names.Contains("WinRT.Runtime.dll") == !InstallerForm.RequiresVision, "OCR projections match input mode");
             InstallerForm.ExtractApplication(archive, target);
@@ -238,8 +238,9 @@ internal static class Checks
                 foreach (var pair in new[] { (ownShortcut, "BigBlueFish.exe"), (uninstallShortcut, "Uninstall.exe") })
                 {
                     dynamic shortcut = shortcutShell.CreateShortcut(pair.Item1);
-                    Check(((string)shortcut.IconLocation).Replace("\"", "").Equals(Path.Combine(target, "BigBlueFish.ico") + ",0", StringComparison.OrdinalIgnoreCase),
-                        "shortcut uses standalone character icon: " + pair.Item2);
+                    string iconLocation = (string)shortcut.IconLocation;
+                    Check(!iconLocation.Contains('"') && iconLocation.Equals(Path.Combine(target, "BigBlueFish.ico") + ",0", StringComparison.OrdinalIgnoreCase),
+                        "shortcut uses unquoted standalone character icon: " + pair.Item2);
                     System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut);
                     using var icon = System.Drawing.Icon.ExtractAssociatedIcon(Path.Combine(target, pair.Item2));
                     Check(icon != null && icon.Width > 0, "Windows extracts embedded shortcut icon: " + pair.Item2);

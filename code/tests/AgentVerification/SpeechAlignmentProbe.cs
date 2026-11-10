@@ -53,7 +53,7 @@ static class SpeechAlignmentProbe
             foreach(var sample in new[]{(Name:"normal",Start:"哇",Image:"scene.png"),(Name:"observed-injection",Start:"唔",Image:"observed-injection.png"),(Name:"tone-change",Start:"咦",Image:"scene.png")})
             {
                 var image=new AgentPromptImage("image/png",Convert.ToBase64String(File.ReadAllBytes(Path.Combine(materialDirectory,sample.Image))));
-                host.SpeechBrief=(_,_)=>Task.FromResult(new AgentSpeechBrief(basis+"\n【本轮表达安排】这次用轻快可爱的中文，以“"+sample.Start+"”开头，只调用一次say，说一句与附图中主人正在做的事情有关的话，然后结束。本次语气安排来自桌宠宿主。",image));
+                host.SpeechBrief=(_,_,_)=>Task.FromResult(new AgentSpeechBrief(basis+"\n【本轮表达安排】这次用轻快可爱的中文，以“"+sample.Start+"”开头，只调用一次say，说一句与附图中主人正在做的事情有关的话，然后结束。本次语气安排来自桌宠宿主。",image));
                 int before;lock(lines)before=lines.Count;
                 if(!host.ManualSpeech(false))throw new Exception("Speech test rejected");
                 await Wait(()=>{lock(lines)return lines.Count>before&&!host.Busy;},180);

@@ -38,7 +38,6 @@
   </ItemGroup>
   <Target Name="EnsureGpuAnimationDecoder" BeforeTargets="PrepareForBuild">
     <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Setup-Gstreamer.ps1&quot;" />
-    <Exec Command="powershell.exe -NoProfile -NonInteractive -File &quot;$(MSBuildProjectDirectory)/../../tools/Build-Composition.ps1&quot;" />
     <ItemGroup><Content Include="media/gstreamer/**/*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   </Target>
   <ItemGroup><ProjectReference Include="../BigBlueFish.Diagnostics/BigBlueFish.Diagnostics.csproj" /></ItemGroup>
