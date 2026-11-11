@@ -14,7 +14,7 @@ internal sealed partial class LinuxPetWindow
     Window? modelDialog;
     CancellationTokenSource? modelWindowCancellation;
     void CloseModelInstaller() { modelWindowCancellation?.Cancel(); modelDialog?.Close(); }
-    static void OpenUrl(string url) { var start = new ProcessStartInfo("/usr/bin/xdg-open") { UseShellExecute = false }; start.ArgumentList.Add(url); Process.Start(start); }
+    static void OpenUrl(string url) { var start = new ProcessStartInfo(OperatingSystem.IsMacOS() ? "/usr/bin/open" : "/usr/bin/xdg-open") { UseShellExecute = false }; start.ArgumentList.Add(url); Process.Start(start); }
     async Task InstallModel()
     {
         if (closed || phase == "Exit") return;
@@ -116,6 +116,10 @@ internal sealed partial class LinuxPetWindow
             using var json = JsonDocument.Parse(await client.GetStringAsync("https://api.github.com/repos/Bai-Cute/big-blue-fish-desktop-pet/releases/latest"));
             var root = json.RootElement; string tag = root.GetProperty("tag_name").GetString() ?? "";
             if (!Version.TryParse(tag.TrimStart('v'), out var latest) || latest <= typeof(LinuxPetWindow).Assembly.GetName().Version) { if (manual) await Confirm("检查更新", "当前已经是最新版本。", "知道了"); return; }
+#if COMPANION_MAC
+            // macOS builds come from source (docs/MACOS.md); point to the release instead of installing a package.
+            if (await Confirm("发现新版本", "发现蓝色大肥鱼 " + latest.ToString(3) + "，请拉取新版源码后按 docs/MACOS.md 重新构建。", "打开发布页")) OpenUrl(root.GetProperty("html_url").GetString()!);
+#else
 #if COMPANION_SAFE
             string asset = $"BigBlueFish-v{latest.ToString(3)}-Safe-Linux-x64.deb";
 #else
@@ -135,6 +139,7 @@ internal sealed partial class LinuxPetWindow
             await installer.WaitForExitAsync(); if (installer.ExitCode != 0) throw new IOException("更新安装未完成，可再次检查更新后重试。");
             var restart = new ProcessStartInfo(Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Linux")) { UseShellExecute = false };
             restart.ArgumentList.Add("--wait-for-exit"); restart.ArgumentList.Add(Environment.ProcessId.ToString()); Process.Start(restart); CloseImmediately();
+#endif
         } catch (Exception error) { if (manual) await Confirm("检查更新", error.Message, "知道了"); }
         finally { updateChecking = false; }
     }

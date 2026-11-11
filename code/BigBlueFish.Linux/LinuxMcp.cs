@@ -139,11 +139,6 @@ internal sealed partial class LinuxPetWindow
                     var image = await LinuxCapture.CaptureAsync(handle, limit, name == "capture_screen", token);
                     token.ThrowIfCancellationRequested();
                     if (!Preferences.McpEnabled) throw new OperationCanceledException();
-                    if (agent?.Connected == true && !agent.SupportsImages)
-                    {
-                        var ocr = await CompanionOcr.RecognizeAsync(image, identity, 0, token, name == "capture_foreground" && !CompanionNative.Wayland && CompanionNative.IsDesktopWindow(handle));
-                        return ControlTools.Text(new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow, mode = "ocr", text = ocr.Context });
-                    }
                     return ControlTools.Image(image.DataUrl, new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow });
                 case "play_action": case "interrupt_action":
                     string action = ControlTools.RequiredText(args, "action", 200);

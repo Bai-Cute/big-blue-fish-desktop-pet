@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- The Avalonia pet from BigBlueFish.Linux, with only the X11 platform layer (LinuxCapture.cs) replaced by MacCapture.cs. -->
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework><RuntimeIdentifier>osx-arm64</RuntimeIdentifier><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings><AssemblyName>BigBlueFish.Mac</AssemblyName><DefineConstants>$(DefineConstants);COMPANION_OCR;COMPANION_MAC</DefineConstants></PropertyGroup>
+  <PropertyGroup Condition="'$(CompanionEdition)' == 'Safe'"><NuGetLockFilePath>packages.safe.lock.json</NuGetLockFilePath></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../BigBlueFish.Linux/Program.cs" Link="Linux/Program.cs" />
+    <Compile Include="../BigBlueFish.Linux/GlobalDiagnostics.cs" Link="Linux/GlobalDiagnostics.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxPetWindow.cs" Link="Linux/LinuxPetWindow.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxVideoPlayer.cs" Link="Linux/LinuxVideoPlayer.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxVisuals.cs" Link="Linux/LinuxVisuals.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxTray.cs" Link="Linux/LinuxTray.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxProcesses.cs" Link="Linux/LinuxProcesses.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxMcp.cs" Link="Linux/LinuxMcp.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxSettings.cs" Link="Linux/LinuxSettings.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxMaintenance.cs" Link="Linux/LinuxMaintenance.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxTestCommands.cs" Link="Linux/LinuxTestCommands.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxLogConsole.cs" Link="Linux/LinuxLogConsole.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxAgentSettings.cs" Link="Linux/LinuxAgentSettings.cs" />
+    <Compile Include="../BigBlueFish.Linux/LinuxAgentWorkspaceSettings.cs" Link="Linux/LinuxAgentWorkspaceSettings.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionCaptureFallback.cs" Link="Shared/CompanionCaptureFallback.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionMedia.cs" Link="Shared/CompanionMedia.cs" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <ProjectReference Include="../BigBlueFish.Control/BigBlueFish.Control.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
+    <ProjectReference Include="../BigBlueFish.Agent/BigBlueFish.Agent.csproj" Condition="'$(CompanionEdition)' != 'Safe'" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionPreferences.cs" Link="Shared/CompanionPreferences.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionAnimationPolicy.cs" Link="Shared/CompanionAnimationPolicy.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionDialogue.cs" Link="Shared/CompanionDialogue.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionBrain.cs" Link="Shared/CompanionBrain.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionInferenceDevices.cs" Link="Shared/CompanionInferenceDevices.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionWeather.cs" Link="Shared/CompanionWeather.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionNews.cs" Link="Shared/CompanionNews.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionRegions.cs" Link="Shared/CompanionRegions.cs" />
+    <Compile Include="../BigBlueFish.Windows/Companion/CompanionOcrLayout.cs" Link="Shared/CompanionOcrLayout.cs" />
+    <Compile Include="../../deployment/ModelStore.cs" Link="Shared/ModelStore.cs" />
+    <Compile Include="../../deployment/ArtifactDownload.cs" Link="Shared/ArtifactDownload.cs" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/china-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.china-regions.json" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/us-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.us-regions.json" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/world-regions.json" LogicalName="BigBlueFish.Windows.assets.regions.world-regions.json" />
+    <EmbeddedResource Include="../BigBlueFish.Windows/assets/regions/world-countries.json" LogicalName="BigBlueFish.Windows.assets.regions.world-countries.json" />
+    <AvaloniaResource Include="../BigBlueFish.Windows/Res/Font/LemiXiaoNaiPaoTi.ttf" Link="Assets/LemiXiaoNaiPaoTi.ttf" />
+    <Content Include="../BigBlueFish.Windows/assets/fish/**/*" Link="assets/fish/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../BigBlueFish.Windows/BigBlueFish.ico" Link="BigBlueFish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup><ProjectReference Include="../BigBlueFish.Diagnostics/BigBlueFish.Diagnostics.csproj" /></ItemGroup>
+</Project>

@@ -232,16 +232,6 @@ public partial class MainWindow
                     token.ThrowIfCancellationRequested();
                     if (!preferences.McpEnabled) throw new OperationCanceledException();
                     if (image == null) throw new IOException("未能截取屏幕。");
-                    if (agent?.Connected == true && !agent.SupportsImages)
-                    {
-#if COMPANION_OCR
-                        var ocr = await CompanionOcr.RecognizeAsync(image, identity, 0, token, name == "capture_foreground" && CompanionNative.IsDesktopWindow(handle));
-                        return ControlTools.Text(new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow, mode = "ocr", text = ocr.Context });
-#else
-                        var context = await Task.Run(() => CompanionNative.ForegroundContext(handle), token);
-                        return ControlTools.Text(new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow, mode = "text", text = context });
-#endif
-                    }
                     return ControlTools.Image(image.DataUrl, new { target = name, identity, image.Width, image.Height, capturedAt = DateTimeOffset.UtcNow });
                 case "play_action": case "interrupt_action":
                     var action = ControlTools.RequiredText(args, "action", 200);

@@ -13,7 +13,8 @@ public static class ControlTools
     public const string DailySpeechDescription = "日常关心触发后，由 Agent 编写鱼鱼要说的话。";
     public const string BehaviorControlDescription = "由 Agent 决定何时关心主人、如何切换动作；没有安排时，鱼鱼保持待机。上一个开关决定由 Agent 还是本地模型编写日常吐字。";
     public const string PuppetWarning = "开启后，鱼鱼会暂停自己的日常关心计时和动作切换，保持待机，等待 Agent 安排。如果 Agent 关闭或断开，需关闭此开关，才能恢复鱼鱼自己的日常关心与动作安排。";
-    public static string PipeName => "BigBlueFish.Control." + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+    // macOS $TMPDIR is long and its domain sockets allow only 104 characters, so the socket gets a short absolute path there.
+    public static string PipeName => (OperatingSystem.IsMacOS() ? "/tmp/bbf-" : "BigBlueFish.Control.") + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)))).Substring(0, 20);
     public static object Text(object value) => new { content = new[] { new { type = "text", text = JsonSerializer.Serialize(value) } } };
     public static object Error(string message) => new { isError = true, content = new[] { new { type = "text", text = message } } };

@@ -16,19 +16,21 @@ internal static class CompanionMedia
     internal static bool HardwareAvailable { get; private set; }
     internal static string HardwareFactory => OperatingSystem.IsWindows() ? "d3d12vp9alphadecodebin" : "vavp9alphadecodebin";
     internal static string RuntimeDirectory => Path.Combine(AppContext.BaseDirectory, "media", "gstreamer");
+    // Windows and macOS ship a pinned GStreamer subset; Linux uses the distribution packages.
+    static bool Bundled => OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
 
     static CompanionMedia() => NativeLibrary.SetDllImportResolver(typeof(CompanionMedia).Assembly, Resolve);
     static IntPtr Resolve(string name, Assembly assembly, DllImportSearchPath? path)
     {
         var file = name switch
         {
-            Core => OperatingSystem.IsWindows() ? "gstreamer-1.0-0.dll" : "libgstreamer-1.0.so.0",
-            App => OperatingSystem.IsWindows() ? "gstapp-1.0-0.dll" : "libgstapp-1.0.so.0",
-            Glib => OperatingSystem.IsWindows() ? "glib-2.0-0.dll" : "libglib-2.0.so.0",
+            Core => OperatingSystem.IsWindows() ? "gstreamer-1.0-0.dll" : OperatingSystem.IsMacOS() ? "lib/libgstreamer-1.0.0.dylib" : "libgstreamer-1.0.so.0",
+            App => OperatingSystem.IsWindows() ? "gstapp-1.0-0.dll" : OperatingSystem.IsMacOS() ? "lib/libgstapp-1.0.0.dylib" : "libgstapp-1.0.so.0",
+            Glib => OperatingSystem.IsWindows() ? "glib-2.0-0.dll" : OperatingSystem.IsMacOS() ? "lib/libglib-2.0.0.dylib" : "libglib-2.0.so.0",
             _ => null
         };
         if (file == null) return IntPtr.Zero;
-        return NativeLibrary.Load(OperatingSystem.IsWindows() ? Path.Combine(RuntimeDirectory, file) : file);
+        return NativeLibrary.Load(Bundled ? Path.Combine(RuntimeDirectory, file) : file);
     }
 
     internal static void Initialize()
@@ -46,7 +48,10 @@ internal static class CompanionMedia
                     if (!SetDefaultDllDirectories(0x1000)) throw new IOException("无法准备动画组件加载路径。");
                     dllDirectory = AddDllDirectory(RuntimeDirectory);
                     if (dllDirectory == IntPtr.Zero) throw new IOException("无法加载随包动画组件目录。");
-                    // Only the pinned, bundled plugins participate in Windows playback.
+                }
+                if (Bundled)
+                {
+                    // Only the pinned, bundled plugins participate in Windows and macOS playback.
                     Environment.SetEnvironmentVariable("GST_PLUGIN_SYSTEM_PATH_1_0", "");
                     Environment.SetEnvironmentVariable("GST_PLUGIN_PATH_1_0", "");
                     var cache = Path.Combine(Environment.CurrentDirectory, "cache", "gstreamer");
@@ -55,11 +60,11 @@ internal static class CompanionMedia
                 }
                 Environment.SetEnvironmentVariable("GST_REGISTRY_FORK", "no");
                 gst_init(IntPtr.Zero, IntPtr.Zero);
-                if (OperatingSystem.IsWindows())
+                if (Bundled)
                 {
                     foreach (var plugin in new[] { "coreelements", "app", "matroska", "videoparsersbad", "vpx", "codecalpha", "videoconvertscale", "videorate", "d3d12" })
                     {
-                        var handle = gst_plugin_load_file(Path.Combine(RuntimeDirectory, "plugins", "gst" + plugin + ".dll"), out var error);
+                        var handle = gst_plugin_load_file(Path.Combine(RuntimeDirectory, "plugins", OperatingSystem.IsWindows() ? "gst" + plugin + ".dll" : "libgst" + plugin + ".dylib"), out var error);
                         if (handle == IntPtr.Zero && plugin == "d3d12") { if (error != IntPtr.Zero) Error(error); continue; }
                         if (handle == IntPtr.Zero) throw new IOException("动画组件加载失败：" + plugin + "：" + Error(error));
                         gst_object_unref(handle);

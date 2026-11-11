@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "bigbluefish.diagnostics": {
+        "type": "Project"
+      }
+    },
+    "net10.0/osx-arm64": {}
+  }
+}

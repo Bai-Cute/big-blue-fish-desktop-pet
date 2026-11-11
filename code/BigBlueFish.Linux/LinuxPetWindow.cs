@@ -63,7 +63,7 @@ internal sealed partial class LinuxPetWindow : Window
         PositionChanged += (_, _) => MoveBubble();
         player.PixelsPresented += (pixels,width,height,mirror) => CompanionNative.SetInputShape(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero,pixels,width,height,Width*DesktopScaling/width,mirror);
         player.Failed += error => { DiagnosticLog.Write(DiagnosticEvent.AnimationFailed, state: "failed"); if (phase == "Exit") CloseImmediately(); };
-        bubbleText.FontFamily = new FontFamily("avares://BigBlueFish.Linux/Assets#LemiXiaoNaiPaoTi");
+        bubbleText.FontFamily = new FontFamily("avares://" + typeof(App).Assembly.GetName().Name + "/Assets#LemiXiaoNaiPaoTi");
         bubbleText.Foreground = Hair;
         var close = new Button { Content = "×", Padding = new Thickness(3), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top, Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
         close.Click += (_, _) => { typing = false; bubbleWindow!.Hide(); };
@@ -75,6 +75,7 @@ internal sealed partial class LinuxPetWindow : Window
         var screen = Screens.Primary?.WorkingArea ?? new PixelRect(0, 0, 1280, 720);
         Position = new((int)(Preferences.Left ?? screen.Right - Width * DesktopScaling), (int)(Preferences.Top ?? screen.Bottom - Height * DesktopScaling)); Clamp();
         Opened += async (_, _) => {
+            if (OperatingSystem.IsMacOS()) { Rescale(); Clamp(); } // Avalonia's macOS backend opens a borderless window at 0×0, ignoring the size set before Show
             if (Puppet) Play(policy.Find("待机呼吸休闲"), "PuppetIdle");
             else { Play(policy.Find("女仆屈膝礼仪"), "Startup"); Welcome(); }
             InitializeMcp(); InitializeTray(); timer.Start();
@@ -209,6 +210,7 @@ internal sealed partial class LinuxPetWindow : Window
     {
         if (bubbleWindow.IsVisible) return;
         bubbleWindow.Show(this);
+        if (OperatingSystem.IsMacOS()) MoveBubble(); // same macOS backend issue as the pet window: size set while hidden is dropped
         // Some X11 WMs discard ABOVE when a window is withdrawn. Reassert it
         // after mapping, without activating the bubble or raising it per letter.
         bubbleWindow.Topmost = false;
