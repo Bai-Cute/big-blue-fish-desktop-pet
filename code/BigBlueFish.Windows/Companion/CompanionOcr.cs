@@ -59,8 +59,14 @@ internal static class CompanionOcr
         }
         stream.Seek(0);
         var decoder = await BitmapDecoder.CreateAsync(stream).AsTask(token).ConfigureAwait(false);
-        using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore)
-            .AsTask(token).ConfigureAwait(false);
+        uint maximum = OcrEngine.MaxImageDimension;
+        double ratio = Math.Min(1d, maximum / (double)Math.Max(decoder.PixelWidth, decoder.PixelHeight));
+        var transform = new BitmapTransform {
+            ScaledWidth = Math.Max(1u, (uint)(decoder.PixelWidth * ratio)),
+            ScaledHeight = Math.Max(1u, (uint)(decoder.PixelHeight * ratio))
+        };
+        using var bitmap = await decoder.GetSoftwareBitmapAsync(BitmapPixelFormat.Bgra8, BitmapAlphaMode.Ignore,
+            transform, ExifOrientationMode.IgnoreExifOrientation, ColorManagementMode.DoNotColorManage).AsTask(token).ConfigureAwait(false);
         watch.Restart();
         var result = await engine.RecognizeAsync(bitmap).AsTask(token).ConfigureAwait(false);
         double recognizeMs = watch.Elapsed.TotalMilliseconds;
@@ -71,8 +77,8 @@ internal static class CompanionOcr
         // rather than presenting those fragments as the owner's current topic.
         var context = desktop
             ? identity + "\n画面是壁纸与快捷方式图标，没有展开的应用正文。"
-            : identity + "\n" + CompanionOcrLayout.Format(words, image.Width, image.Height);
-        return new CompanionOcrSnapshot(context, language.LanguageTag, image.Width, image.Height,
+            : identity + "\n" + CompanionOcrLayout.Format(words, bitmap.PixelWidth, bitmap.PixelHeight);
+        return new CompanionOcrSnapshot(context, language.LanguageTag, bitmap.PixelWidth, bitmap.PixelHeight,
             words.Length, captureMs, recognizeMs, words, IsDesktop: desktop);
     }
 }

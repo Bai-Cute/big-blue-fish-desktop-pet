@@ -248,6 +248,9 @@ public sealed class AcpException : IOException
         }
         return message;
     }
+    public bool ImageContentRejected => !AuthenticationRequired &&
+        (ProtocolMessage.Contains("image", StringComparison.OrdinalIgnoreCase)
+        || ProtocolMessage.Contains("图片", StringComparison.Ordinal) || ProtocolMessage.Contains("图像", StringComparison.Ordinal));
     public bool SessionMissing => !AuthenticationRequired && (Code == -32002 || ProtocolMessage.Contains("session", StringComparison.OrdinalIgnoreCase)
         && (ProtocolMessage.Contains("not found", StringComparison.OrdinalIgnoreCase) || ProtocolMessage.Contains("unknown", StringComparison.OrdinalIgnoreCase)
             || ProtocolMessage.Contains("does not exist", StringComparison.OrdinalIgnoreCase) || ProtocolMessage.Contains("expired", StringComparison.OrdinalIgnoreCase)

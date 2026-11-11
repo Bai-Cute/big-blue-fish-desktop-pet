@@ -349,15 +349,17 @@ internal static class Program
                 Check(client.Events.Any(e => e.TryGetProperty("method", out var method) && method.GetString() == "notifications/message" && e.GetProperty("params").GetProperty("data").GetProperty("kind").GetString() == "user_message" && e.GetProperty("params").GetProperty("data").GetProperty("detail").GetProperty("text").GetString() == submitted), "User message pushed through actual MCP unchanged");
                 Check(input.Text.Length == 0 && placeholder.IsVisible, "Actual Ctrl+Enter sends, clears input and restores placeholder");
                 Check(pet.Topmost && !pet.ShowActivated && (WindowStyle(Handle(pet),-20).ToInt64() & 0x08000008) == 0x08000008, "Typing preserves pet topmost non-activating policy");
-                client.Data("say", new { text = "鱼鱼回答主人的话" }); client.Data("say", new { text = "鱼鱼之后随口说的话" }); Pump(100);
+                Wait(() => Read("agent") is AgentCoordinator { Busy: false } && ((TextBlock)Read("bubbleText")).Text == "tool-only response", 10,
+                    "Submitted owner message receives its real fixture tool reply before checking history");
+                client.Data("say", new { text = "鱼鱼之后随口说的话" }); Pump(100);
                 var historyView = Descendants<ScrollViewer>(inputWindow).First(s => s.Content is StackPanel);
                 string HistoryText() => string.Concat(Descendants<TextBlock>((StackPanel)historyView.Content).Select(t => t.Text));
-                void Wheel(int delta) { GetCursorPos(out var old); try { var at = input.PointToScreen(new System.Windows.Point(input.ActualWidth / 2, input.ActualHeight / 2)); SetCursorPos((int)at.X, (int)at.Y); Pump(50); mouse_event(0x0800, 0, 0, unchecked((uint)delta), UIntPtr.Zero); Pump(200); } finally { SetCursorPos(old.X, old.Y); } }
+                void Wheel(int delta) { GetCursorPos(out var old); try { FrameworkElement target = delta < 0 && historyView.IsVisible ? historyView : input; var at = target.PointToScreen(new System.Windows.Point(target.ActualWidth / 2, target.ActualHeight / 2)); SetCursorPos((int)at.X, (int)at.Y); Pump(50); mouse_event(0x0800, 0, 0, unchecked((uint)delta), UIntPtr.Zero); Pump(200); } finally { SetCursorPos(old.X, old.Y); } }
                 double collapsedHeight = inputWindow.Height, collapsedBottom = inputWindow.Top + inputWindow.Height;
                 Check(!historyView.IsVisible, "Chat history stays hidden until the owner scrolls up");
                 Wheel(120);
                 Check(historyView.IsVisible && inputWindow.Height > collapsedHeight && Math.Abs(inputWindow.Top + inputWindow.Height - collapsedBottom) < 1, "Real wheel-up opens history above the editor, keeping the editor in place");
-                Check(HistoryText().Contains(submitted) && HistoryText().Contains("鱼鱼回答主人的话") && !HistoryText().Contains("鱼鱼之后随口说的话"), "Default history keeps the owner's message and the pet reply, not later idle lines");
+                Check(HistoryText().Contains(submitted) && HistoryText().Contains("tool-only response") && !HistoryText().Contains("鱼鱼之后随口说的话"), "Default history keeps the owner's message and the pet reply, not later idle lines");
                 Check(Descendants<TextBlock>((StackPanel)historyView.Content).Single(t => t.Text == submitted).Parent is Border { Background: SolidColorBrush { Color: { R: 0xBF, G: 0xDB, B: 0xFE } } }, "Owner line sits in a light blue bubble");
                 Render((Visual)inputWindow.Content, "mcp-input-history.png", (int)inputWindow.ActualWidth, (int)inputWindow.ActualHeight);
                 prefs.GetType().GetProperty("ChatLogShowAll")!.SetValue(prefs, true); Pump(400);
@@ -417,6 +419,10 @@ internal static class Program
                 Invoke("PublishMcpInteraction", "drag_start", new { Left = pet.Left });
                 Invoke("PublishMcpInteraction", "drag_end", new { Left = pet.Left });
                 client.Data("get_settings"); Check(client.Events.Count(e => e.TryGetProperty("method", out var method) && method.GetString() == "notifications/message") >= 3, "Click/drag automatically pushed on MCP connection");
+                var coordinator = (AgentCoordinator)Read("agent");
+                File.WriteAllText(Path.Combine(coordinator.Workspaces.Current, "fixture-no-images"), "");
+                Check(coordinator.Reconnect(), "Reconnect a text-only ACP fixture");
+                Wait(() => coordinator.Connected && !coordinator.Busy && !coordinator.SupportsImages, 15, "ACP peer declares no prompt image support");
                 using var fixture = new Fixture(); fixture.Window.Show(); fixture.Window.Activate(); Pump(200);
                 Field("lastExternalForeground", new System.Windows.Interop.WindowInteropHelper(fixture.Window).Handle);
                 foreach (var name in new[] { "capture_foreground", "capture_screen" })

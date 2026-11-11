@@ -82,9 +82,25 @@ internal static class SpeechFlowVerification
             Check(string.Join(",", chat.Lines(false).Select(l => l.Text)) == "b,u1,c,d,u2,u3,e" && chat.Lines(true).Count() == 9,
                 "chat log default keeps owner messages with the pet line before and after; all mode keeps everything");
             Check(new CompanionChatLog("chat-log-check.json").Lines(true).SequenceEqual(chat.Lines(true)), "chat log survives a restart");
+            File.WriteAllText("chat-log-damaged.json", "[null,{\"User\":true,\"Text\":\"kept\"}]");
+            Check(new CompanionChatLog("chat-log-damaged.json").Lines(true).Single().Text == "kept", "history tolerates null entries without crashing startup");
+            var disabledHistory = new CompanionChatLog("disabled-history.json", enabled: false); disabledHistory.Add(false, "private");
+            Check(!File.Exists("disabled-history.json") && !disabledHistory.Lines(true).Any(), "edition without dialogue does not persist unseen local speech");
             window = new MainWindow(); window.Show();
             Wait(() => (bool)Field(window, "companionReady")!, "actual animations load", 15);
             ((DispatcherTimer)Field(window, "companionTimer")!).Stop();
+            var player = (CompanionVideoPlayer)Field(window, "videoPlayer")!;
+            var failPlayback = (Action<string>)typeof(CompanionVideoPlayer).GetField("Failed", Access)!.GetValue(player)!;
+            failPlayback("controlled test failure");
+            var policy = (CompanionAnimationPolicy)Field(window, "animationPolicy")!;
+            Invoke(window, "PlayAnimation", policy.Find("轻快摇摆舞"), "External", false);
+            Pump(750);
+            Check((string)Field(window, "currentAction")! == "轻快摇摆舞", "old animation retry cannot interrupt a newer external action");
+            player.Paused = true; Set(window, "consecutiveAnimationFailures", 0);
+            failPlayback("test failure 1"); failPlayback("test failure 2"); failPlayback("test failure 3");
+            Check(!(bool)Field(window, "companionReady")!, "repeated playback failure has a finite retry limit");
+            Invoke(window, "RecoverCompanionSession");
+            Wait(() => (bool)Field(window, "companionReady")! && player.Frames > 2, "recovery restarts real playback after failure");
             var prefs = (CompanionPreferences)Field(window, "preferences")!;
             var brain = (CompanionBrain)Field(window, "brain")!;
             Invoke(window, "OpenCompanionSettings"); Pump(150);

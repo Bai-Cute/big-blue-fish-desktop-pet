@@ -159,7 +159,7 @@ internal sealed class CompanionVideoPlayer : IDisposable
                     {
                         var vec = Vector256.Load(source + x);
                         var alpha = Vector256.ShiftRightLogical(vec, 24);
-                        var transparent = Vector256.LessThan(alpha, Vector256.Create(8u));
+                        var transparent = Vector256.LessThan(alpha, Vector256.Create((uint)CompanionSpriteImage.AlphaThreshold));
                         (vec & ~(transparent & Vector256.Create(0xff000000u))).Store(target + x);
                         if (checkVisible && !visible && Vector256.LessThan(Vector256.Create(15u), alpha) != Vector256<uint>.Zero)
                             visible = true;
@@ -169,7 +169,7 @@ internal sealed class CompanionVideoPlayer : IDisposable
                 {
                     uint p = source[x];
                     uint a = p >> 24;
-                    target[x] = a < 8 ? p & 0x00ffffffu : p;
+                    target[x] = a < CompanionSpriteImage.AlphaThreshold ? p & 0x00ffffffu : p;
                     if (checkVisible && a >= 16) visible = true;
                 }
             }

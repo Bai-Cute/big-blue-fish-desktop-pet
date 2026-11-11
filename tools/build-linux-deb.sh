@@ -1,7 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 root=$(realpath "$1"); work=$(realpath "$2"); runtime=$(realpath "$3"); output=$(realpath "$4"); version=$5; edition=$6
-[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.-]+)?$ ]]
+deb_version=${version/-/\~}
 [[ $edition == Standard || $edition == Safe ]]
 payload="$work/payload"
 mkdir -p "$payload/runtime"
@@ -28,7 +29,7 @@ package=bigbluefish; conflict=bigbluefish-safe; suffix=''; title=蓝色大肥鱼
 if [[ $edition == Safe ]]; then package=bigbluefish-safe; conflict=bigbluefish; suffix=-Safe; title=蓝色大肥鱼无MCP版; fi
 cat > "$stage/DEBIAN/control" <<EOF
 Package: $package
-Version: $version
+Version: $deb_version
 Section: games
 Priority: optional
 Architecture: amd64

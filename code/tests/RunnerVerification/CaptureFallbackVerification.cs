@@ -36,6 +36,20 @@ internal static class CaptureFallbackVerification
             var actual = await CompanionOcr.ReadAsync(new IntPtr(-123), CancellationToken.None);
             Check(actual.WindowHandle == 0 && !actual.IsDesktop && actual.Context.StartsWith(CompanionCaptureFallback.ScreenIdentity), "actual invalid HWND produces full-screen OCR with truthful scene identity");
             Check(actual.Width > 0 && actual.Height > 0 && actual.Language.Length > 0, "actual desktop image passes through the installed Windows OCR engine");
+            int oversizedWidth = checked((int)Windows.Media.Ocr.OcrEngine.MaxImageDimension + 128);
+            using var bitmap = new System.Drawing.Bitmap(oversizedWidth, 160);
+            using (var graphics = System.Drawing.Graphics.FromImage(bitmap))
+            using (var font = new System.Drawing.Font("Microsoft YaHei UI", 32))
+            {
+                graphics.Clear(System.Drawing.Color.White);
+                graphics.DrawString("蓝色大肥鱼 正在测试文字识别", font, System.Drawing.Brushes.Black, 30, 45);
+            }
+            using var bytes = new MemoryStream(); bitmap.Save(bytes, System.Drawing.Imaging.ImageFormat.Png);
+            var oversized = new CompanionWindowImage("data:image/png;base64," + Convert.ToBase64String(bytes.ToArray()), oversizedWidth, 160);
+            var scaled = await CompanionOcr.RecognizeAsync(oversized, "synthetic OCR fixture", 0, CancellationToken.None);
+            Console.WriteLine($"OCR dimension fixture input={oversizedWidth}x160 output={scaled.Width}x{scaled.Height} limit={Windows.Media.Ocr.OcrEngine.MaxImageDimension} words={scaled.WordCount}");
+            Check(scaled.Width <= Windows.Media.Ocr.OcrEngine.MaxImageDimension && scaled.Height > 0 && scaled.WordCount > 0,
+                "oversized direct OCR input is scaled to the engine limit and still recognizes actual text");
         }
 #endif
         Console.WriteLine($"RESULT {checks} capture fallback checks passed"); return 0;

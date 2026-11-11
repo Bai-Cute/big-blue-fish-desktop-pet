@@ -10,6 +10,8 @@
 
 截图结果的首项文字包含目标、身份、宽高与截取时间，第二项是 `type:image`、`mimeType:image/png` 和 base64 `data`。图像在内存中取得；Windows 前台遵循鱼鱼已有前台选择规则，全屏包含全部显示器；Linux 由 X11 或 Wayland 门户捕获，门户授权由桌面环境处理。
 
+显式截图工具始终返回图片，其结果不随 ACP 的 `promptCapabilities.image` 改为 OCR 文本。该能力字段只参与宿主向 Agent 主动投递日常关心时的输入形式选择。
+
 ## 设置
 
 `get_settings` 返回 `settings` 与 `state`。settings 为持久化字段及系统启动项；state 为窗口可见性、隐藏来源、当前动作、播放阶段、动作队列、待说文字、工具连接、输入框、Agent状态和模型状态的快照。`modelAvailable` 表示有模型文件，不等于推理进程已驻留。

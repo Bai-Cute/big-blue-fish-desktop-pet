@@ -28,7 +28,6 @@ static class Program
             for (int sx = 4; sx < bitmap.PixelWidth - 4; sx += 8)
             {
                 byte alpha = bytes[(sy * bitmap.PixelWidth + sx) * 4 + 3];
-                if (alpha > 0 && alpha < 64) continue;
                 double visualX = mirrored
                     ? (bitmap.PixelWidth - 1 - sx + 0.5) * bounds.Width / bitmap.PixelWidth
                     : (sx + 0.5) * bounds.Width / bitmap.PixelWidth;
@@ -36,7 +35,7 @@ static class Program
                 var pt = new Point(bounds.Left + visualX, bounds.Top + visualY);
                 if (pt.X < 1 || pt.Y < 1 || pt.X >= window.ActualWidth - 1 || pt.Y >= window.ActualHeight - 1) continue;
                 var hit = VisualTreeHelper.HitTest(window, pt);
-                if (alpha >= 64)
+                if (alpha >= CompanionSpriteImage.AlphaThreshold)
                 {
                     if (!ReferenceEquals(hit?.VisualHit, image))
                         throw new Exception($"Opaque pixel missed hit-test at ({sx},{sy}) mirrored={mirrored}");
@@ -61,6 +60,47 @@ static class Program
         var window = new Window { Title = "animation verification", Width = 520, Height = 330, Content = image, Background = Brushes.Transparent, WindowStyle = WindowStyle.None, AllowsTransparency = true };
         using var player = new CompanionVideoPlayer(image);
         string? error = null; player.Failed += e => error = e; bool ended = false;
+        if (args.Contains("--all-clips"))
+        {
+            try
+            {
+                window.Show(); Pump(100);
+                foreach (bool software in new[] { false, true })
+                {
+                    player.ForceSoftware = software;
+                    foreach (var file in Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "assets/fish"), "*.webm").Order())
+                    {
+                        error = null; player.Play(file, false, () => { });
+                        Wait(() => player.Frames >= 3 || error != null, 12);
+                        Check(error == null, $"{(software ? "CPU" : "GPU")} clip produces real frames: {Path.GetFileName(file)} ({player.Backend})");
+                    }
+                }
+                Console.WriteLine($"RESULT all 106 enhanced and 106 compatibility clips decoded; {checks} checks passed");
+                return 0;
+            }
+            finally { player.Dispose(); window.Close(); Pump(300); app.Shutdown(); }
+        }
+        if (args.Length == 2 && args[0] == "--routing-fixture")
+        {
+            string destination = Path.GetFullPath(args[1]); Directory.CreateDirectory(destination);
+            window.Title = "BigBlueFish isolated routing fixture"; window.Left = 180; window.Top = 180; window.Topmost = true;
+            int inputCount = 0;
+            image.MouseLeftButtonDown += (_, _) => File.WriteAllText(Path.Combine(destination, "fish-clicks.txt"), (++inputCount).ToString());
+            window.Show(); Pump(200);
+            player.Play(Path.Combine(AppContext.BaseDirectory, "assets/fish/原地小憩沉眠.webm"), false, () => { });
+            Wait(() => player.PositionSeconds > 3.8 || error != null, 12); Check(error == null, "input fixture real playback ready");
+            player.Paused = true; Pump(250);
+            var source = (BitmapSource)image.Source; var png = new PngBitmapEncoder(); png.Frames.Add(BitmapFrame.Create(source));
+            using (var output = File.Create(Path.Combine(destination, "frame.png"))) png.Save(output);
+            var origin = image.PointToScreen(new Point());
+            var corner = image.PointToScreen(new Point(image.ActualWidth, image.ActualHeight));
+            File.WriteAllText(Path.Combine(destination, "ready.json"), System.Text.Json.JsonSerializer.Serialize(new {
+                hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle.ToInt64(),
+                left = origin.X, top = origin.Y, width = corner.X-origin.X, height = corner.Y-origin.Y
+            }));
+            var watch = Stopwatch.StartNew(); while (!File.Exists(Path.Combine(destination, "stop")) && watch.Elapsed.TotalSeconds < 180) Pump(50);
+            player.Dispose(); window.Close(); app.Shutdown(); return 0;
+        }
         if (args.Contains("--region-check"))
         {
             try

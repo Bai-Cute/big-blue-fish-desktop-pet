@@ -142,7 +142,7 @@ internal sealed partial class LinuxPetWindow
             }
         }
         void About() {
-            Title("关于与更新"); body.Children.Add(Paragraph("蓝色大肥鱼 " + typeof(LinuxPetWindow).Assembly.GetName().Version!.ToString(3) + (McpAvailable ? "" : " · 无MCP版")));
+            Title("关于与更新"); body.Children.Add(Paragraph("蓝色大肥鱼 " + System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(typeof(LinuxPetWindow).Assembly)!.InformationalVersion.Split('+')[0] + (McpAvailable ? "" : " · 无MCP版")));
             Toggle("每次启动自动检查更新", Preferences.CheckUpdatesOnStartup, value => Preferences.CheckUpdatesOnStartup = value);
             body.Children.Add(ActionButton("检查更新", async () => await CheckUpdates(true)));
         }

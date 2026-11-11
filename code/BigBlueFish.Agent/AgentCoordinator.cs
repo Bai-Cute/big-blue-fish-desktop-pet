@@ -262,38 +262,33 @@ public sealed class AgentCoordinator : IDisposable
                     try
                     {
                         JsonElement result;
-                        try
+                        bool authenticationRetried = false, imageRetried = false;
+                        while (true)
                         {
-                            if (image != null && !current.SupportsImages)
+                            try
                             {
-                                DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "image", state: "unsupported");
-                                if (SpeechBrief != null) await ApplySpeechBrief(false, "unsupported");
-                                else image = null;
+                                if (image != null && !current.SupportsImages)
+                                    await ApplySpeechBrief(false, "unsupported");
+                                result = await current.Request("session/prompt", new { sessionId, prompt = Prompt() }, turn.Token, TimeSpan.FromMinutes(5));
+                                break;
                             }
-                            result = await current.Request("session/prompt", new { sessionId, prompt = Prompt() }, turn.Token, TimeSpan.FromMinutes(5));
-                        }
-                        catch (AcpException error) when (error.AuthenticationRequired && Interlocked.Read(ref spoken) == Interlocked.Read(ref turnStartSpoken)
-                            && Interlocked.Read(ref toolActivity) == toolsBeforePrompt)
-                        {
-                            await DropConnection(); await Connect(false, turn.Token); current = connection!;
-                            if (image != null && !current.SupportsImages)
+                            catch (AcpException error) when (error.AuthenticationRequired && !authenticationRetried
+                                && Interlocked.Read(ref spoken) == Interlocked.Read(ref turnStartSpoken)
+                                && Interlocked.Read(ref toolActivity) == toolsBeforePrompt)
                             {
-                                DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "image", state: "unsupported");
-                                if (SpeechBrief != null) await ApplySpeechBrief(false, "unsupported");
-                                else image = null;
+                                authenticationRetried = true;
+                                await DropConnection(); await Connect(false, turn.Token); current = connection!;
                             }
-                            result = await current.Request("session/prompt", new { sessionId, prompt = Prompt() }, turn.Token, TimeSpan.FromMinutes(5));
-                        }
-                        catch (Exception error) when (image != null && !turn.IsCancellationRequested
-                            && (error is AcpException acp && !acp.AuthenticationRequired || error is IOException)
-                            && Interlocked.Read(ref spoken) == Interlocked.Read(ref turnStartSpoken)
-                            && Interlocked.Read(ref toolActivity) == toolsBeforePrompt)
-                        {
-                            DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "image", state: "failed", error: error);
-                            if (!current.Alive) { await DropConnection(); await Connect(false, turn.Token); current = connection!; }
-                            if (SpeechBrief != null) await ApplySpeechBrief(false, "failed");
-                            else { image = null; text += "\n本轮截图附件提交未完成，已改用纯文本继续投递本轮事件。"; }
-                            result = await current.Request("session/prompt", new { sessionId, prompt = Prompt() }, turn.Token, TimeSpan.FromMinutes(5));
+                            catch (Exception error) when (image != null && !imageRetried && !turn.IsCancellationRequested
+                                && (error is AcpException acp ? acp.ImageContentRejected : error is IOException && !current.Alive)
+                                && Interlocked.Read(ref spoken) == Interlocked.Read(ref turnStartSpoken)
+                                && Interlocked.Read(ref toolActivity) == toolsBeforePrompt)
+                            {
+                                imageRetried = true;
+                                DiagnosticLog.Write(DiagnosticEvent.ScreenReadFallback, kind: "image", state: "failed", error: error);
+                                if (!current.Alive) { await DropConnection(); await Connect(false, turn.Token); current = connection!; }
+                                await ApplySpeechBrief(false, "failed");
+                            }
                         }
                         if (!result.TryGetProperty("stopReason", out var reason)) throw new IOException("Agent 未返回 ACP 轮次结束原因。");
                         DiagnosticLog.Write(DiagnosticEvent.AgentReply, kind: request.Kind, state: "success");

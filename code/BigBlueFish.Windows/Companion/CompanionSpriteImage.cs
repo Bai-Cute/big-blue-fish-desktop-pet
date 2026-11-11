@@ -6,6 +6,7 @@ using System.Windows.Media.Imaging;
 namespace BigBlueFish.Windows;
 internal sealed class CompanionSpriteImage : Image
 {
+    internal const byte AlphaThreshold = 8;
     private byte[]? framePixels;
     private int frameWidth, frameHeight;
 
@@ -25,7 +26,7 @@ internal sealed class CompanionSpriteImage : Image
         {
             int px = (int)(parameters.HitPoint.X * w / ActualWidth);
             int py = (int)(parameters.HitPoint.Y * h / ActualHeight);
-            return px >= 0 && py >= 0 && px < w && py < h && pixels[(py * w + px) * 4 + 3] >= 16
+            return px >= 0 && py >= 0 && px < w && py < h && pixels[(py * w + px) * 4 + 3] >= AlphaThreshold
                 ? new PointHitTestResult(this, parameters.HitPoint) : null;
         }
         if (Source is not BitmapSource bitmap) return null;
@@ -34,6 +35,6 @@ internal sealed class CompanionSpriteImage : Image
         if (x < 0 || y < 0 || x >= bitmap.PixelWidth || y >= bitmap.PixelHeight) return null;
         var pixel = new byte[4];
         bitmap.CopyPixels(new Int32Rect(x, y, 1, 1), pixel, 4, 0);
-        return pixel[3] >= 16 ? new PointHitTestResult(this, parameters.HitPoint) : null;
+        return pixel[3] >= AlphaThreshold ? new PointHitTestResult(this, parameters.HitPoint) : null;
     }
 }

@@ -14,18 +14,21 @@ internal sealed class CompanionChatLog
     private const int Limit = 300;
     private readonly string path;
     private readonly List<CompanionChatLine> lines = new();
+    private readonly bool enabled;
     internal int Version { get; private set; }
 
-    internal CompanionChatLog(string path = "chat-log.json")
+    internal CompanionChatLog(string path = "chat-log.json", bool enabled = true)
     {
         this.path = Path.GetFullPath(path);
-        try { lines.AddRange((JsonSerializer.Deserialize<CompanionChatLine[]>(File.ReadAllText(this.path)) ?? []).Where(l => !string.IsNullOrWhiteSpace(l.Text)).TakeLast(Limit)); }
+        this.enabled = enabled;
+        if (!enabled) return;
+        try { lines.AddRange((JsonSerializer.Deserialize<CompanionChatLine?[]>(File.ReadAllText(this.path)) ?? []).Where(l => l != null && !string.IsNullOrWhiteSpace(l.Text)).Select(l => l!).TakeLast(Limit)); }
         catch (Exception e) when (e is IOException or JsonException or UnauthorizedAccessException) { }
     }
 
     internal void Add(bool user, string text)
     {
-        if (string.IsNullOrWhiteSpace(text)) return;
+        if (!enabled || string.IsNullOrWhiteSpace(text)) return;
         lines.Add(new(user, text.Trim()));
         if (lines.Count > Limit) lines.RemoveAt(0);
         Version++;

@@ -23,7 +23,11 @@ public partial class MainWindow
     private Border loadingIndicator = null !;
     private CompanionLoadingRing loadingSpinner = null !;
     private CompanionSpeech speech = null!;
+#if COMPANION_SAFE
+    private readonly CompanionChatLog chatLog = new(enabled: false);
+#else
     private readonly CompanionChatLog chatLog = new();
+#endif
     private bool bubbleIsModelReply;
     private long speechRequestVersion;
     private Grid companionLayout = null !;

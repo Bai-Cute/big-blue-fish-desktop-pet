@@ -19,6 +19,8 @@ public partial class MainWindow
     private bool exitAnimation, exitReady;
     private bool greetingNoticeActive;
     private int consecutiveAnimationFailures;
+    private long animationRevision;
+    private System.Windows.Threading.DispatcherTimer? animationRetry;
     private static string WelcomeText(DateTime now)
     {
         string period = now.Hour switch { >= 5 and < 11 => "早上", >= 11 and < 14 => "中午", >= 14 and < 18 => "下午", _ => "晚上" };
@@ -57,11 +59,14 @@ public partial class MainWindow
             if (exitAnimation) { exitReady = true; base.Close(); return; }
             if (++consecutiveAnimationFailures < 3 && !companionClosed)
             {
-                var retry = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+                animationRetry?.Stop();
+                long failedRevision = animationRevision;
+                var retry = animationRetry = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
                 retry.Tick += (_, _) =>
                 {
                     retry.Stop();
-                    if (!companionClosed && !exitAnimation && companionReady) PlayIdle();
+                    if (ReferenceEquals(animationRetry, retry)) animationRetry = null;
+                    if (failedRevision == animationRevision && !companionClosed && !exitAnimation && companionReady) PlayIdle();
                 };
                 retry.Start();
                 return;
@@ -71,7 +76,7 @@ public partial class MainWindow
         };
         videoPlayer.FramePresented += seconds =>
         {
-            consecutiveAnimationFailures = 0;
+            if (videoPlayer.Frames >= 60 && seconds - videoPlayer.StartSeconds >= 1) consecutiveAnimationFailures = 0;
             MoveWithAnimation(seconds);
         };
         companionReady = true;
@@ -85,6 +90,8 @@ public partial class MainWindow
     private void PlayAnimation(CompanionAnimationRule rule, string phase, bool mirror = false)
     {
         if (!companionReady || companionClosed) return;
+        animationRetry?.Stop(); animationRetry = null;
+        animationRevision++;
         if (phase is not ("Startup" or "Exit")) EndGreetingNotice();
         DiagnosticLog.Write(DiagnosticEvent.AnimationStarted, kind: phase, action: rule.Id);
         currentAction = rule.Id; animationPhase = phase;

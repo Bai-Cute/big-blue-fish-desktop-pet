@@ -191,6 +191,14 @@ try
     await Until(() => said.Count == rejectBefore + 1 && !host.Busy, "runtime image error retries with text/OCR brief and completes say");
     Check(File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.txt")).Contains("host retry fallback brief for speech_test"), "runtime image rejection retried using non-image brief");
     File.Delete(Path.Combine(host.Workspaces.Current, "fixture-reject-images"));
+    File.WriteAllText(Path.Combine(host.Workspaces.Current, "fixture-prompt-auth"), "");
+    File.Delete(Path.Combine(host.Workspaces.Current, "fixture-prompt-auth-used"));
+    File.WriteAllText(Path.Combine(host.Workspaces.Current, "fixture-reject-images"), "");
+    int authImageBefore = said.Count;
+    Check(host.ManualSpeech(false), "authentication followed by image rejection accepted");
+    await Until(() => said.Count == authImageBefore + 1 && !host.Busy, "authentication recovery can still degrade rejected image and finish exactly once");
+    File.Delete(Path.Combine(host.Workspaces.Current, "fixture-prompt-auth"));
+    File.Delete(Path.Combine(host.Workspaces.Current, "fixture-reject-images"));
     string lastVisual = File.ReadAllText(Path.Combine(host.Workspaces.Current, "fixture-last-prompt.json"));
     var preparation = new TaskCompletionSource<AgentSpeechBrief>(TaskCreationOptions.RunContinuationsAsynchronously);
     host.SpeechBrief = (_, _, _) => preparation.Task;
@@ -344,10 +352,10 @@ static class Fixture
                 case "session/prompt":
                     File.WriteAllText("fixture-last-prompt.json", p.GetRawText());
                     File.WriteAllText("fixture-last-prompt.txt", p.GetProperty("prompt")[0].GetProperty("text").GetString());
-                    if (File.Exists("fixture-reject-images") && p.GetProperty("prompt").EnumerateArray().Any(b => b.GetProperty("type").GetString() == "image"))
-                    { await Send(new { jsonrpc = "2.0", id, error = new { code = -32602, message = "Upstream model does not support image content blocks" } }); break; }
                     if (File.Exists("fixture-prompt-auth") && !File.Exists("fixture-prompt-auth-used"))
                     { File.WriteAllText("fixture-prompt-auth-used", ""); await Send(new {jsonrpc="2.0",id,error=new {code=-32000,message="Authentication required"}}); break; }
+                    if (File.Exists("fixture-reject-images") && p.GetProperty("prompt").EnumerateArray().Any(b => b.GetProperty("type").GetString() == "image"))
+                    { await Send(new { jsonrpc = "2.0", id, error = new { code = -32602, message = "Upstream model does not support image content blocks" } }); break; }
                     string text = p.GetProperty("prompt")[0].GetProperty("text").GetString()!;
                     if (text.Contains("permission"))
                     {
