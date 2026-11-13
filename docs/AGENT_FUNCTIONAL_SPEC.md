@@ -1,4 +1,4 @@
-# 蓝色大肥鱼 1.1.3-beta.1 行为规格
+# 蓝色大肥鱼 1.1.3 行为规格
 
 ## 运行平台与发行类型
 
@@ -285,7 +285,7 @@ Apple Silicon macOS 源码入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠�
 
 ## 版本与构建工具行为
 
-根目录 Version.props 指定产品版本1.1.3-beta.1，文件版本与程序集版本为1.1.3.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
+根目录 Version.props 指定产品版本1.1.3，文件版本与程序集版本为1.1.3.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
 
 PowerShell 构建与测试脚本以带 BOM 的 UTF-8 保存，兼容 Windows PowerShell 对中文脚本的读取。PowerShellEncodingVerification.ps1 枚举 Git 已跟踪及未忽略的 .ps1 文件，检查 UTF-8 BOM 并通过 PowerShell 语法解析器读取；检查失败抛出错误。code/test.ps1 在其他检查前调用此脚本。
 

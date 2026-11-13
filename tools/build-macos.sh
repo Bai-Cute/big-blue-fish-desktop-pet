@@ -11,12 +11,17 @@ version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$root/Version.props")
 cache="$root/.work/macos-download"; work="$root/.work/macos-$edition"
 title=蓝色大肥鱼; [[ $edition == Safe ]] && title=蓝色大肥鱼无MCP版
 app="$output/$title.app"; payload="$work/$title.app/Contents/MacOS"
-mkdir -p "$cache" "$output"; rm -rf "$work"; mkdir -p "$payload/runtime" "$work/$title.app/Contents/Resources"
+mkdir -p "$cache" "$output"
+if [[ -e $work ]]; then
+    [[ $work == "$root/.work/macos-$edition" && ! -L $work ]] || exit 1
+    rm -r -- "$work"
+fi
+mkdir -p "$payload/runtime" "$work/$title.app/Contents/Resources"
 
 fetch() { # url sha256 -> cached path, verified
     local file="$cache/$(basename "$1")"
     if [[ ! -f $file ]]; then curl -fL --retry 3 -o "$file.partial" "$1"; mv "$file.partial" "$file"; fi
-    echo "$2  $file" | shasum -a 256 -c --status || { echo "下载校验失败：$file" >&2; rm -f "$file"; exit 1; }
+    echo "$2  $file" | shasum -a 256 -c --status || { echo "下载校验失败：$file" >&2; rm -- "$file"; exit 1; }
     echo "$file"
 }
 
@@ -49,8 +54,8 @@ EOF
 cp "$manifest" "$payload/media/gstreamer/runtime-manifest.json"
 
 # Native helpers: process-exit guard (shared with Linux) and Apple Vision OCR
-clang -O2 -Wall -Wextra -o "$payload/runtime/BigBlueFish.RunnerGuard" "$root/code/BigBlueFish.Linux/runner-guard.c"
-swiftc -O -o "$payload/runtime/BigBlueFish.MacOcr" "$root/code/BigBlueFish.Mac/mac-ocr.swift"
+clang -O2 -Wall -Wextra -mmacosx-version-min=14.0 -o "$payload/runtime/BigBlueFish.RunnerGuard" "$root/code/BigBlueFish.Linux/runner-guard.c"
+swiftc -O -target arm64-apple-macos14.0 -o "$payload/runtime/BigBlueFish.MacOcr" "$root/code/BigBlueFish.Mac/mac-ocr.swift"
 cp -a "$root/code/licenses" "$payload/"; cp "$root/code/LICENSE" "$root/code/THIRD-PARTY.md" "$payload/"
 
 # Bundle
@@ -75,5 +80,9 @@ cat > "$work/$title.app/Contents/Info.plist" <<EOF
 EOF
 # shortcut: ad-hoc signature only; Developer ID signing and notarization need the maintainers' certificate.
 codesign --force --deep --sign - "$work/$title.app"
-rm -rf "$app"; mv "$work/$title.app" "$app"
+if [[ -e $app ]]; then
+    [[ $app == "$output/$title.app" && ! -L $app ]] || exit 1
+    rm -r -- "$app"
+fi
+mv "$work/$title.app" "$app"
 echo "已生成：$app"

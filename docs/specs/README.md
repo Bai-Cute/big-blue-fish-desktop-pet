@@ -20,4 +20,5 @@
 - [1.1.0](1.1.0.md)
 - [1.1.1](1.1.1.md)
 - [1.1.2](1.1.2.md)
-- [1.1.3-beta.1（当前）](../AGENT_FUNCTIONAL_SPEC.md)
+- [1.1.3-beta.1](1.1.3-beta.1.md)
+- [1.1.3（当前）](../AGENT_FUNCTIONAL_SPEC.md)
