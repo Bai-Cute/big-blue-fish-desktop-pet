@@ -48,15 +48,21 @@ native = list(payload.rglob("*.dylib")) + [payload / n for n in [
 if args.edition == "Standard":
     native.append(payload / "BigBlueFish.Mcp")
 names = {p.name for p in payload.rglob("*") if p.is_file()}
+dependency_errors = []
 for file in native:
     arch = run("lipo", "-archs", str(file), text=True).strip()
     check("arm64" in arch.split(), "arm64: " + str(file.relative_to(payload)))
+    own_ids = set(run("otool", "-arch", "arm64", "-D", str(file), text=True).splitlines()[1:]) if file.suffix == ".dylib" else set()
     for line in run("otool", "-arch", "arm64", "-L", str(file), text=True).splitlines()[1:]:
         dependency = line.strip().split(" (", 1)[0]
-        if dependency.startswith(("/System/Library/", "/usr/lib/")):
+        if dependency in own_ids or dependency.startswith(("/System/Library/", "/usr/lib/")):
             continue
-        check(dependency.startswith("@") and pathlib.Path(dependency).name in names,
-              "self-contained native dependency: " + dependency)
+        if dependency.startswith("@") and pathlib.Path(dependency).name in names:
+            check(True, "self-contained native dependency: " + dependency)
+        else:
+            dependency_errors.append({"file": str(file.relative_to(payload)), "dependency": dependency})
+(args.output / "native-dependency-errors.json").write_text(json.dumps(dependency_errors, indent=2))
+check(not dependency_errors, "native dependency closure: " + json.dumps(dependency_errors))
 run("codesign", "--verify", "--deep", "--strict", str(app))
 check(True, "application bundle signature verifies")
 run(str(payload / "runtime/llama-server"), "--version", timeout=30)
@@ -88,6 +94,7 @@ with tempfile.TemporaryDirectory(prefix="bbf-macos-verify-") as temporary:
                 if status["phase"] != "Startup" and status["frames"] > 3:
                     break
                 time.sleep(.25)
+            (args.output / "status.json").write_text(json.dumps(status, indent=2))
             check(status is not None and status["phase"] != "Startup" and status["frames"] > 3,
                   "real application completes startup clip and presents subsequent decoded frames")
             check(status["McpAvailable"] == (args.edition == "Standard"), "running edition matches package")
@@ -97,7 +104,9 @@ with tempfile.TemporaryDirectory(prefix="bbf-macos-verify-") as temporary:
                 time.sleep(.25)
             check((data / "pet.png").stat().st_size > 1000, "real pet window renders")
             (args.output / "pet.png").write_bytes((data / "pet.png").read_bytes())
-            (args.output / "status.json").write_text(json.dumps(status, indent=2))
+            ocr = subprocess.run([str(payload / "runtime/BigBlueFish.MacOcr")], input=(data / "pet.png").read_bytes(),
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=30)
+            check(ocr.stdout.startswith(b"level\tpage_num\t"), "bundled Apple Vision OCR processes a real PNG")
             (data / "test-command.txt").write_text("exit")
             process.wait(timeout=15)
             check(process.returncode == 0, "application exits normally")
