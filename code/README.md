@@ -81,7 +81,7 @@ python ./tools/import-regions.py "ok_data_level3.csv" "ok_geo.csv"
 
 ## Linux 与无MCP版
 
-当前版本为 1.1.3，Windows 和 Linux 都提供标准版与无MCP版。无MCP版使用 `CompanionEdition=Safe` 编译，排除控制服务、工具执行器和对话输入窗口，安装包不分发 MCP 桥接程序及 Control 程序集；`Safe` 是构建和安装包文件名中的版本类型标识。
+当前版本为 1.1.3，Windows、Linux 和 macOS 都提供标准版与无MCP版。无MCP版使用 `CompanionEdition=Safe` 编译，排除控制服务、工具执行器和对话输入窗口，安装包不分发 MCP 桥接程序及 Control 程序集；`Safe` 是构建和安装包文件名中的版本类型标识。
 
 Windows 安装器运行 `../tools/Build-Installer.ps1 -Edition Standard -RuntimeDirectory "Windows运行时目录"`，将 `Standard` 改为 `Safe` 可生成无MCP版。直接构建 Windows 无MCP版使用 `dotnet build ./BigBlueFish.Windows/BigBlueFish.Windows.csproj -c Release -p:Platform=x64 -p:CompanionEdition=Safe -p:RestoreLockedMode=true`。
 

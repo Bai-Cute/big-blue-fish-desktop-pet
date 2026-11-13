@@ -281,7 +281,7 @@ Linux 通过标准或无MCP版 .deb 安装到 /opt/bigbluefish，注册 bigbluef
 
 ## macOS 平台行为
 
-Apple Silicon macOS 源码入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠和共享行为代码，程序运行目录为自包含.app内部，数据目录为 ~/Library/Application Support/bigbluefish。从登录shell读取PATH以查找CLI；开机启动使用用户LaunchAgents，终端登录通过Terminal.app。窗口识别使用CoreGraphics与AppKit，截图通过系统screencapture，OCR通过随包Apple Vision小程序；截图临时文件读取后删除。进程退出保障使用kqueue监控宿主。动画使用随包GStreamer及原始兼容素材。更新检查引导打开发布页并按源码构建流程更新。
+Apple Silicon macOS 入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠和共享行为代码，程序运行目录为自包含.app内部，数据目录为 ~/Library/Application Support/bigbluefish。从登录shell读取PATH以查找CLI；开机启动使用用户LaunchAgents，终端登录通过Terminal.app。窗口识别使用CoreGraphics与AppKit，截图通过系统screencapture，OCR通过随包Apple Vision小程序；截图临时文件读取后删除。进程退出保障使用kqueue监控宿主。动画使用随包GStreamer及原始兼容素材。标准版与无MCP版通过DMG安装镜像分发，镜像包含应用及Applications链接；应用使用临时签名，最低系统版本为macOS 14。原生进程守护与Apple Vision辅助程序以macOS 14为编译目标。更新检查引导打开发布页；用户以新版应用替换原应用，继续使用个人数据目录。
 
 ## 版本与构建工具行为
 

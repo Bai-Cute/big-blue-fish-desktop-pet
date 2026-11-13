@@ -1,6 +1,6 @@
 # 蓝色大肥鱼桌宠 / Big Blue Fish Desktop Pet
 
-蓝色大肥鱼是一款住在电脑桌面上的 AI 桌宠软件，支持 Windows 与 Linux 双平台。她是一位蓝发的小鲸鱼娘，形象来自对 DeepSeek 的二创虚拟形象“蓝色大肥鱼”。软件内置 4B 本地大模型，借助 OCR 技术读懂主人正在桌面上做的事情，每隔一段时间就从文字气泡里送来一句可爱的话，陪伴和关心主人；她还会查看天气、浏览科技新闻，再用自己的方式讲给主人听。
+蓝色大肥鱼是一款住在电脑桌面上的 AI 桌宠软件，支持 Windows、Linux 与 macOS。她是一位蓝发的小鲸鱼娘，形象来自对 DeepSeek 的二创虚拟形象“蓝色大肥鱼”。软件内置 4B 本地大模型，借助 OCR 技术读懂主人正在桌面上做的事情，每隔一段时间就从文字气泡里送来一句可爱的话，陪伴和关心主人；她还会查看天气、浏览科技新闻，再用自己的方式讲给主人听。
 
 鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版还能通过 ACP 一键连接 21 款主流 CLI Agent，陪主人进行稳定的长对话。
 
@@ -25,7 +25,7 @@
 
 ## 她怎样陪伴主人
 
-鱼鱼会读取当前前台窗口的画面，通过 OCR 识别其中的文字，并按照标题栏、侧边栏、正文等区域整理好，再交给内置的 4B 本地模型理解。无论主人在读文章、写文档、改代码，还是在聊天里提到了什么话题，她都能顺着眼前的内容组织一小段新的话；主人停在桌面、主页或新标签页时，她也会自然地问候、撒娇或者碎碎念。Windows 使用系统自带的 Windows OCR，Linux 使用 Tesseract，X11 与 Wayland 桌面均可使用。
+鱼鱼会读取当前前台窗口的画面，通过 OCR 识别其中的文字，并按照标题栏、侧边栏、正文等区域整理好，再交给内置的 4B 本地模型理解。无论主人在读文章、写文档、改代码，还是在聊天里提到了什么话题，她都能顺着眼前的内容组织一小段新的话；主人停在桌面、主页或新标签页时，她也会自然地问候、撒娇或者碎碎念。Windows 使用系统自带的 Windows OCR，Linux 使用 Tesseract，macOS 使用 Apple Vision；Linux 的 X11 与 Wayland 桌面均可使用。
 
 启动约 45 秒后，鱼鱼会第一次开口，之后在主人选择的时间范围内随机安排下一次说话，范围从 2–3 分钟到 20–30 分钟共六档。她会挑主人暂时停下键盘和鼠标的间隙开口，准备说话时头边会转起一个蓝色的小圈圈，随后文字一个字一个字地出现在奶油色的气泡里。气泡大小和停留时间都可以在设置中调整，右键菜单里的“吐字测试”可以随时让她现场说一句。
 
@@ -63,6 +63,7 @@
 | --- | --- | --- |
 | Windows x64 | `BigBlueFish-v1.1.3-OCR-Setup.exe` | `BigBlueFish-v1.1.3-Safe-OCR-Setup.exe` |
 | Ubuntu／Debian x64 | `BigBlueFish-v1.1.3-Linux-x64.deb` | `BigBlueFish-v1.1.3-Safe-Linux-x64.deb` |
+| macOS 14+ · Apple Silicon | `BigBlueFish-v1.1.3-macOS-arm64.dmg` | `BigBlueFish-v1.1.3-Safe-macOS-arm64.dmg` |
 
 在 Windows 上，双击安装器即可开始部署。安装器会把桌宠程序、动画资源、.NET 运行时和本地推理运行时一并安装好，默认位置是 `Program Files` 下的“蓝色大肥鱼”文件夹，并创建桌面和开始菜单快捷方式。随后安装器会请主人选择模型的准备方式：Hugging Face（推荐）、国内源（稳定）或手动安装。自动下载的模型约 2.7 GB，下载完成后会经过 SHA-256 校验，中途断开也能从已有进度继续。下载时如果想改用手动安装，可以选择“放弃并转为手动安装”；手动安装会显示模型应放入的文件夹，并打开模型来源页面，也可以直接选择已经下载好的 GGUF 文件。卸载时可以在卸载界面勾选“保留模型和设置”。
 
@@ -74,13 +75,15 @@ sudo apt install ./BigBlueFish-v1.1.3-Linux-x64.deb
 
 安装无ACP版时换成对应的文件名即可。安装完成后，可以从应用菜单或 `bigbluefish` 命令启动鱼鱼，再到设置的“模型与信息”中点击“安装模型”，为她准备本地模型。
 
+Mac 主人打开 `.dmg`，将应用拖入 Applications 后启动，具体安装与授权步骤见 [macOS 安装说明](docs/MACOS.md)。
+
 如果暂时不想下载模型，也可以先让鱼鱼以无模型模式住进桌面。这时她依然会行礼、问候、道别，播放全部动作表情，回应主人的点击和拖动。之后随时可以到设置中点击“安装模型”，让她开始读懂屏幕、开口说话。
 
 鱼鱼可以在设置中检查更新，也可以在每次启动时自动检查。发现新版本后，应用会下载并校验对应版本的安装包，完成更新后重新启动，模型和设置都会继续保留。Windows 用户也可以退出桌宠后手动运行新版安装器，选择原安装目录完成更新。
 
 ## 内置模型
 
-鱼鱼使用 Qwen3.5-4B 的 Q4_K_M 量化 GGUF 模型，由随包分发的 [llama.cpp](https://github.com/ggml-org/llama.cpp)（b10809，Vulkan 版本）在本机推理，可以使用 GPU 加速，也可以切换到 CPU 运行。两个预设来源的模型有所不同，但都适合本应用，主人可以按自己的网络环境选择。
+鱼鱼使用 Qwen3.5-4B 的 Q4_K_M 量化 GGUF 模型，由随包分发的 [llama.cpp](https://github.com/ggml-org/llama.cpp)（b10809，Windows／Linux 使用 Vulkan，macOS 使用 Metal）在本机推理，可以使用 GPU 加速，也可以切换到 CPU 运行。两个预设来源的模型有所不同，但都适合本应用，主人可以按自己的网络环境选择。
 
 Hugging Face 来源为 [Biomanticus/Qwen3.5-4B-heretic-gguf](https://huggingface.co/Biomanticus/Qwen3.5-4B-heretic-gguf/tree/b63ff4662e4863cfa005c9cd8ed34b87ed44b7e1)，它是 [p-e-w/Qwen3.5-4B-heretic](https://huggingface.co/p-e-w/Qwen3.5-4B-heretic) 的 GGUF 转换版本，基于 Qwen3.5-4B。国内来源为 ModelScope 上的 [diodel/Qwen3.5-4B-Q4_K_M-GGUF](https://modelscope.cn/models/diodel/Qwen3.5-4B-Q4_K_M-GGUF/files)，是原版 [Qwen/Qwen3.5-4B](https://huggingface.co/Qwen/Qwen3.5-4B) 的 Q4_K_M 转换版本。两个来源都使用固定修订，具体文件名、大小与校验值见[第三方声明](code/THIRD-PARTY.md)。
 

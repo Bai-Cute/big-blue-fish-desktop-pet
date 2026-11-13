@@ -2,6 +2,7 @@ name: macOS package
 on:
   push:
     branches: [build/macos-1.1.3]
+    paths: [Version.props, 'code/**', '!code/**/*.md', 'tools/**']
   workflow_dispatch:
     inputs:
       release_tag:
@@ -20,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        edition: [Safe]
+        edition: [Standard, Safe]
     env:
       RELEASE_TAG: ${{ github.event_name == 'push' && 'v1.1.3' || inputs.release_tag }}
     steps:
