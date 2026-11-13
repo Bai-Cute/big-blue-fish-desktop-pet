@@ -65,7 +65,17 @@ for file in native:
 check(not dependency_errors, "native dependency closure: " + json.dumps(dependency_errors))
 run("codesign", "--verify", "--deep", "--strict", str(app))
 check(True, "application bundle signature verifies")
-run(str(payload / "runtime/llama-server"), "--version", timeout=30)
+with (args.output / "llama-version.log").open("w") as log:
+    version_process = subprocess.Popen([str(payload / "runtime/llama-server"), "--version"],
+        stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT)
+    try:
+        version_process.wait(timeout=90)
+    except subprocess.TimeoutExpired:
+        subprocess.run(["sample", str(version_process.pid), "3", "-file", str(args.output / "llama-stack.txt")], timeout=20)
+        version_process.kill()
+        version_process.wait()
+        raise
+    check(version_process.returncode == 0, "llama-server version query exits successfully")
 check(True, "bundled llama-server starts")
 run(str(payload / "runtime/BigBlueFish.RunnerGuard"), "/usr/bin/true", timeout=10)
 check(True, "native runner guard executes a child")

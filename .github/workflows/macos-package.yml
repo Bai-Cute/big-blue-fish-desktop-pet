@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        edition: [Standard, Safe]
+        edition: [Safe]
     env:
       RELEASE_TAG: ${{ github.event_name == 'push' && 'v1.1.3' || inputs.release_tag }}
     steps:
