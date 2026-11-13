@@ -43,7 +43,8 @@ jobs:
           stage=$(mktemp -d "$RUNNER_TEMP/dmg-stage.XXXXXXXX")
           ditto "$app" "$stage/$title.app"
           ln -s /Applications "$stage/Applications"
-          name="BigBlueFish-v1.1.3${suffix}-macOS-arm64.dmg"
+          version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' Version.props)
+          name="BigBlueFish-v${version}${suffix}-macOS-arm64.dmg"
           mkdir -p "$RUNNER_TEMP/packages"
           hdiutil create -volname 'BigBlueFish' -srcfolder "$stage" -format UDZO "$RUNNER_TEMP/packages/$name"
           hdiutil verify "$RUNNER_TEMP/packages/$name"

@@ -8,6 +8,7 @@ import plistlib
 import subprocess
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 
 parser = argparse.ArgumentParser()
 parser.add_argument("app", type=pathlib.Path)
@@ -32,7 +33,8 @@ def run(*command, **kwargs):
 
 
 info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
-check(info["CFBundleShortVersionString"] == "1.1.3", "bundle product version")
+expected_version = ET.parse(pathlib.Path(__file__).resolve().parents[1] / "Version.props").findtext(".//Version")
+check(info["CFBundleShortVersionString"] == expected_version, "bundle product version")
 for name in ["BigBlueFish.Mac", "libcoreclr.dylib", "libhostfxr.dylib",
              "runtime/llama-server", "runtime/BigBlueFish.RunnerGuard",
              "runtime/BigBlueFish.MacOcr", "media/gstreamer/lib/libgstreamer-1.0.0.dylib"]:
@@ -49,7 +51,7 @@ names = {p.name for p in payload.rglob("*") if p.is_file()}
 for file in native:
     arch = run("lipo", "-archs", str(file), text=True).strip()
     check("arm64" in arch.split(), "arm64: " + str(file.relative_to(payload)))
-    for line in run("otool", "-L", str(file), text=True).splitlines()[1:]:
+    for line in run("otool", "-arch", "arm64", "-L", str(file), text=True).splitlines()[1:]:
         dependency = line.strip().split(" (", 1)[0]
         if dependency.startswith(("/System/Library/", "/usr/lib/")):
             continue
