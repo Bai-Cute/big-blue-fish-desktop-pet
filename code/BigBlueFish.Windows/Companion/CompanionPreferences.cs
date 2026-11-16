@@ -12,6 +12,11 @@ internal sealed class CompanionPreferences
     public bool ForegroundEnabled { get; set; } = true;
     public bool StopModelOnBattery { get; set; } = true;
     public bool HideOnFullscreen { get; set; } = true;
+#if COMPANION_MAC
+    // The 1280x720, 60 fps clips through VideoToolbox where the Mac decodes VP9 in hardware; off: the 640x360, 24 fps
+    // clips on the CPU, which costs less CPU time in all (fewer frames to hand to the window).
+    public bool HighQualityAnimation { get; set; } = true;
+#endif
     public bool CheckUpdatesOnStartup { get; set; } = true;
     public bool AgentEnabled { get; set; }
     public string AgentHarnessId { get; set; } = "codex";

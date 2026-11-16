@@ -91,6 +91,20 @@ internal sealed partial class LinuxPetWindow
             Slider("文字气泡大小（%）", Preferences.BubbleScale * 100, 50, 200, value => { Preferences.BubbleScale = value / 100; MoveBubble(); }, 5);
             Toggle("开机启动", StartupEnabled, SetStartup); Toggle("全屏时自动隐藏桌宠", Preferences.HideOnFullscreen, value => { Preferences.HideOnFullscreen = value; ApplySettings(); });
             Select("气泡驻留时间", CompanionPreferences.BubbleDurationLabels, Preferences.BubbleDurationIndex, value => { Preferences.BubbleDurationIndex = value; ResetDwell(); });
+#if COMPANION_MAC
+            var quality = new CheckBox { Content = "高清动画（1280×720、60 帧/秒）", IsChecked = Preferences.HighQualityAnimation, Margin = new Thickness(0, 12, 0, 4) };
+            quality.IsCheckedChanged += (_, _) => { Preferences.HighQualityAnimation = quality.IsChecked == true; player.PreferHardware = Preferences.HighQualityAnimation; Save(); };
+            body.Children.Add(quality);
+            // Normally done by the first clip already; a runtime that cannot load must not take the settings window down
+            // with it (the failure is recorded in the log console).
+            bool ready;
+            try { CompanionMedia.Initialize(); ready = true; }
+            catch (Exception error) { ready = false; DiagnosticLog.Write(DiagnosticEvent.AnimationFailed, state: "unavailable", error: error); }
+            body.Children.Add(Paragraph(!ready ? "动画组件无法加载，不能使用高清动画；可在“日志控制台”查看相关记录。"
+                : CompanionMedia.HardwareAvailable ? "由 Mac 的硬件解码，画面更清晰、动作更流畅，从下一段动作开始生效。CPU 占用比关闭时高一些；想省电可以关闭，改为播放 640×360、24 帧/秒的动画。"
+                : "这台 Mac 不能硬件解码这种动画，因此播放 640×360、24 帧/秒的动画。"));
+            quality.IsEnabled = ready && CompanionMedia.HardwareAvailable;
+#endif
         }
         void Model() {
             Title("模型与信息"); Toggle("启用本地大模型", Preferences.ModelEnabled, value => { Preferences.ModelEnabled = value; ApplySettings(); });

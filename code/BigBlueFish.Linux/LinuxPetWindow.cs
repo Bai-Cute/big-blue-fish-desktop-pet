@@ -60,6 +60,9 @@ internal sealed partial class LinuxPetWindow : Window
         var canvas = new Grid(); canvas.Children.Add(sprite); canvas.Children.Add(loading); Content = canvas;
         loading.HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left; loading.VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top;
         player = new(sprite); player.FramePresented += MoveWithAnimation;
+#if COMPANION_MAC
+        player.PreferHardware = Preferences.HighQualityAnimation;
+#endif
         PositionChanged += (_, _) => MoveBubble();
         player.PixelsPresented += (pixels,width,height,mirror) => CompanionNative.SetInputShape(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero,pixels,width,height,Width*DesktopScaling/width,mirror);
         player.Failed += error => { DiagnosticLog.Write(DiagnosticEvent.AnimationFailed, state: "failed"); if (phase == "Exit") CloseImmediately(); };
