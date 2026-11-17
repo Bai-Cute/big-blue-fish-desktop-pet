@@ -339,7 +339,7 @@ public sealed class AgentCoordinator : IDisposable
             if (Connected) return;
             var harness = HarnessCatalog.Get(harnessId);
             var adapters = new AgentAdapterStore(root);
-            string executable = adapters.FindExecutable(harness) ?? (harness.Id == "antigravity" ? "" : throw new IOException("未找到 " + harness.Name + "，请先按官方说明安装，并确认程序位于 PATH 中。"));
+            string executable = adapters.FindExecutable(harness) ?? (harness.Id == "antigravity" ? "" : throw new IOException(HarnessDesktopLocator.NotFoundMessage(harness)));
             if (!File.Exists(bridge)) throw new IOException("安装包缺少内部 MCP 组件，请重新安装完整标准版。");
             ExecutablePath = executable;
             Workspaces.EnsureCurrent(); Workspaces.Open(Workspaces.Current);
@@ -352,6 +352,8 @@ public sealed class AgentCoordinator : IDisposable
             // The actual installed CLI is preferred by adapters when they spawn it.
             start.Environment["PATH"] = Path.GetDirectoryName(executable) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
             if (harness.Id == "codex") start.Environment["CODEX_PATH"] = executable;
+            // The desktop application's Electron binary runs the bundled CLI only in Node mode.
+            if (harness.DesktopBundle != null) start.Environment["ELECTRON_RUN_AS_NODE"] = "1";
             if (harness.Id == "antigravity" && AgentAdapterStore.AntigravityHelper(command.Path) is { } helper)
                 start.Environment["ANTIGRAVITY_HARNESS_PATH"] = helper;
             DiagnosticLog.Write(DiagnosticEvent.AgentConnecting, kind: harness.Id, directory: skills.Workspace);

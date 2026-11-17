@@ -12,6 +12,7 @@
 | Codex CLI | codex | codex-acp 适配器，使用找到的 Codex 路径 |
 | Gemini CLI | gemini | --acp --allowed-tools mcp_big-blue-fish_* |
 | DeepSeek Harness | dsh | --profile acp |
+| DeepSeek Harness 桌面版 | 桌面版应用自带 | 用桌面版自己的运行时执行包内 CLI，--profile acp |
 | Kimi Code | kimi | acp |
 | Qwen Code | qwen | --acp |
 | Antigravity CLI | agy 或 agy_acp_server | Google 官方 agy_acp_server |
@@ -35,6 +36,8 @@ Claude、Codex 与 Pi 的 ACP 适配器优先从 PATH 查找；没有时安装�
 Agent 要求认证时，鱼鱼展示它公布的登录方式。协议认证通过 ACP `authenticate` 完成；终端认证会打开交互式登录终端，成功后重新连接并继续原对话请求。兼容 Kimi 等产品的旧 `_meta.terminal-auth` 格式，使用检测到的本机程序及其公布的登录参数。已有登录的复用由官方组件处理。认证可等待5分钟，也可以取消。Antigravity 的普通交互入口已经登录时，首次 ACP 连接仍可能需要选择 Google 账号等认证方式。
 
 Windows 使用可直接启动的程序入口打开登录终端；Linux 使用系统已有的 GNOME Terminal、Konsole 或 xterm。登录方式和参数来自 Agent，认证窗口展示终端参数与环境项。没有公布认证方式的产品沿用它自己的配置、登录方式和“安装与登录说明”入口。生成开始前凭据失效时，鱼鱼可以恢复连接并继续原轮次；已经发生工具调用或发言的轮次不会自动重发。
+
+DeepSeek Harness 桌面版把同一套 CLI 打包在应用内，不写入 PATH。鱼鱼读取卸载信息、常见安装位置与运行中的实例，确认应用包内含 harness 本体与 ACP 组件后，用该应用自带的运行时执行随附 CLI。检测只读取应用档案，不启动进程。同时安装命令行版与桌面版时两者是独立条目，各自保存会话与预约；桌面版过旧或损坏时提示升级，不会静默失败。
 
 这些条目表示程序采用的接入路径。CLI 版本、可用平台、账号及模型配置由各产品决定。DeepSeek Harness 的 ACP profile 与 Web profile 分开配置；OpenClaw 的 ACP 桥接需要可用的 Gateway。连接页显示实际协商状态与错误原因。
 

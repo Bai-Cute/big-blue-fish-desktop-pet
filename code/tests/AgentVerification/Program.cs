@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
@@ -22,6 +23,7 @@ if (args.Length >= 3 && args[0] == "--auth-inventory")
     return;
 }
 if (args.Length >= 3 && args[0] == "--probe") { Environment.ExitCode = await LiveProbe.Run(args[1], args[2], args.Contains("--prompt"), args.Contains("--configure"), args.Contains("--wakeup")); return; }
+if (args.Length >= 2 && args[0] == "--dsh-desktop") { Environment.ExitCode = await DshDesktopProbe.Run(args[1]); return; }
 int passed = 0;
 void Check(bool condition, string label) { if (!condition) throw new Exception("FAIL " + label); passed++; Console.WriteLine("PASS " + label); }
 async Task Until(Func<bool> predicate, string label, int seconds = 15)
@@ -33,7 +35,31 @@ async Task Until(Func<bool> predicate, string label, int seconds = 15)
 string root = Path.GetFullPath(args.FirstOrDefault(a => !a.StartsWith("--")) ?? Path.Combine(".work", "agent-verification-" + Guid.NewGuid().ToString("N")));
 Directory.CreateDirectory(root);
 WorkspaceVerification.Run(Path.Combine(root, "workspace-rules"), Check);
-Check(HarnessCatalog.All.Count == 21 && HarnessCatalog.All.Select(x => x.Id).Distinct().Count() == 21, "21 distinct selected harnesses");
+Check(HarnessCatalog.All.Count == 22 && HarnessCatalog.All.Select(x => x.Id).Distinct().Count() == 22, "22 distinct selected harnesses");
+var desktopHarness = HarnessCatalog.Get("dsh-desktop");
+Check(desktopHarness.Arguments.SequenceEqual(["--profile", "acp"]) && desktopHarness.Commands.Length == 0
+    && desktopHarness.DesktopBundle == "dsh/node_modules/@deepseek-ai/dsh/lib/bin.js", "desktop DSH launches the CLI bundled in its own app");
+string desktopExecutable = Path.Combine(root, OperatingSystem.IsWindows() ? "DeepSeek Harness.exe" : "DeepSeek Harness");
+var desktopArguments = HarnessDesktopLocator.Arguments(desktopExecutable, desktopHarness.DesktopBundle!, ["--profile", "acp"]);
+Check(desktopArguments.Length == 3 && desktopArguments[0] == HarnessDesktopLocator.BundlePath(desktopExecutable, desktopHarness.DesktopBundle!)
+    && desktopArguments[0].EndsWith(Path.Combine("app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js"))
+    && desktopArguments[1] == "--profile" && desktopArguments[2] == "acp", "desktop launch passes the bundled entry script before the ACP arguments");
+Check(!HarnessDesktopLocator.TryValidate(desktopExecutable, desktopHarness.DesktopBundle!, out _), "an app without desktop-runtime.json is not accepted");
+string fakeDesktop = Path.Combine(root, "fake-desktop");
+string fakeExecutable = Path.Combine(fakeDesktop, "DeepSeek Harness" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+string fakeArchive = Path.Combine(HarnessDesktopLocator.ResourcesDirectory(fakeExecutable), "app.asar");
+Directory.CreateDirectory(Path.GetDirectoryName(fakeArchive)!);
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out _), "a desktop app without app.asar is not accepted");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json");
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? noHarness) && noHarness != null, "an asar without the harness packages is rejected");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json", "dsh/node_modules/@deepseek-ai/dsh/package.json");
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? noBridge)
+    && noBridge != null && noBridge.Contains("ACP"), "a desktop app without the ACP bundle is reported as too old");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json", "dsh/node_modules/@deepseek-ai/dsh/package.json", "dsh/node_modules/@deepseek-ai/dsh-acp-app/package.json");
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? noEntry)
+    && noEntry != null && noEntry.Contains("入口"), "an asar without the bundled CLI entry is rejected as incomplete");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json", "dsh/node_modules/@deepseek-ai/dsh/package.json", "dsh/node_modules/@deepseek-ai/dsh-acp-app/package.json", desktopHarness.DesktopBundle!);
+Check(HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? accepted) && accepted == null, "a complete desktop archive is accepted");
 Check(HarnessCatalog.Get("kimi").Arguments.SequenceEqual(["acp"]), "Kimi native ACP launch");
 Check(HarnessCatalog.Get("codex").AdapterPackage != null && HarnessCatalog.Get("claude").AdapterPackage != null && HarnessCatalog.Get("pi").AdapterPackage != null, "three explicit ACP adapters");
 Check(HarnessCatalog.FindExecutable("fish-no-such-cli", root) == null, "missing CLI is not invented");
@@ -278,6 +304,43 @@ try
 }
 finally { host?.Dispose(); Environment.SetEnvironmentVariable("PATH", oldPath); }
 Console.WriteLine($"RESULT {passed} Agent checks passed; fixtures are not real model compatibility evidence.");
+
+static void WriteAsar(string path, params string[] entries)
+{
+    var root = new Dictionary<string, object> { ["files"] = new Dictionary<string, object>() };
+    foreach (string entry in entries)
+    {
+        var directory = (Dictionary<string, object>)root["files"];
+        string[] segments = entry.Split('/');
+        for (int index = 0; index < segments.Length; index++)
+        {
+            if (!directory.TryGetValue(segments[index], out object? node))
+            {
+                node = index == segments.Length - 1
+                    ? new Dictionary<string, object> { ["size"] = 0, ["offset"] = "0" }
+                    : new Dictionary<string, object> { ["files"] = new Dictionary<string, object>() };
+                directory[segments[index]] = node;
+            }
+            if (index < segments.Length - 1 && node is Dictionary<string, object> folder)
+                directory = (Dictionary<string, object>)folder["files"];
+        }
+    }
+    byte[] json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(root));
+    int padding = (4 - json.Length % 4) % 4;
+    int payloadSize = 4 + json.Length + padding;
+    using var stream = File.Create(path);
+    var prefix = new byte[8];
+    BinaryPrimitives.WriteUInt32LittleEndian(prefix, 4);
+    BinaryPrimitives.WriteUInt32LittleEndian(prefix.AsSpan(4), (uint)(payloadSize + 4));
+    stream.Write(prefix);
+    var sizes = new byte[8];
+    BinaryPrimitives.WriteUInt32LittleEndian(sizes, (uint)payloadSize);
+    BinaryPrimitives.WriteUInt32LittleEndian(sizes.AsSpan(4), (uint)json.Length);
+    stream.Write(sizes);
+    stream.Write(json);
+    stream.Write(new byte[padding]);
+}
+
 
 static class Fixture
 {

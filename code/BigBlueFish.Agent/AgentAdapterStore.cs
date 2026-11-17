@@ -21,6 +21,8 @@ public sealed class AgentAdapterStore(string root)
 
     public async Task<(string Path, string[] Arguments)> Resolve(HarnessDefinition harness, string executable, CancellationToken token, Action<string> status)
     {
+        if (harness.DesktopBundle != null)
+            return (executable, HarnessDesktopLocator.Arguments(executable, harness.DesktopBundle, harness.Arguments));
         if (harness.Id == "antigravity") return await Antigravity(executable, token, status);
         if (harness.AdapterPackage == null) return (executable, harness.Arguments);
         string? existing = HarnessCatalog.FindExecutable(harness.AdapterCommand!);

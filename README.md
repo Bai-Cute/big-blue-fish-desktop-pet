@@ -2,7 +2,7 @@
 
 蓝色大肥鱼是一款住在电脑桌面上的 AI 桌宠软件，支持 Windows、Linux 与 macOS。她是一位蓝发的小鲸鱼娘，形象来自对 DeepSeek 的二创虚拟形象“蓝色大肥鱼”。软件内置 4B 本地大模型，借助 OCR 技术读懂主人正在桌面上做的事情，每隔一段时间就从文字气泡里送来一句可爱的话，陪伴和关心主人；她还会查看天气、浏览科技新闻，再用自己的方式讲给主人听。
 
-鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版还能通过 ACP 一键连接 21 款主流 CLI Agent，陪主人进行稳定的长对话。
+鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版还能通过 ACP 一键连接 22 款主流 CLI Agent，陪主人进行稳定的长对话。
 
 当前版本为 **1.1.3**，安装包请前往 [GitHub Releases](https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest) 下载。
 
@@ -93,7 +93,7 @@ Hugging Face 来源为 [Biomanticus/Qwen3.5-4B-heretic-gguf](https://huggingface
 
 从 1.1.0 起，标准版的蓝色大肥鱼通过 ACP（Agent Client Protocol）连接主人电脑上已经安装的 CLI Agent。连接只需在设置里点选一次：鱼鱼会在后台启动所选的 Agent，为自己开一个专用对话，并自动接好动作、截图、说话等工具。接上之后，主人可以和鱼鱼长时间地聊天，也可以借助 Agent 的能力，实现电脑操控、与云端大模型对话、自定义陪伴和动作逻辑等各种玩法。
 
-鱼鱼目前已经适配了 21 款 CLI Agent，其中有 Claude Code、Codex CLI、Gemini CLI、DeepSeek Harness、Kimi Code、Qwen Code、GitHub Copilot CLI、Cursor CLI、OpenCode 等。全部适配项和各自的启动方式见[连接本机 CLI Harness](docs/ACP.md)。
+鱼鱼目前已经适配了 22 款 CLI Agent，其中有 Claude Code、Codex CLI、Gemini CLI、DeepSeek Harness（命令行版与桌面版）、Kimi Code、Qwen Code、GitHub Copilot CLI、Cursor CLI、OpenCode 等。DeepSeek Harness 桌面版不需要额外安装命令行，鱼鱼会借用桌面版自带的运行时启动它内含的 ACP 入口。全部适配项和各自的启动方式见[连接本机 CLI Harness](docs/ACP.md)。
 
 ### 连接方法
 

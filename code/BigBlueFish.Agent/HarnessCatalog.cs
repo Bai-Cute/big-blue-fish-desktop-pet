@@ -5,7 +5,11 @@ namespace BigBlueFish.Agent;
 public sealed record HarnessDefinition(string Id, string Name, string[] Commands, string[] Arguments,
     string Website, string SkillDirectory = ".agents/skills", string? AdapterPackage = null, string? AdapterCommand = null)
 {
-    public string? FindExecutable() => Commands.Select(c => HarnessCatalog.FindExecutable(c)).FirstOrDefault(p => p != null);
+    /// <summary>Entry script of a CLI that ships inside an installed desktop application, relative to its app.asar.</summary>
+    public string? DesktopBundle { get; init; }
+
+    public string? FindExecutable() => Commands.Select(c => HarnessCatalog.FindExecutable(c)).FirstOrDefault(p => p != null)
+        ?? (DesktopBundle == null ? null : HarnessDesktopLocator.Find(DesktopBundle));
 }
 
 public static class HarnessCatalog
@@ -16,6 +20,8 @@ public static class HarnessCatalog
         new("codex", "Codex CLI", ["codex"], [], "https://developers.openai.com/codex/cli", ".agents/skills", "@agentclientprotocol/codex-acp@2.5.0", "codex-acp"),
         new("gemini", "Gemini CLI", ["gemini"], ["--acp", "--allowed-tools", "mcp_big-blue-fish_*"], "https://geminicli.com", ".gemini/skills"),
         new("dsh", "DeepSeek Harness", ["dsh"], ["--profile", "acp"], "https://github.com/deepseek-ai/deepseek-harness"),
+        new("dsh-desktop", "DeepSeek Harness 桌面版", [], ["--profile", "acp"], "https://github.com/deepseek-ai/deepseek-harness")
+        { DesktopBundle = "dsh/node_modules/@deepseek-ai/dsh/lib/bin.js" },
         new("kimi", "Kimi Code", ["kimi"], ["acp"], "https://moonshotai.github.io/kimi-cli", ".agents/skills"),
         new("qwen", "Qwen Code", ["qwen"], ["--acp"], "https://qwenlm.github.io/qwen-code-docs", ".qwen/skills"),
         new("antigravity", "Antigravity CLI", ["agy", "agy_acp_server"], [], "https://antigravity.google/docs/cli/overview/", ".agents/skills"),
