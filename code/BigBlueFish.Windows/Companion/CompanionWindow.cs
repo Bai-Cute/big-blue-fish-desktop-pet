@@ -65,6 +65,7 @@ public partial class MainWindow
         singleClickTimer?.Stop();
         lastClickAt = DateTime.MinValue;
         if (IsMouseCaptured) ReleaseMouseCapture();
+        SetSpritePressed(false);
         dragging = false;
         CancelMovement();
         if (videoPlayer != null && !companionClosed && !exitAnimation)
@@ -251,6 +252,7 @@ public partial class MainWindow
         PreviewMouseLeftButtonUp += CompanionUp;
         LostMouseCapture += (_, _) =>
         {
+            SetSpritePressed(false);
             if (dragging) { dragging = false; if (dragged) PublishMcpInteraction("drag_end", new { Left, Top, cancelled = true }); FinishDragAnimation(); }
         };
         Closing += CompanionClosing;
@@ -415,6 +417,17 @@ public partial class MainWindow
         dragStart = new Point(p.X, p.Y);
         windowStart = new Point(Left, Top);
         CaptureMouse();
+        SetSpritePressed(true);
+    }
+
+    private void SetSpritePressed(bool pressed)
+    {
+        // Dragging captures the mouse on the window, and WPF resolves the pointer from the
+        // capturing element rather than the image under it; without a window cursor the drag
+        // fell back to the arrow. Clearing it on release hands control back to the image.
+        Cursor = pressed ? CompanionSpriteImage.PalmGrab : null;
+        // The image owns its own cursor and refreshes the pointer once both are set.
+        (videoImage as CompanionSpriteImage)?.SetPressed(pressed);
     }
 
     internal void TraceCompanionPointer(uint message, uint buttons)
@@ -452,6 +465,7 @@ public partial class MainWindow
         e.Handled = true;
         dragging = false;
         ReleaseMouseCapture();
+        SetSpritePressed(false);
         ClampCompanion();
         anchor = new Point(Left, Top);
         SaveCompanion();

@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -212,6 +213,21 @@ internal static partial class Program
         Check(w.Topmost&&!w.ShowActivated&&!w.ShowInTaskbar,"outside-click handling preserves pet window policy");
         Console.WriteLine($"Outside click: {checks} real mouse/WPF checks passed.");
     }
+    static void VerifyCursor(MainWindow w)
+    {
+        var sprite=(Image)Read(w,"videoImage");
+        Check(sprite.Cursor!=System.Windows.Input.Cursors.Hand,"visible character shows the palm cursor, not the system pointing hand");
+        Check(sprite.InputHitTest(new Point(1,1))==null,"transparent video margins keep the system cursor");
+        Check(sprite.InputHitTest(new Point(sprite.ActualWidth/2,sprite.ActualHeight*.45))!=null,"visible character stays clickable under the hand cursor");
+        var open=sprite.Cursor;
+        Invoke(w,"CompanionDown",sprite,new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left){RoutedEvent=UIElement.PreviewMouseLeftButtonDownEvent});Pump(60);
+        Check(!ReferenceEquals(sprite.Cursor,open),"pressing the pet closes the palm");
+        Check(w.Cursor==CompanionSpriteImage.PalmGrab,"the capturing window shows the grip while dragging");
+        Invoke(w,"CompanionUp",sprite,new MouseButtonEventArgs(Mouse.PrimaryDevice,Environment.TickCount,MouseButton.Left){RoutedEvent=UIElement.PreviewMouseLeftButtonUpEvent});Pump(60);
+        Check(ReferenceEquals(sprite.Cursor,open),"releasing the pet opens the palm again");
+        Check(w.Cursor==null,"releasing clears the window cursor so the element cursor applies again");
+        Console.WriteLine($"Cursor: {checks} real WPF cursor checks passed.");
+    }
     [STAThread] static int Main(string[] args)
     {
         MainWindow? w=null;
@@ -257,6 +273,11 @@ internal static partial class Program
             {
                 Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before bubble verification");
                 VerifyBubbleScale(w);Field(w,"exitReady",true);w.Close();return 0;
+            }
+            if(args.Contains("--cursor"))
+            {
+                Wait(()=>(string)Read(w,"animationPhase")!="Startup",10,"startup finishes before cursor verification");
+                VerifyCursor(w);Field(w,"exitReady",true);w.Close();return 0;
             }
             var player=Read(w,"videoPlayer");var prefs=Read(w,"preferences");var layout=(Grid)Read(w,"companionLayout");
             Check(Property<double>(player,"PlaybackRate")==1.5,"startup greeting uses 1.5x playback");
