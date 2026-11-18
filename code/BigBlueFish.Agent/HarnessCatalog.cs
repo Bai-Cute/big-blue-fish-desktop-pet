@@ -20,7 +20,7 @@ public static class HarnessCatalog
         new("codex", "Codex CLI", ["codex"], [], "https://developers.openai.com/codex/cli", ".agents/skills", "@agentclientprotocol/codex-acp@2.5.0", "codex-acp"),
         new("gemini", "Gemini CLI", ["gemini"], ["--acp", "--allowed-tools", "mcp_big-blue-fish_*"], "https://geminicli.com", ".gemini/skills"),
         new("dsh", "DeepSeek Harness", ["dsh"], ["--profile", "acp"], "https://github.com/deepseek-ai/deepseek-harness"),
-        new("dsh-desktop", "DeepSeek Harness 桌面版", [], ["--profile", "acp"], "https://github.com/deepseek-ai/deepseek-harness")
+        new("dsh-desktop", "DeepSeek Harness Desktop", [], ["--profile", "acp"], "https://github.com/deepseek-ai/deepseek-harness")
         { DesktopBundle = "dsh/node_modules/@deepseek-ai/dsh/lib/bin.js" },
         new("kimi", "Kimi Code", ["kimi"], ["acp"], "https://moonshotai.github.io/kimi-cli", ".agents/skills"),
         new("qwen", "Qwen Code", ["qwen"], ["--acp"], "https://qwenlm.github.io/qwen-code-docs", ".qwen/skills"),

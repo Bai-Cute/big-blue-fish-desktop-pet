@@ -12,7 +12,7 @@
 | Codex CLI | codex | codex-acp 适配器，使用找到的 Codex 路径 |
 | Gemini CLI | gemini | --acp --allowed-tools mcp_big-blue-fish_* |
 | DeepSeek Harness | dsh | --profile acp |
-| DeepSeek Harness 桌面版 | 桌面版应用自带 | 用桌面版自己的运行时执行包内 CLI，--profile acp |
+| DeepSeek Harness Desktop | 桌面版应用自带 | 用桌面版自己的运行时执行包内 CLI，--profile acp |
 | Kimi Code | kimi | acp |
 | Qwen Code | qwen | --acp |
 | Antigravity CLI | agy 或 agy_acp_server | Google 官方 agy_acp_server |
