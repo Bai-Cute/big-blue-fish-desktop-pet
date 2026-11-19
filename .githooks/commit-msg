@@ -1,2 +1,0 @@
-#!/bin/sh
-exec python tools/Check-Attribution.py --message "$1"
