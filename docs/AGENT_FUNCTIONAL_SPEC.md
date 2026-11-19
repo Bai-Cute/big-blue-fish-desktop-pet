@@ -1,4 +1,4 @@
-# 蓝色大肥鱼 1.1.3 行为规格
+# 蓝色大肥鱼 1.1.4 行为规格
 
 ## 运行平台与发行类型
 
@@ -20,8 +20,9 @@ Windows 使用 `Local\BlueWhaleCompanion` 互斥量限制同一登录会话中�
 | GpuEnabled | true | 本地推理使用 GPU；关闭后使用 CPU |
 | PublicInfo | true | 获取天气和科技新闻 |
 | ForegroundEnabled | true | 自主生成时读取当前前台内容 |
-| StopModelOnBattery | true | 离电时取消推理并卸载本地模型 |
+| StopModelOnBattery | true | “拔电时暂停鱼鱼的AI功能”：离电取消推理并卸载本地模型，关闭鱼鱼启动的 Agent 进程，暂停日常关心、主动对话、手动天气与吐字测试；插电后恢复 |
 | HideOnFullscreen | true | 检测到外部前台全屏时自动隐藏桌宠 |
+| HideFromCapture | false | Windows 将角色、气泡及对话输入框排除出支持该机制的截图与录屏；Linux/macOS 仅保存该字段 |
 | CheckUpdatesOnStartup | true | 启动后检查新版本 |
 | AgentEnabled | false | 连接本机CLI Harness；仅用户界面可修改 |
 | AgentHarnessId | codex | 首选Harness的目录id；未知id在初始化连接时归到codex |
@@ -49,6 +50,10 @@ Windows 使用 `Local\BlueWhaleCompanion` 互斥量限制同一登录会话中�
 ## 窗口、显示与用户操作
 
 角色窗口透明、无边框、置顶，不显示任务栏按钮，不因点击角色而取得键盘输入焦点。气泡使用独立的透明置顶窗口，跟随角色移动，包含关闭按钮。Linux 气泡以角色窗口为所有者；每次从隐藏变为显示时重新设置置顶和不显示任务栏按钮，显示与逐字更新不激活气泡或取得输入焦点。设置窗口是正常可激活的桌面窗口；再次打开已有设置时恢复最小化状态并将其显示到前面。MCP 输入框是依附角色的可激活输入浮层，没有标题栏或任务栏按钮。设置窗口不会永久置顶，切到其他应用后可被正常覆盖。
+
+Windows 的“截屏时隐藏大肥鱼”开关默认关闭，开启后对角色、气泡和对话输入浮层的顶层窗口设置 WDA_EXCLUDEFROMCAPTURE，关闭时恢复 WDA_NONE。窗口新建、重新显示以及开关改变时应用当前值。桌面上的显示、点击、拖动与动作调度继续运行，设置窗口正常参与截屏。该机制使用 Windows 10 2004 起的截图排除能力；截图软件是否遵守取决于其捕获方式。原生设置成功或失败记录到排障日志。
+
+Windows 鼠标悬停在角色可点击像素上时显示张开手掌，按住左键时显示握紧手掌；松开、失去鼠标捕获或会话恢复时回到张开状态。透明区域继续穿透，光标样式由下层应用决定。光标从内嵌资源加载。
 
 位置约束使用角色的可见身体区域，而非整张透明素材的边界。位置与布局使用640×360的逻辑坐标，主要可见身体区域按 x=208–428、y=58–336 映射；高清素材的像素尺寸为1280×720；桌宠大小按 Scale 缩放。恢复保存位置后，将可见身体限制到所在显示器工作区。Windows 处理显示器配置变化和 DPI 变化；文字气泡通过桌宠坐标转换定位到屏幕，使用原生窗口位置接口放置；菜单外部点击以物理鼠标坐标与菜单窗口物理边界比较。Linux 在缩放、恢复显示和拖动结束时重新限制位置。
 
@@ -122,7 +127,7 @@ Linux 使用系统 GStreamer；可用时尝试 VA VP9 透明硬解与缩放，�
 
 消息使用标准 system/user 分层：system 包含鲸鱼娘的语气、可迁移的性格演示和表达要求；user 包含本轮时间、前台材料与可用的公共信息。请求不拼接上一轮历史。普通吐字顺着眼前内容组织短小、活泼、亲近的反应；用户填写的演示用于迁移语气，不作为场景与答案的固定映射。新闻使用独立的新闻说明提示词。
 
-本地服务就绪状态会经过健康检查。启动失败、健康异常、请求失败和取消会使已失效的 runner 引用被清理，相应子进程终止，后续请求可以重新启动。允许供电且启用模型、模型已就绪但进程尚未启动时，界面调度可提前预加载。离电暂停策略会取消本地任务并将模型移出内存；手动天气或测试在此条件下显示固定提示：`主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。`
+本地服务就绪状态会经过健康检查。启动失败、健康异常、请求失败和取消会使已失效的 runner 引用被清理，相应子进程终止，后续请求可以重新启动。允许供电且启用模型、模型已就绪但进程尚未启动时，界面调度可提前预加载。离电暂停策略会取消本地任务并将模型移出内存；手动天气或测试在此条件下显示固定提示：`主人，当前设置为拔电时暂停鱼鱼的AI功能，可以在设置里调节哦。`
 
 停止模型先移除当前进程引用并请求终止，再异步等待最多5秒并释放进程对象，不在界面线程同步等待退出。加载取消后、预填充完成前后检查取消标志与进程身份。流式文字从工作线程异步排入界面队列，并再次检查当前请求版本；已经隐藏、取消、恢复会话或被新请求替换的旧片段不显示。
 
@@ -162,11 +167,17 @@ MCP 的 capture_foreground 显式调用上述前台选择与截图路径；captu
 
 标准版设置有“连接 Agent”页面。“连接本机兼容的 CLI Harness”默认关闭，开启前异步确认读屏、输入和交互内容将交给所选Agent，可能由其发送给所配置模型服务。取消保持关闭。开启后显示Harness下拉列表、重新检测、安装与登录说明、状态、重新连接、开始新对话、取消当前请求、人设编辑、Agent接管日常吐字和关心触发与动作接管。没有独立的双击对话开关或允许唤醒开关。日常关心的两个开关分别显示为“把日常关心的吐字交给 Agent”（AgentDailySpeech）和“把日常关心的触发和日常的动作切换逻辑交给 Agent”（PuppetMode），前者选择话语的编写者，后者选择关心时机及动作的安排者。
 
-目录包含Claude、Codex、Gemini、DeepSeek Harness、Kimi、Qwen、Antigravity、Copilot、Cursor、OpenCode、Cline、CodeBuddy、Qoder、TRAE、Kiro、Pi、Devin、Grok、Hermes、OpenClaw、MiniMax共21项。原生命令和适配器启动方式见[ACP连接参考](ACP.md)。检测使用PATH；Windows合并当前进程、用户和系统PATH，按exe、cmd、bat、ps1及无扩展名顺序寻找。下拉列表将检测到的项目放在前面，未检测到的标明状态。检测不启动全部Agent。
+目录包含Claude、Codex、Gemini、DeepSeek Harness、DeepSeek Harness Desktop、Kimi、Qwen、Antigravity、Copilot、Cursor、OpenCode、Cline、CodeBuddy、Qoder、TRAE、Kiro、Pi、Devin、Grok、Hermes、OpenClaw、MiniMax共22项。原生命令和适配器启动方式见[ACP连接参考](ACP.md)。检测使用PATH；Windows合并当前进程、用户和系统PATH，按exe、cmd、bat、ps1及无扩展名顺序寻找。下拉列表将检测到的项目放在前面，未检测到的标明状态。检测不启动全部Agent。
+
+DeepSeek Harness Desktop 单独探测桌面版的常见目录、Windows卸载登记和运行中实例的程序路径；macOS检查系统及用户Applications，Linux检查/opt及运行实例。只读解析app.asar索引，确认内置dsh入口、运行时清单及ACP应用包。连接时以ELECTRON_RUN_AS_NODE=1另起桌面版程序执行内置CLI，参数为内置入口路径及--profile acp；不接管用户已有桌面进程。“重新检测”会清除桌面版检测缓存。
+
+“拔电时暂停鱼鱼的AI功能”开启且电池供电时，Agent连接保留用户启用状态但暂停工作：取消当前轮次，清空待处理请求，关闭鱼鱼单独启动的ACP进程树，隐藏对话输入框，阻止后台重连和工具操作（get_settings仍可读取）。模型、Agent两种编写者的日常关心以及主动对话、天气和吐字测试均暂停。已保存的工作区、会话记录和预约保留；插电或关闭该供电开关后重新连接并按既有会话恢复规则继续，不重放已取消的请求。用户自行启动的Agent进程不纳入鱼鱼的进程管理。
 
 选定的CLI在后台自有进程中运行，使用UTF-8逐行JSON-RPC ACP v1。鱼鱼声明不提供文件读写与终端回调，Agent使用自身工具；权限请求返回其提供的选项，未知客户端方法返回Method not found。鱼鱼自己的可识别工具请求按连接授权处理，其他请求通过正常窗口等待用户选择。普通Agent输出和历史重放不显示为气泡。Windows自有进程加入退出时清理的Job，正常关闭时终止所启动的进程树。
 
 Claude、Codex、Pi的ACP适配器优先从PATH寻找，否则在data/agent/adapters内按固定npm版本安装，使用官方registry与独立缓存。需要Node.js/npm时显示缺少组件的原因。Codex适配器通过CODEX_PATH指定发现的Codex程序。Antigravity优先使用PATH中带配套localharness_external的agy_acp_server，否则在agent/adapters/antigravity准备Google官方组件，同时提取同一发布包的ACP程序和配套运行程序，校验压缩包SHA256并沿用发布参数。子进程通过ANTIGRAVITY_HARNESS_PATH定位配套程序。已下载的Antigravity组件计入检测；尚未下载时可在连接时准备。鱼鱼不升级或卸载原有CLI。
+
+Windows 的 CLI 检测合并进程、用户和机器 PATH。Linux/macOS 还通过用户交互 shell（macOS 使用登录 shell）读取 PATH，将其与进程 PATH 合并用于 CLI 检测与子进程启动；不修改用户配置文件或进程全局 PATH。Linux 可用 /usr/bin/setsid 时通过独立会话启动该 shell，避免后台终端作业的控制信号暂停桌宠。shell 的 PATH 结果缓存60秒，“重新检测”立即刷新缓存；shell 启动4秒未完成时终止，管道读取等待最多额外500毫秒；读取失败时继续使用进程 PATH。显式指定搜索目录时仅检查这些目录。
 
 初始化保存Agent公布的认证方式；认证错误中附带的authMethods可更新此次选择。收到认证要求后展示可用登录方式，协议认证发送authenticate及methodId，成功后重试原会话请求一次。交互终端可用时声明auth.terminal支持：Windows支持可直接启动的程序入口，Linux使用gnome-terminal、konsole或xterm。终端登录使用相同程序、工作区及环境，追加所选方法的args并应用env，展示参数后由用户选择；旧_meta.terminal-auth格式使用其登录参数替换常规ACP参数，忽略其中的command。终端成功退出后重新初始化ACP并继续原会话请求，非零退出显示失败。认证最长等待5分钟，可取消；已有账号凭据的复用和浏览器登录由Agent官方组件处理。取消选择停止自动重连，原会话记录保留。没有公布认证方式时显示错误及安装登录说明入口。
 
@@ -273,11 +284,11 @@ Windows 桌面、开始菜单应用入口和卸载入口的快捷方式均引用
 
 Windows 独立 Uninstall.exe 打开卸载界面，“保留模型和设置”默认不勾选。卸载工作进程从安装目录外运行，停止属于本目录的进程、删除清单文件并清理本安装的启动项、快捷方式及系统登记。勾选保留时留下模型、设置和缓存；默认清理本应用数据，仍有未列入删除清单的外部文件时保留非空目录。
 
-Windows 更新检查读取项目最新正式 Release，按标准版/无MCP版选择对应 OCR 安装器及校验信息，下载并核验后直接启动更新安装器。安装器等待当前应用退出并在同目录更新，复用模型和用户设置。取消或失败不会当作更新成功。
+Windows 更新检查读取项目最新正式 Release，按标准版/无MCP版选择对应 OCR 安装器及校验信息，从 GitHub 安装包资产的 digest 读取 SHA256，不请求独立校验文件；摘要缺失或无效时停止更新并提示稍后重试。下载并核验后直接启动更新安装器。安装器等待当前应用退出并在同目录更新，复用模型和用户设置。取消或失败不会当作更新成功。
 
 Windows 更新窗口显示该 Release 的发布说明；说明按 GitHub 风格 Markdown 渲染标题、段落、粗体、斜体、删除线、行内与围栏代码、链接、引用、无序/有序/任务列表和分隔线。链接只接受 HTTP、HTTPS 与 mailto，其他目标按原文显示；没有说明时显示占位文案。
 
-Linux 通过标准或无MCP版 .deb 安装到 /opt/bigbluefish，注册 bigbluefish 启动命令、图标与桌面菜单。依赖由系统包管理器提供，.NET 随包。两种包声明互斥并替换同一程序目录；用户数据在个人目录中，系统卸载不删除该个人目录。Linux 更新检查选择对应 .deb，核验下载后通过 pkexec 和 apt-get 安装，成功后等待旧进程结束再启动新进程。
+Linux 通过标准或无MCP版 .deb 安装到 /opt/bigbluefish，注册 bigbluefish 启动命令、图标与桌面菜单。依赖由系统包管理器提供，.NET 随包。两种包声明互斥并替换同一程序目录；用户数据在个人目录中，系统卸载不删除该个人目录。Linux 更新检查选择对应 .deb，从 GitHub 资产 digest 获取 SHA256，不下载独立校验文件；摘要缺失或无效时停止更新。核验下载后通过 pkexec 和 apt-get 安装，成功后等待旧进程结束再启动新进程。
 
 ## macOS 平台行为
 
@@ -285,11 +296,11 @@ Apple Silicon macOS 入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠和共�
 
 ## 版本与构建工具行为
 
-根目录 Version.props 指定产品版本1.1.3，文件版本与程序集版本为1.1.3.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
+根目录 Version.props 指定产品版本1.1.4，文件版本与程序集版本为1.1.4.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
 
 PowerShell 构建与测试脚本以带 BOM 的 UTF-8 保存，兼容 Windows PowerShell 对中文脚本的读取。PowerShellEncodingVerification.ps1 枚举 Git 已跟踪及未忽略的 .ps1 文件，检查 UTF-8 BOM 并通过 PowerShell 语法解析器读取；检查失败抛出错误。code/test.ps1 在其他检查前调用此脚本。
 
-Windows 安装器构建显式接收已核对的推理运行时目录，以自包含方式发布桌宠、标准版 MCP 桥接程序与独立卸载器，附加带固定来源及 SHA256 清单的 GStreamer 解码组件、Visual C++运行库与许可文件，再生成安装器及 SHA256文件。默认附带release/README.md作为INSTALL-README.md；SkipInstallReadme开启时省略该文件。本次使用的 payload目录、setup-stub目录、uninstaller目录、中间压缩文件或目标安装器已存在时报告错误，不覆盖这些已有构建产物。Linux 构建按发行类型发布自包含程序，加入推理运行时、RunnerGuard、PortalCapture与许可，生成对应的 .deb 与 SHA256文件；预发布包将版本号中的连字符转换为Debian版本的波浪号，因此1.1.3~beta.1排序早于正式1.1.3；包依赖声明包含 GStreamer 核心、基础、good 与 bad 插件，包管理器准备这些系统组件。
+Windows 主程序、MCP 桥接程序、安装器和卸载器的应用宿主关闭 CET 兼容标记，.NET 运行时仍以自包含方式携带。Windows 安装器构建显式接收已核对的推理运行时目录，以自包含方式发布桌宠、标准版 MCP 桥接程序与独立卸载器，附加带固定来源及 SHA256 清单的 GStreamer 解码组件、Visual C++运行库与许可文件，再生成安装器及 SHA256文件。默认附带release/README.md作为INSTALL-README.md；SkipInstallReadme开启时省略该文件。本次使用的 payload目录、setup-stub目录、uninstaller目录、中间压缩文件或目标安装器已存在时报告错误，不覆盖这些已有构建产物。Linux 构建按发行类型发布自包含程序，加入推理运行时、RunnerGuard、PortalCapture与许可，生成对应的 .deb 与 SHA256文件；预发布包将版本号中的连字符转换为Debian版本的波浪号，使预发布包排序早于对应正式版；包依赖声明包含 GStreamer 核心、基础、good 与 bad 插件，包管理器准备这些系统组件。
 
 ## 持久化、网络与诊断
 

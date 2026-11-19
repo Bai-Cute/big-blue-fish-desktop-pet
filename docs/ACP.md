@@ -4,7 +4,7 @@
 
 ## 支持目录
 
-下表列出内置适配项。程序从 PATH 寻找对应命令；Windows 同时检查进程 PATH 与当前用户、系统 PATH，优先查找 exe、cmd、bat、ps1。软件不在检测时启动所有产品，也不安装所选 Harness 本体。各产品需要完成自己的登录、模型和运行环境配置。
+下表列出内置适配项。程序从 PATH 寻找对应命令；Windows 同时检查进程 PATH 与当前用户、系统 PATH，优先查找 exe、cmd、bat、ps1。软件不在检测时启动所有产品，也不安装所选 Harness 本体。各产品需要完成自己的登录、模型和运行环境配置。Linux 还读取用户交互 shell 的 PATH，macOS 使用登录 shell；“重新检测”会刷新已缓存的 shell PATH。
 
 | 名称 | 命令 | ACP 启动方式 |
 | --- | --- | --- |
@@ -12,6 +12,7 @@
 | Codex CLI | codex | codex-acp 适配器，使用找到的 Codex 路径 |
 | Gemini CLI | gemini | --acp --allowed-tools mcp_big-blue-fish_* |
 | DeepSeek Harness | dsh | --profile acp |
+| DeepSeek Harness Desktop | 已安装桌面版程序 | 以 ELECTRON_RUN_AS_NODE=1 执行 app.asar 内置 CLI，传入 --profile acp |
 | Kimi Code | kimi | acp |
 | Qwen Code | qwen | --acp |
 | Antigravity CLI | agy 或 agy_acp_server | Google 官方 agy_acp_server |

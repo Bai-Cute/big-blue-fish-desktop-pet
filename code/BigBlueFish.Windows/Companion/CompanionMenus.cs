@@ -9,7 +9,7 @@ namespace BigBlueFish.Windows;
 
 public partial class MainWindow
 {
-    private const string BatteryPauseNotice = "主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。";
+    private const string BatteryPauseNotice = "主人，当前设置为拔电时暂停鱼鱼的AI功能，可以在设置里调节哦。";
 
     private void BuildCompanionContextMenu()
     {
@@ -46,6 +46,7 @@ public partial class MainWindow
     private async Task SpeakCompanionWeather()
     {
         if (weatherRequestPending || companionClosed || exitAnimation) return;
+        if (preferences.AiPausedOnBattery) { ApplyCompanionPowerPolicy(); ShowCompanionNotice(BatteryPauseNotice, true, true); return; }
         if (hiddenByUser || fullscreenHidden) RestoreCompanion();
         if (await TryManualAgentSpeech(true)) return;
         if (!brain.ModelAvailable) { OpenModelInstaller(); return; }
@@ -103,6 +104,7 @@ public partial class MainWindow
     private async Task SpeakCompanionTest()
     {
         if (companionClosed || exitAnimation) return;
+        if (preferences.AiPausedOnBattery) { ApplyCompanionPowerPolicy(); ShowCompanionNotice(BatteryPauseNotice, true, true); return; }
         if (hiddenByUser || fullscreenHidden) RestoreCompanion();
         if (await TryManualAgentSpeech(false)) return;
         if (!preferences.ModelEnabled)

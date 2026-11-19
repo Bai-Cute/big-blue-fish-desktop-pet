@@ -113,6 +113,7 @@ public static class CompanionEdgeLayout
                     Owner = pet,
                     Content = bubble
                 };
+                BigBlueFish.Windows.CompanionCaptureVisibility.Track(popup, () => ((BigBlueFish.Windows.MainWindow)pet).HideFromCapture);
                 popup.SourceInitialized += (object? s, EventArgs e) =>
                 {
                     nint handle = new WindowInteropHelper(popup).Handle;

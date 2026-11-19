@@ -11,7 +11,10 @@ internal sealed class CompanionPreferences
     public bool PublicInfo { get; set; } = true;
     public bool ForegroundEnabled { get; set; } = true;
     public bool StopModelOnBattery { get; set; } = true;
+    [JsonIgnore] public bool AiPausedOnBattery => StopModelOnBattery && !CompanionNative.OnAC;
+    internal const string BatteryPauseLabel = "拔电时暂停鱼鱼的AI功能";
     public bool HideOnFullscreen { get; set; } = true;
+    public bool HideFromCapture { get; set; }
     public bool CheckUpdatesOnStartup { get; set; } = true;
     public bool AgentEnabled { get; set; }
     public string AgentHarnessId { get; set; } = "codex";

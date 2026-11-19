@@ -31,6 +31,8 @@ public sealed class AgentCoordinator : IDisposable
     private long epoch;
     private volatile bool changingWorkspace;
     private bool authenticationPending;
+    private volatile bool powerPaused;
+    public bool PowerPaused => powerPaused;
     private static readonly JsonSerializerOptions EventJson = new() { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     private long spoken, turnStartSpoken;
     private long toolActivity;
@@ -65,6 +67,23 @@ public sealed class AgentCoordinator : IDisposable
         Workspaces = new(this.root, defaultWorkspace); Wakeups = new(this.root); _ = Worker();
     }
     private void Report(string value, string extra = "") { status = value; detail = extra; Changed?.Invoke(); }
+    public void SetPowerPaused(bool paused)
+    {
+        if (powerPaused == paused || disposed != 0) return;
+        powerPaused = paused;
+        Interlocked.Increment(ref epoch);
+        connectionLifetime.Cancel(); connectionLifetime = new();
+        var previous = Interlocked.Exchange(ref connection, null);
+        if (previous != null) { DiagnosticLog.Write(DiagnosticEvent.AgentDisconnected, state: "power"); _ = previous.DisposeAsync(); }
+        sessionId = ""; guideFingerprint = null; Configuration.Reset();
+        lock (gate) { while (events.Reader.TryRead(out var abandoned)) abandoned.Completion?.TrySetCanceled(); coalesced.Clear(); }
+        if (paused) Report("电池供电 · 鱼鱼的 AI 功能已暂停", "鱼鱼启动的 Agent 进程已关闭，插电后恢复连接。");
+        else if (mode.Enabled)
+        {
+            retryAfter = DateTimeOffset.MinValue; initialCare = mode.Puppet;
+            Report("正在恢复 Agent 连接…"); Enqueue("connect", new { });
+        }
+    }
     public void Configure(string selected, AgentMode updated)
     {
         HarnessCatalog.Get(selected);
@@ -84,6 +103,7 @@ public sealed class AgentCoordinator : IDisposable
         if (startsCare) initialCare = true;
         if (!updated.Enabled || !updated.DailyCare && activeKind is "daily_care" or "speech_test" or "weather_request" || !updated.Puppet && activeKind is "wakeup" or "start_care") activeTurn?.Cancel();
         if (!updated.Enabled) { Report("连接已关闭"); return; }
+        if (powerPaused) { Report("电池供电 · 鱼鱼的 AI 功能已暂停"); return; }
         if (reconnect && !changingWorkspace) Enqueue("connect", new { });
         else if (startsCare) Enqueue("start_care", new { purpose = "开始接管日常关心；请检查已有预约，安排后续唤醒。" });
         Changed?.Invoke();
@@ -151,7 +171,7 @@ public sealed class AgentCoordinator : IDisposable
     }
     public void Tick(DateTimeOffset now, bool canDeliver)
     {
-        if (!mode.Enabled || !canDeliver || disposed != 0 || changingWorkspace) return;
+        if (!mode.Enabled || powerPaused || !canDeliver || disposed != 0 || changingWorkspace) return;
         if (!Connected && now >= retryAfter) { retryAfter = now.AddSeconds(30); Enqueue("connect", new { }); }
         if (!mode.Puppet || !Connected) return;
         var due = Wakeups.PeekDue(harnessId, sessionId, now);
@@ -161,6 +181,7 @@ public sealed class AgentCoordinator : IDisposable
     {
         lock (gate)
         {
+            if (powerPaused) { completion?.TrySetException(new InvalidOperationException("鱼鱼的 AI 功能已按供电设置暂停。")); return false; }
             bool combine = kind is "connect" or "reconnect" or "new_conversation" or "daily_care" or "wakeup" or "start_care";
             if (combine && !coalesced.Add(kind)) return true;
             if (events.Writer.TryWrite(new(kind, data, fresh, Interlocked.Read(ref epoch), completion))) return true;
@@ -176,7 +197,7 @@ public sealed class AgentCoordinator : IDisposable
             await foreach (var request in events.Reader.ReadAllAsync(lifetime.Token))
             {
                 lock (gate) coalesced.Remove(request.Kind);
-                if (!mode.Enabled || changingWorkspace || request.Epoch != Interlocked.Read(ref epoch)) { request.Completion?.TrySetCanceled(); continue; }
+                if (!mode.Enabled || powerPaused || changingWorkspace || request.Epoch != Interlocked.Read(ref epoch)) { request.Completion?.TrySetCanceled(); continue; }
                 if (request.Kind is "speech_test" or "weather_request" && !mode.DailyCare
                     || request.Kind is "daily_care" && (!mode.DailyCare || mode.Puppet)
                     || request.Kind is "wakeup" or "start_care" && !mode.Puppet) continue;
@@ -184,6 +205,7 @@ public sealed class AgentCoordinator : IDisposable
                 activeTurn = turn; activeKind = request.Kind;
                 try
                 {
+                    if (powerPaused || request.Epoch != Interlocked.Read(ref epoch)) throw new OperationCanceledException();
                     if (request.Kind == "reconnect") await DropConnection();
                     await Connect(request.Fresh, turn.Token);
                     turn.Token.ThrowIfCancellationRequested();
@@ -309,7 +331,7 @@ public sealed class AgentCoordinator : IDisposable
                         await DropConnection(); throw;
                     }
                 }
-                catch (OperationCanceledException) { DiagnosticLog.Write(DiagnosticEvent.AgentCancelled, kind: request.Kind); request.Completion?.TrySetCanceled(); if (authenticationPending) retryAfter = DateTimeOffset.MaxValue; if (mode.Enabled) Report("请求已取消"); }
+                catch (OperationCanceledException) { DiagnosticLog.Write(DiagnosticEvent.AgentCancelled, kind: request.Kind); request.Completion?.TrySetCanceled(); if (authenticationPending) retryAfter = DateTimeOffset.MaxValue; if (mode.Enabled) Report(powerPaused ? "电池供电 · 鱼鱼的 AI 功能已暂停" : "请求已取消"); }
                 catch (Exception error)
                 {
                     DiagnosticLog.Write(DiagnosticEvent.AgentFailed, kind: request.Kind, error: error);
@@ -339,7 +361,7 @@ public sealed class AgentCoordinator : IDisposable
             if (Connected) return;
             var harness = HarnessCatalog.Get(harnessId);
             var adapters = new AgentAdapterStore(root);
-            string executable = adapters.FindExecutable(harness) ?? (harness.Id == "antigravity" ? "" : throw new IOException("未找到 " + harness.Name + "，请先按官方说明安装，并确认程序位于 PATH 中。"));
+            string executable = adapters.FindExecutable(harness) ?? (harness.Id == "antigravity" ? "" : throw new IOException(HarnessDesktopLocator.NotFoundMessage(harness)));
             if (!File.Exists(bridge)) throw new IOException("安装包缺少内部 MCP 组件，请重新安装完整标准版。");
             ExecutablePath = executable;
             Workspaces.EnsureCurrent(); Workspaces.Open(Workspaces.Current);
@@ -350,8 +372,10 @@ public sealed class AgentCoordinator : IDisposable
             token.ThrowIfCancellationRequested();
             var start = AgentProcess.StartInfo(command.Path, command.Arguments, skills.Workspace);
             // The actual installed CLI is preferred by adapters when they spawn it.
-            start.Environment["PATH"] = Path.GetDirectoryName(executable) + Path.PathSeparator + Environment.GetEnvironmentVariable("PATH");
+            start.Environment["PATH"] = Path.GetDirectoryName(executable) + Path.PathSeparator + HarnessEnvironment.SearchPath;
             if (harness.Id == "codex") start.Environment["CODEX_PATH"] = executable;
+            // The desktop application's Electron binary runs the bundled CLI only in Node mode.
+            if (harness.DesktopBundle != null) start.Environment["ELECTRON_RUN_AS_NODE"] = "1";
             if (harness.Id == "antigravity" && AgentAdapterStore.AntigravityHelper(command.Path) is { } helper)
                 start.Environment["ANTIGRAVITY_HARNESS_PATH"] = helper;
             DiagnosticLog.Write(DiagnosticEvent.AgentConnecting, kind: harness.Id, directory: skills.Workspace);
@@ -426,9 +450,10 @@ public sealed class AgentCoordinator : IDisposable
                     Report("正在建立鱼鱼专用对话…");
                     var result = await SessionRequest("session/new", new { cwd = skills.Workspace, mcpServers = servers });
                     token.ThrowIfCancellationRequested();
-                    sessionId = result.GetProperty("sessionId").GetString() ?? throw new IOException("Agent 未返回对话编号。");
-                    if (sessionId.Length == 0) throw new IOException("Agent 返回了空对话编号。");
-                    AtomicText.Write(stateFile, JsonSerializer.Serialize(new AgentSession(sessionId, executable, skills.Workspace)));
+                    string createdSession = result.GetProperty("sessionId").GetString() ?? throw new IOException("Agent 未返回对话编号。");
+                    if (createdSession.Length == 0) throw new IOException("Agent 返回了空对话编号。");
+                    AtomicText.Write(stateFile, JsonSerializer.Serialize(new AgentSession(createdSession, executable, skills.Workspace)));
+                    sessionId = createdSession;
                     guideFingerprint = null;
                 }
                 token.ThrowIfCancellationRequested();

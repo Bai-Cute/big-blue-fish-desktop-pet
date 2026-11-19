@@ -68,6 +68,21 @@ internal static partial class DeploymentVerification
         using var updates = new HttpClient(new Transport(_ => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(release) }));
         Check((await UpdateService.Check("0.5.0", client: updates))?.Sha256 == hash, "public release metadata selects matching OCR installer and SHA256");
         Check(await UpdateService.Check("0.5.1", client: updates) == null && await UpdateService.Check("0.5.2", client: updates) == null, "update check never offers equal version or downgrade");
+        int metadataRequests = 0;
+        using var metadataOnly = new HttpClient(new Transport(r => {
+            metadataRequests++;
+            Check(r.RequestUri!.AbsolutePath == "/latest", "update does not request a separate checksum file");
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(release) };
+        }));
+        Check((await UpdateService.Check("0.5.0", client: metadataOnly, apiUrl: "http://fixture/latest"))?.Sha256 == hash && metadataRequests == 1,
+            "release with installer digest and no checksum asset is usable");
+        foreach (var digest in new string?[] { null, "", "sha256:bad", "sha512:" + hash }) {
+            var asset = JsonSerializer.SerializeToElement(new { name = "package.deb", digest });
+            bool rejected = false; try { ReleaseAssetDigest.Sha256(asset); } catch (InvalidDataException) { rejected = true; }
+            Check(rejected, "missing or malformed digest is rejected without unverified installation");
+        }
+        Check(ReleaseAssetDigest.Sha256(JsonSerializer.SerializeToElement(new { digest = "SHA256:" + hash.ToUpperInvariant() })) == hash,
+            "Windows and Linux share normalized GitHub SHA256 digest parsing");
         var transaction = Path.Combine(root, "transaction"); Directory.CreateDirectory(Path.Combine(transaction, "models"));
         File.WriteAllText(Path.Combine(transaction, "main.bin"), "old program");
         File.WriteAllText(Path.Combine(transaction, "preferences.json"), "user settings");

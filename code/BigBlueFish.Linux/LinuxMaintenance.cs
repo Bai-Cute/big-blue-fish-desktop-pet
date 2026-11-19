@@ -126,11 +126,11 @@ internal sealed partial class LinuxPetWindow
             string asset = $"BigBlueFish-v{latest.ToString(3)}-Linux-x64.deb";
 #endif
             var assets = root.GetProperty("assets").EnumerateArray().ToArray();
-            string? Url(string name) => assets.FirstOrDefault(a => a.GetProperty("name").GetString() == name).TryGetProperty("browser_download_url", out var value) ? value.GetString() : null;
-            string? url = Url(asset), checksum = Url(asset + ".sha256"); if (url == null || checksum == null) throw new IOException("该版本的 Linux 安装包尚未就绪。");
+            var packageAsset = assets.FirstOrDefault(a => a.GetProperty("name").GetString() == asset);
+            if (packageAsset.ValueKind == JsonValueKind.Undefined) throw new IOException("该版本的 Linux 安装包尚未就绪。");
+            string url = packageAsset.GetProperty("browser_download_url").GetString()!;
+            string hash = ReleaseAssetDigest.Sha256(packageAsset);
             if (!await Confirm("发现新版本", "发现蓝色大肥鱼 " + latest.ToString(3) + "，是否下载并安装更新？", "下载更新")) return;
-            string hash = (await client.GetStringAsync(checksum)).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)[0].ToLowerInvariant();
-            if (!Regex.IsMatch(hash, "^[a-f0-9]{64}$")) throw new IOException("更新校验信息无效。");
             string package = Path.Combine(Environment.CurrentDirectory, "cache/updates", asset);
             await ArtifactDownload.Download(url, package, hash);
             var start = new ProcessStartInfo("/usr/bin/pkexec") { UseShellExecute = false };

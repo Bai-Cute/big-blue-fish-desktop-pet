@@ -131,7 +131,7 @@ public partial class MainWindow
                 nextSpeech = DateTime.UtcNow.AddSeconds(20);
             }
         });
-        Toggle("拔电时暂停并卸载模型", preferences.StopModelOnBattery, v =>
+        Toggle(CompanionPreferences.BatteryPauseLabel, preferences.StopModelOnBattery, v =>
         {
             preferences.StopModelOnBattery = v;
             ApplyCompanionPowerPolicy();
@@ -149,6 +149,13 @@ public partial class MainWindow
             preferences.HideOnFullscreen = v;
             UpdateCompanionVisibility();
         });
+        Toggle("截屏时隐藏大肥鱼", preferences.HideFromCapture, v =>
+        {
+            preferences.HideFromCapture = v;
+            CompanionCaptureVisibility.Refresh();
+        });
+        p.Children.Add(new TextBlock { Text = "从支持 Windows 截屏排除功能的截图与录屏中隐藏角色、文字气泡和对话输入框，桌面上仍正常显示。",
+            FontSize = 11, Foreground = Brushes.SlateGray, TextWrapping = TextWrapping.Wrap });
         Toggle("开机自动启动", StartupEnabled(), SetCompanionStartup);
         Toggle("启动时检查更新", preferences.CheckUpdatesOnStartup, v => preferences.CheckUpdatesOnStartup = v);
         p = pages[1];
@@ -299,7 +306,7 @@ public partial class MainWindow
             bool available = brain.ModelAvailable;
             installModel.Visibility = available ? Visibility.Collapsed : Visibility.Visible;
             status.Text = (CompanionNative.OnAC ? "已插电" :
-                preferences.StopModelOnBattery ? "电池供电 · 已按设置暂停模型" : "电池供电 · 允许模型运行")
+                preferences.StopModelOnBattery ? "电池供电 · 鱼鱼的 AI 功能已暂停" : "电池供电 · 允许 AI 功能运行")
                 + "\n" + (AgentDailyActive ? "日常吐字由 Agent 编写，本地模型不自动加载。" : PuppetActive ? "Agent 决定日常关心的时机，本地模型负责吐字。\n" : "")
                 + (available ? brain.Status : "尚未安装模型")
                 + "\n推理设备：" + brain.ExecutionDevice;

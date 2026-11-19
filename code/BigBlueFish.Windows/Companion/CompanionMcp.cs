@@ -22,6 +22,7 @@ public partial class MainWindow
 #if COMPANION_SAFE
     private bool AgentDailyActive => false;
     private void TickAgent(DateTime now) { }
+    private void UpdateAgentPowerPolicy() { }
     private bool DispatchAgentDaily() => false;
     private bool McpInputAvailable => false;
     private bool PuppetActive => false;
@@ -42,7 +43,7 @@ public partial class MainWindow
     private bool mcpConsentOpen;
     private Window? mcpConsentWindow;
     private Window? mcpInput;
-    private bool McpInputAvailable => preferences.AgentEnabled;
+    private bool McpInputAvailable => preferences.AgentEnabled && !preferences.AiPausedOnBattery;
     private bool PuppetActive => preferences.AgentEnabled && preferences.PuppetMode;
     private bool HasScheduledMcpSpeech => mcpNextSpeech != null;
     private bool AgentDailyActive => preferences.AgentEnabled && preferences.AgentDailySpeech;
@@ -97,12 +98,22 @@ public partial class MainWindow
 
     private void ConfigureAgent()
     {
+        UpdateAgentPowerPolicy();
         agent?.Configure(preferences.AgentHarnessId, new(preferences.AgentEnabled, preferences.PuppetMode, preferences.AgentDailySpeech));
         if (!AgentDailyActive) nextWarmup = DateTime.MinValue;
     }
     private bool agentLoading;
+    private bool agentPowerPaused;
+    private void UpdateAgentPowerPolicy()
+    {
+        bool paused = preferences.AiPausedOnBattery;
+        if (paused && !agentPowerPaused) { mcpActions.Clear(); mcpNextSpeech = null; mcpInput?.Hide(); }
+        agentPowerPaused = paused;
+        agent?.SetPowerPaused(paused);
+    }
     private void TickAgent(DateTime now)
     {
+        UpdateAgentPowerPolicy();
         agent?.Tick(new DateTimeOffset(now), !hiddenByUser && !fullscreenHidden && !dragging && !exitAnimation && !companionClosed);
         bool loading = agent?.AwaitingSpeech == true && !hiddenByUser && !fullscreenHidden;
         if (loading != agentLoading || loading && loadingIndicator.Visibility != Visibility.Visible)
@@ -114,6 +125,7 @@ public partial class MainWindow
     private bool DispatchAgentDaily()
     {
         if (!AgentDailyActive) return false;
+        if (preferences.AiPausedOnBattery) return true;
         nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
         agent?.DailyCare(); return true;
     }
@@ -207,6 +219,8 @@ public partial class MainWindow
         {
             token.ThrowIfCancellationRequested();
             if (!preferences.McpEnabled || companionClosed || exitAnimation) throw new InvalidOperationException("MCP 接口已关闭或桌宠正在退出。");
+            UpdateAgentPowerPolicy();
+            if (preferences.AiPausedOnBattery && name != "get_settings") throw new InvalidOperationException("鱼鱼的 AI 功能已按供电设置暂停。");
             switch (name)
             {
                 case "get_settings":
@@ -308,6 +322,7 @@ public partial class MainWindow
         brain.UseGpu = preferences.GpuEnabled; brain.WeatherRegionCode = preferences.WeatherRegionCode;
         if (oldRegion != preferences.WeatherRegionCode) InvalidateSpeechRequests();
         ApplyCompanionPowerPolicy(); ApplyCompanionScale(false); ApplyCompanionBubbleScale(false);
+        CompanionCaptureVisibility.Refresh();
         if (values.TryGetValue("Left", out var left) && left is double x) Left = x;
         if (values.TryGetValue("Top", out var top) && top is double y) Top = y;
         ClampCompanion(); anchor = new(Left, Top);
@@ -368,6 +383,7 @@ public partial class MainWindow
         var window = new Window { Title = "蓝色大肥鱼 · 输入", Width = 354, Height = 120, WindowStyle = WindowStyle.None,
             AllowsTransparency = true, Background = Brushes.Transparent, ResizeMode = ResizeMode.NoResize,
             ShowInTaskbar = false, ShowActivated = false, Topmost = true, Owner = this, Content = frame, FontFamily = new FontFamily("Microsoft YaHei UI") };
+        CompanionCaptureVisibility.Track(window, () => preferences.HideFromCapture);
         using (var theme = typeof(ModernWindow).Assembly.GetManifestResourceStream("BigBlueFish.ModernTheme.xaml")!)
         {
             var resources = (ResourceDictionary)System.Windows.Markup.XamlReader.Load(theme);
