@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <CompanionInputMode Condition="'$(CompanionInputMode)' == ''">Ocr</CompanionInputMode>
-    <Version>1.1.4</Version>
+    <Version>1.1.5</Version>
     <!-- Keep the self-contained runtime; avoid CET startup failures on older Windows patches. -->
     <CetCompat>false</CetCompat>
     <CompanionEdition Condition="'$(CompanionEdition)' == ''">Standard</CompanionEdition>

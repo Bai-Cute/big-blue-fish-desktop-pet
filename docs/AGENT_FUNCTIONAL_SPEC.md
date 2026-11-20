@@ -1,4 +1,4 @@
-# 蓝色大肥鱼 1.1.4 行为规格
+# 蓝色大肥鱼 1.1.5 行为规格
 
 ## 运行平台与发行类型
 
@@ -173,7 +173,7 @@ DeepSeek Harness Desktop 单独探测桌面版的常见目录、Windows卸载登
 
 “拔电时暂停鱼鱼的AI功能”开启且电池供电时，Agent连接保留用户启用状态但暂停工作：取消当前轮次，清空待处理请求，关闭鱼鱼单独启动的ACP进程树，隐藏对话输入框，阻止后台重连和工具操作（get_settings仍可读取）。模型、Agent两种编写者的日常关心以及主动对话、天气和吐字测试均暂停。已保存的工作区、会话记录和预约保留；插电或关闭该供电开关后重新连接并按既有会话恢复规则继续，不重放已取消的请求。用户自行启动的Agent进程不纳入鱼鱼的进程管理。
 
-选定的CLI在后台自有进程中运行，使用UTF-8逐行JSON-RPC ACP v1。鱼鱼声明不提供文件读写与终端回调，Agent使用自身工具；权限请求返回其提供的选项，未知客户端方法返回Method not found。鱼鱼自己的可识别工具请求按连接授权处理，其他请求通过正常窗口等待用户选择。普通Agent输出和历史重放不显示为气泡。Windows自有进程加入退出时清理的Job，正常关闭时终止所启动的进程树。
+选定的CLI在后台自有进程中运行，使用UTF-8逐行JSON-RPC ACP v1。鱼鱼声明不提供文件读写与终端回调，Agent使用自身工具；权限请求返回其提供的选项，未知客户端方法返回Method not found。鱼鱼自己的可识别工具请求按连接授权处理，其他请求通过正常窗口等待用户选择。普通Agent输出和历史重放不显示为气泡。每轮主人主动对话明确要求通过say回复：长任务开始前告知正在做什么，工作中在有实际进展或需要主人知情时以合理频率汇报，结束前汇报结果、无法完成的原因或需要主人提供的信息。开始与进度汇报不替代最终回复。详细产物保存在工作区或Agent对话中，鱼鱼使用一行、少于100字且不含代码、路径、列表的话语告知主人。Windows自有进程加入退出时清理的Job，正常关闭时终止所启动的进程树。
 
 Claude、Codex、Pi的ACP适配器优先从PATH寻找，否则在data/agent/adapters内按固定npm版本安装，使用官方registry与独立缓存。需要Node.js/npm时显示缺少组件的原因。Codex适配器通过CODEX_PATH指定发现的Codex程序。Antigravity优先使用PATH中带配套localharness_external的agy_acp_server，否则在agent/adapters/antigravity准备Google官方组件，同时提取同一发布包的ACP程序和配套运行程序，校验压缩包SHA256并沿用发布参数。子进程通过ANTIGRAVITY_HARNESS_PATH定位配套程序。已下载的Antigravity组件计入检测；尚未下载时可在连接时准备。鱼鱼不升级或卸载原有CLI。
 
@@ -198,7 +198,7 @@ agent/sessions/工作区路径SHA256/Harness编号.json保存会话编号、程�
 
 设置的模型与权限区域显示当前Agent报告的配置项，名称、分组、说明和当前值取自Agent。configOptions优先于旧模式字段，select绘制下拉框，boolean绘制复选框，未知控件类型跳过。初始化声明session.configOptions.boolean支持。修改使用session/set_config_option；成功响应及config_option_update包含的完整选项替换当前列表，依照协议到达顺序应用。旧models和modes状态分别使用session/set_model及session/set_mode，Agent返回Method not found时该项转为只读。可选值只能来自Agent报告；未提供配置能力时显示由Harness配置。正在生成、修改配置或切换工作区时选择器禁用。权限／工作模式按Harness执行，单项操作的批准窗口继续独立处理。
 
-请求等待队列上限32，连接、重连、日常关心、预约到期和开始关心事件分别合并。用户文字队列满时不清空输入。ACP初始化最长45秒，普通控制请求60秒，模型轮次5分钟。取消或模型轮次超时发送session/cancel并关闭该自有连接，后续恢复会话。登录错误停止自动重连，其他请求失败两分钟后可重试。实际断开时清除就绪状态。结束轮次必须返回stopReason；没有调用说话工具时状态显示本轮未调用说话工具。
+请求等待队列上限32，连接、重连、日常关心、预约到期和开始关心事件分别合并。用户文字队列满时不清空输入。ACP初始化最长45秒，普通控制请求60秒，模型轮次5分钟。取消或模型轮次超时发送session/cancel并关闭该自有连接，后续恢复会话。登录错误停止自动重连，其他请求失败两分钟后可重试。实际断开时清除就绪状态。结束轮次必须返回stopReason；没有调用说话工具时状态显示本轮未调用说话工具。主人主动对话、日常关心、手动天气、吐字测试和由Agent编写的预约关心在轮次已经结束或请求返回错误、且尚未即时发言时，气泡显示“主人，Agent结束工作了但没有给予回复。”；连接已经丢失则显示“主人，Agent连接断开了。”。已建立的空闲会话意外断开时也显示断开提示。同一轮只提示一次；普通ACP文本和say_next不计作即时发言。请求仍在进行时不显示未回复提示；主动取消、退出、切换连接或工作区以及供电暂停不显示故障提示。界面投递的提示绑定原轮次和连接代次，后续轮次或设置切换使旧提示失效。提示采用鱼鱼气泡和聊天记录的正常显示路径，排障日志记录提示类型，不记录任务正文。
 
 ## 内部MCP工具
 
@@ -296,7 +296,7 @@ Apple Silicon macOS 入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠和共�
 
 ## 版本与构建工具行为
 
-根目录 Version.props 指定产品版本1.1.4，文件版本与程序集版本为1.1.4.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
+根目录 Version.props 指定产品版本1.1.5，文件版本与程序集版本为1.1.5.0；Windows、Linux、MCP桥接程序、安装器与卸载器从同一版本属性生成。CompanionEdition 为 Standard 或 Safe，Safe 对应无MCP版；当前标准发行采用 OCR 读屏。
 
 PowerShell 构建与测试脚本以带 BOM 的 UTF-8 保存，兼容 Windows PowerShell 对中文脚本的读取。PowerShellEncodingVerification.ps1 枚举 Git 已跟踪及未忽略的 .ps1 文件，检查 UTF-8 BOM 并通过 PowerShell 语法解析器读取；检查失败抛出错误。code/test.ps1 在其他检查前调用此脚本。
 

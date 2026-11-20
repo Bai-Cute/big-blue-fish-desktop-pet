@@ -22,4 +22,6 @@
 - [1.1.2](1.1.2.md)
 - [1.1.3-beta.1](1.1.3-beta.1.md)
 - [1.1.3](1.1.3.md)
-- [1.1.4（当前 Windows/Linux）](../AGENT_FUNCTIONAL_SPEC.md)
+
+- [1.1.4](1.1.4.md)
+- [1.1.5（当前 Windows/Linux）](../AGENT_FUNCTIONAL_SPEC.md)

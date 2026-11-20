@@ -95,8 +95,15 @@ internal sealed partial class LinuxPetWindow
     {
         if (!Preferences.AgentEnabled) return;
         mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
-        agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"), Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), agentPipe, RequestAgentPermission,
-            App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+        if (agent == null)
+        {
+            var coordinator = new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"), Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), agentPipe, RequestAgentPermission,
+                App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+            agent = coordinator;
+            coordinator.Notice += notice => Dispatcher.UIThread.Post(() => {
+                if (agent == coordinator && coordinator.CanDisplayNotice(notice)) SayExternal(notice.Text);
+            });
+        }
         if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
         agent.SpeechBrief = (kind, allowImages, token) => Dispatcher.UIThread.InvokeAsync(() => BuildAgentSpeechBrief(kind, allowImages, token));
@@ -161,8 +168,7 @@ internal sealed partial class LinuxPetWindow
                     return ControlTools.Text(new { action, started = name == "interrupt_action", queued = externalActions.Count });
                 case "say": case "say_next":
                     string text = ControlTools.RequiredText(args, "text");
-                    agent?.MarkSpoken();
-                    if (name == "say") SayExternal(text); else nextExternalText = text;
+                    if (name == "say") { SayExternal(text); agent?.MarkSpoken(); } else nextExternalText = text;
                     return ControlTools.Text(new { displayed = name == "say", pending = name == "say_next", text });
                 case "get_operation_guide": case "get_wakeups": case "schedule_wakeup": case "cancel_wakeup":
                     return ControlTools.Text(agent?.ExecuteTool(name, args) ?? throw new InvalidOperationException("Agent 尚未连接。"));

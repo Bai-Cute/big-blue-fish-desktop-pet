@@ -17,7 +17,7 @@ public enum DiagnosticEvent
     RunnerStarting, RunnerReady, RunnerStopped, RunnerFailed, RunnerCpuFallback,
     WeatherRefresh, WeatherCached, WeatherFailed, NewsFetch, NewsSelected, NewsFailed,
     AgentConnecting, AgentConnected, AgentDisconnected, AgentRequest, AgentMaterials, AgentReply,
-    AgentCancelled, AgentFailed, AgentPermission, AgentConfiguration, AgentWorkspace, McpTool,
+    AgentCancelled, AgentFailed, AgentPermission, AgentConfiguration, AgentWorkspace, AgentNotice, McpTool,
     LogExported, LogExportFailed, CaptureVisibility
 }
 
@@ -166,6 +166,7 @@ public static class DiagnosticLog
         DiagnosticEvent.AgentConnecting => "开始连接 Agent", DiagnosticEvent.AgentConnected => "Agent 会话已连接", DiagnosticEvent.AgentDisconnected => "Agent 连接已关闭",
         DiagnosticEvent.AgentRequest => "向 Agent 提交事件", DiagnosticEvent.AgentMaterials => "准备或送交 Agent 资料", DiagnosticEvent.AgentReply => "Agent 本轮处理结束",
         DiagnosticEvent.AgentCancelled => "Agent 请求已取消", DiagnosticEvent.AgentFailed => "Agent 请求失败", DiagnosticEvent.AgentPermission => "Agent 请求权限或认证",
+        DiagnosticEvent.AgentNotice => "Agent 未回复或断开，显示提示",
         DiagnosticEvent.AgentConfiguration => "调整 Agent 会话配置", DiagnosticEvent.AgentWorkspace => "Agent 工作区状态变化", DiagnosticEvent.McpTool => "收到 MCP 工具调用",
         DiagnosticEvent.LogExported => "排障日志已保存为 TXT", DiagnosticEvent.LogExportFailed => "排障日志保存失败",
         DiagnosticEvent.CaptureVisibility => "截屏隐藏状态", _ => code.ToString()

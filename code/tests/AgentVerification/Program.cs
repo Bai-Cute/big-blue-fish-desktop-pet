@@ -111,6 +111,7 @@ AgentCoordinator? host = null;
 var said = new List<string>(); int permissions = 0, authentications = 0;
 using var server = new ControlServer((name, values, token) => {
     if (name == "say") { host?.MarkSpoken(); lock (said) said.Add(values.GetProperty("text").GetString()!); return Task.FromResult(ControlTools.Text(new { displayed = true })); }
+    if (name == "say_next") return Task.FromResult(ControlTools.Text(new { pending = true }));
     return Task.FromResult(ControlTools.Text(host!.ExecuteTool(name, values)));
 }, pipe);
 try
@@ -327,6 +328,55 @@ try
         Check(File.ReadAllText(Path.Combine(terminalWorkspace, "fixture-terminal-authenticated")) == "terminal-test", "terminal login preserves configured entry cwd and passes args plus environment");
         Check(!File.Exists(Path.Combine(terminalWorkspace, "fixture-authenticated")), "terminal method never sent to authenticate");
     }
+    string noticeWorkspace = Path.Combine(root, "notice-workspace"); Directory.CreateDirectory(noticeWorkspace);
+    var notices = new System.Collections.Concurrent.ConcurrentQueue<AgentNotice>();
+    host.Notice += notices.Enqueue;
+    host.Configure("opencode", new(true, false, true));
+    await host.OpenWorkspace(noticeWorkspace);
+    await Until(() => host.Connected && !host.Busy, "notice tests use a separate connected workspace");
+    string noticeMode = Path.Combine(noticeWorkspace, "fixture-notice-mode");
+    int originalSaid = said.Count;
+    File.WriteAllText(noticeMode, "silent");
+    host.SendUser("silent task");
+    await Until(() => notices.Count == 1 && !host.Busy, "completed turn without say emits one visible missing reply notice");
+    var firstNotice = notices.Single();
+    Check(firstNotice.Text == "主人，Agent结束工作了但没有给予回复。" && host.CanDisplayNotice(firstNotice), "notice has fixed text and current request identity");
+    Check(said.Count == originalSaid, "ordinary assistant output never substitutes for say or counts as a reply");
+    string sentPrompt = File.ReadAllText(Path.Combine(noticeWorkspace, "fixture-last-prompt.txt"));
+    Check(sentPrompt.Contains("长任务开始前") && sentPrompt.Contains("完成后再次用 say") && sentPrompt.Contains("say_next 也不能替代"), "every user turn requires start progress and completion reports via say");
+    host.Interaction("click", new { });
+    await Until(() => !host.CanDisplayNotice(firstNotice) && !host.Busy, "new turn invalidates delayed notices");
+    Check(notices.Count == 1, "silent optional interaction does not produce an error");
+    File.WriteAllText(noticeMode, "error");
+    host.SendUser("API failure");
+    await Until(() => notices.Count == 2 && !host.Busy, "explicit ACP request error without say emits a missing reply notice");
+    Check(host.Connected, "API request error is distinguished from a lost connection");
+    File.WriteAllText(noticeMode, "pending");
+    host.SendUser("delayed speech only");
+    await Until(() => notices.Count == 3 && !host.Busy, "say_next alone does not count as an immediate response");
+    File.WriteAllText(noticeMode, "progress-error");
+    host.SendUser("progress before failure");
+    await Until(() => said.Count == originalSaid + 1 && !host.Busy, "visible progress is a real Agent utterance");
+    Check(notices.Count == 3, "existing Agent speech is not overwritten with a false no reply notice");
+    File.WriteAllText(noticeMode, "disconnect");
+    host.SendUser("connection loss");
+    await Until(() => notices.Count == 4 && !host.Busy && !host.Connected, "process loss during prompt emits one disconnected notice");
+    Check(notices.Last().Text == "主人，Agent连接断开了。", "disconnect uses its own fixed bubble text");
+    File.Delete(noticeMode); host.Reconnect();
+    await Until(() => host.Connected && !host.Busy, "recover connection after notice");
+    host.SendUser("wait");
+    await Until(() => host.Busy && File.ReadAllText(Path.Combine(noticeWorkspace, "fixture-last-prompt.txt")).Contains("\"wait\""), "running request remains without an early error");
+    Check(notices.Count == 4, "working Agent is not prematurely declared finished");
+    host.Cancel(); await Until(() => !host.Busy, "explicit cancellation completes");
+    Check(notices.Count == 4, "deliberate cancellation does not emit a failure bubble");
+    host.Reconnect(); await Until(() => host.Connected && !host.Busy, "idle disconnect fixture reconnected");
+    Process.GetProcessById(int.Parse(File.ReadAllText(Path.Combine(noticeWorkspace, "fixture-pid")))).Kill();
+    await Until(() => notices.Count == 5 && !host.Connected, "unexpected idle disconnect also becomes visible once");
+    var idleNotice = notices.Last();
+    host.SetPowerPaused(true);
+    Check(!host.CanDisplayNotice(idleNotice) && notices.Count == 5, "power pause invalidates queued notices and does not add an error");
+    host.SetPowerPaused(false);
+    await Until(() => host.Connected && !host.Busy, "resume after notification power test");
     string cancelledWorkspace = Path.Combine(root, "auth-cancel-workspace"); Directory.CreateDirectory(cancelledWorkspace);
     File.WriteAllText(Path.Combine(cancelledWorkspace, "fixture-auth-methods"), ""); File.WriteAllText(Path.Combine(cancelledWorkspace, "fixture-auth-cancel"), "");
     await host.OpenWorkspace(cancelledWorkspace);
@@ -410,6 +460,7 @@ static class Fixture
     }
     public static async Task Run()
     {
+        File.WriteAllText("fixture-pid", Environment.ProcessId.ToString());
         string session = ""; bool authenticated = false;
         while (await Console.In.ReadLineAsync() is string line)
         {
@@ -453,6 +504,17 @@ static class Fixture
                     if (File.Exists("fixture-reject-images") && p.GetProperty("prompt").EnumerateArray().Any(b => b.GetProperty("type").GetString() == "image"))
                     { await Send(new { jsonrpc = "2.0", id, error = new { code = -32602, message = "Upstream model does not support image content blocks" } }); break; }
                     string text = p.GetProperty("prompt")[0].GetProperty("text").GetString()!;
+                    if (File.Exists("fixture-notice-mode"))
+                    {
+                        string behavior = File.ReadAllText("fixture-notice-mode");
+                        if (behavior == "disconnect") Environment.Exit(0);
+                        if (behavior == "pending") await Tool("say_next", new { text = "pending only" });
+                        if (behavior == "progress-error") await Tool("say", new { text = "starting task" });
+                        await Send(new { jsonrpc = "2.0", method = "session/update", @params = new { sessionId = session, update = new { sessionUpdate = "agent_message_chunk", content = new { type = "text", text = "ordinary internal answer" } } } });
+                        if (behavior is "error" or "progress-error") await Send(new { jsonrpc = "2.0", id, error = new { code = -32603, message = "fixture API request failed" } });
+                        else await Send(new { jsonrpc = "2.0", id, result = new { stopReason = "end_turn" } });
+                        break;
+                    }
                     if (text.Contains("permission"))
                     {
                         await Send(new { jsonrpc = "2.0", id = "permission-1", method = "session/request_permission", @params = new { sessionId = session, toolCall = new { title = "fixture permission", rawInput = new { command = "fixture" } }, options = new[] { new { optionId = "once", name = "允许一次", kind = "allow_once" } } } });

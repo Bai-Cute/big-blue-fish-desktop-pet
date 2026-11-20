@@ -133,9 +133,17 @@ public partial class MainWindow
     {
         if (!preferences.AgentEnabled) return;
         mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
-        agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"),
-            Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe"), agentPipe, RequestAgentPermission,
-            App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+        if (agent == null)
+        {
+            var coordinator = new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"),
+                Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe"), agentPipe, RequestAgentPermission,
+                App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+            agent = coordinator;
+            coordinator.Notice += notice => Dispatcher.BeginInvoke(() => {
+                if (agent == coordinator && coordinator.CanDisplayNotice(notice) && !companionClosed && !exitAnimation)
+                    ShowMcpSpeech(notice.Text, false);
+            });
+        }
         if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.InvokeAsync(() => RequestAgentLocalSpeech(token)).Task.Unwrap();
         agent.SpeechBrief = (kind, allowImages, token) => Dispatcher.InvokeAsync(() => BuildAgentSpeechBrief(kind, allowImages, token)).Task.Unwrap();
@@ -194,9 +202,9 @@ public partial class MainWindow
         if (companionContextMenu != null) foreach (int index in new[] { 1, 2 }) if (companionContextMenu.Items[index] is MenuItem item) item.IsEnabled = true;
         if (notifyIcon?.ContextMenuStrip != null) foreach (int index in new[] { 2, 3 }) notifyIcon.ContextMenuStrip.Items[index].Enabled = true;
     }
-    private void ShowMcpSpeech(string text)
+    private void ShowMcpSpeech(string text, bool agentReply = true)
     {
-        agent?.MarkSpoken();
+        if (agentReply) agent?.MarkSpoken();
         InvalidateSpeechRequests(); EndGreetingNotice();
         externalBubble = true;
         bubbleIsModelReply = false;
@@ -264,7 +272,6 @@ public partial class MainWindow
                     return ControlTools.Text(new { action, started = name == "interrupt_action" || animationPhase == "External" && currentAction == action, queued = mcpActions.Count });
                 case "say": case "say_next":
                     var text = ControlTools.RequiredText(args, "text");
-                    agent?.MarkSpoken();
                     if (name == "say") ShowMcpSpeech(text); else mcpNextSpeech = text;
                     return ControlTools.Text(new { displayed = name == "say", pending = name == "say_next", text });
                 case "get_operation_guide": case "get_wakeups": case "schedule_wakeup": case "cancel_wakeup":
