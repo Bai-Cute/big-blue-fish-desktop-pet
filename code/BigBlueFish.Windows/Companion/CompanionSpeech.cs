@@ -24,6 +24,7 @@ internal sealed class CompanionSpeech(TextBlock text, Border bubble, Action refr
         Cancel();
         if (!subscribed) { timer.Tick += Tick; subscribed = true; }
         FullText = message;
+        CompanionVoice.Queue(message);
         boundaries = StringInfo.ParseCombiningCharacters(message);
         shown = animate && boundaries.Length > 0 ? 1 : boundaries.Length;
         text.Text = Prefix(shown);
@@ -54,9 +55,10 @@ internal sealed class CompanionSpeech(TextBlock text, Border bubble, Action refr
         if (count <= shown) return;
         shown = count;
         text.Text = Prefix(count);
-        if (shown == boundaries.Length) { Cancel(); completed(); }
+        if (shown == boundaries.Length) { StopTyping(); completed(); }
     }
 
-    internal void Cancel() { timer.Stop(); elapsed.Stop(); }
+    private void StopTyping() { timer.Stop(); elapsed.Stop(); }
+    internal void Cancel() { StopTyping(); CompanionVoice.Cancel(); }
     public void Dispose() { Cancel(); timer.Tick -= Tick; }
 }

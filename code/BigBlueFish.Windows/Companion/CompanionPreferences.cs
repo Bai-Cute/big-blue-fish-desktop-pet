@@ -11,7 +11,10 @@ internal sealed class CompanionPreferences
     public bool PublicInfo { get; set; } = true;
     public bool ForegroundEnabled { get; set; } = true;
     public bool StopModelOnBattery { get; set; } = true;
+    [JsonIgnore] public bool AiPausedOnBattery => StopModelOnBattery && !CompanionNative.OnAC;
+    internal const string BatteryPauseLabel = "拔电时暂停鱼鱼的AI功能";
     public bool HideOnFullscreen { get; set; } = true;
+    public bool HideFromCapture { get; set; }
 #if COMPANION_MAC
     // The 1280x720, 60 fps clips through VideoToolbox where the Mac decodes VP9 in hardware; off: the 640x360, 24 fps
     // clips on the CPU, which costs less CPU time in all (fewer frames to hand to the window).

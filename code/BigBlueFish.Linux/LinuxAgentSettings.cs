@@ -27,7 +27,7 @@ internal sealed partial class LinuxPetWindow
             refreshing = false;
         }
         Detect(); extra.Children.Add(select);
-        var buttons = new WrapPanel(); buttons.Children.Add(ActionButton("重新检测", Detect));
+        var buttons = new WrapPanel(); buttons.Children.Add(ActionButton("重新检测", () => { HarnessEnvironment.Refresh(); HarnessDesktopLocator.Refresh(); Detect(); }));
         buttons.Children.Add(ActionButton("安装与登录说明", () => OpenUrl(HarnessCatalog.Get(Preferences.AgentHarnessId).Website)));
         extra.Children.Add(buttons);
         var state = Paragraph(""); extra.Children.Add(state);
@@ -56,11 +56,12 @@ internal sealed partial class LinuxPetWindow
             refreshWorkspace(); refreshConfiguration();
             if (select.SelectedItem is ComboBoxItem { Tag: "antigravity" } selected)
                 selected.Content = "Antigravity CLI" + (adapters.FindExecutable(HarnessCatalog.Get("antigravity")) == null ? " · 连接时准备官方组件" : " · 已检测到");
-            state.Text = (agent?.Status ?? "尚未连接") + "\n" + (agent?.Detail ?? "选择后连接，双击鱼鱼即可对话。");
+            state.Text = Preferences.AiPausedOnBattery ? "电池供电 · 鱼鱼的 AI 功能已暂停" : (agent?.Status ?? "尚未连接") + "\n" + (agent?.Detail ?? "选择后连接，双击鱼鱼即可对话。");
             details.Text = $"程序：{agent?.ExecutablePath}\n版本：{agent?.Version}\n模型：{agent?.CurrentModel}\n对话编号：{agent?.SessionId}\n内部工具连接：{mcpServer?.Connections ?? 0}\n点击响应：{Preferences.AgentRespondToClick}；拖动响应：{Preferences.AgentRespondToDrag}（可由 Agent 调整）";
             wake.Text = Preferences.PuppetMode && Preferences.AgentDailySpeech ? "下一次日常关心：" + (agent?.NextWake ?? "等待 Agent 安排")
                 : Preferences.PuppetMode ? "Agent 安排日常关心的时机，本地模型负责吐字。下一次关心：" + (agent?.NextWake ?? "等待 Agent 预约") : Preferences.AgentDailySpeech ? "鱼鱼决定何时关心主人，Agent 编写关心的话。" : "鱼鱼按自己的节奏关心主人，日常说话使用内置模型。";
-            if (Preferences.PuppetMode && agent?.Connected != true) wake.Text += "\nAgent 未连接，鱼鱼保持待机；关闭第二个开关可恢复鱼鱼自己的安排。";
+            if (Preferences.AiPausedOnBattery) wake.Text = "鱼鱼的 AI 功能已按供电设置暂停，插电后恢复。";
+            else if (Preferences.PuppetMode && agent?.Connected != true) wake.Text += "\nAgent 未连接，鱼鱼保持待机；关闭第二个开关可恢复鱼鱼自己的安排。";
         }
         select.SelectionChanged += (_, _) => { if (!refreshing && select.SelectedItem is ComboBoxItem { Tag: string id }) { Preferences.AgentHarnessId = id; ConfigureAgent(); Save(); } };
         daily.Click += (_, _) => { Preferences.AgentDailySpeech = daily.IsChecked == true; ApplySettings(); Refresh(); };

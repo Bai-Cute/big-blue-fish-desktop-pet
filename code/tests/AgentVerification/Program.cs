@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.IO.Pipes;
 using System.Text;
@@ -22,6 +23,7 @@ if (args.Length >= 3 && args[0] == "--auth-inventory")
     return;
 }
 if (args.Length >= 3 && args[0] == "--probe") { Environment.ExitCode = await LiveProbe.Run(args[1], args[2], args.Contains("--prompt"), args.Contains("--configure"), args.Contains("--wakeup")); return; }
+if (args.Length >= 2 && args[0] == "--dsh-desktop") { Environment.ExitCode = await DshDesktopProbe.Run(args[1]); return; }
 int passed = 0;
 void Check(bool condition, string label) { if (!condition) throw new Exception("FAIL " + label); passed++; Console.WriteLine("PASS " + label); }
 async Task Until(Func<bool> predicate, string label, int seconds = 15)
@@ -33,7 +35,38 @@ async Task Until(Func<bool> predicate, string label, int seconds = 15)
 string root = Path.GetFullPath(args.FirstOrDefault(a => !a.StartsWith("--")) ?? Path.Combine(".work", "agent-verification-" + Guid.NewGuid().ToString("N")));
 Directory.CreateDirectory(root);
 WorkspaceVerification.Run(Path.Combine(root, "workspace-rules"), Check);
-Check(HarnessCatalog.All.Count == 21 && HarnessCatalog.All.Select(x => x.Id).Distinct().Count() == 21, "21 distinct selected harnesses");
+Check(HarnessCatalog.All.Count == 22 && HarnessCatalog.All.Select(x => x.Id).Distinct().Count() == 22, "22 distinct selected harnesses");
+var desktopHarness = HarnessCatalog.Get("dsh-desktop");
+Check(desktopHarness.Arguments.SequenceEqual(["--profile", "acp"]) && desktopHarness.Commands.Length == 0
+    && desktopHarness.DesktopBundle == "dsh/node_modules/@deepseek-ai/dsh/lib/bin.js", "desktop DSH launches the CLI bundled in its own app");
+string desktopExecutable = Path.Combine(root, OperatingSystem.IsWindows() ? "DeepSeek Harness.exe" : "DeepSeek Harness");
+var desktopArguments = HarnessDesktopLocator.Arguments(desktopExecutable, desktopHarness.DesktopBundle!, ["--profile", "acp"]);
+Check(desktopArguments.Length == 3 && desktopArguments[0] == HarnessDesktopLocator.BundlePath(desktopExecutable, desktopHarness.DesktopBundle!)
+    && desktopArguments[0].EndsWith(Path.Combine("app.asar", "dsh", "node_modules", "@deepseek-ai", "dsh", "lib", "bin.js"))
+    && desktopArguments[1] == "--profile" && desktopArguments[2] == "acp", "desktop launch passes the bundled entry script before the ACP arguments");
+Check(!HarnessDesktopLocator.TryValidate(desktopExecutable, desktopHarness.DesktopBundle!, out _), "an app without desktop-runtime.json is not accepted");
+string fakeDesktop = Path.Combine(root, "fake-desktop");
+string fakeExecutable = Path.Combine(fakeDesktop, "DeepSeek Harness" + (OperatingSystem.IsWindows() ? ".exe" : ""));
+string fakeArchive = Path.Combine(HarnessDesktopLocator.ResourcesDirectory(fakeExecutable), "app.asar");
+Directory.CreateDirectory(Path.GetDirectoryName(fakeArchive)!);
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out _), "a desktop app without app.asar is not accepted");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json");
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? noHarness) && noHarness != null, "an asar without the harness packages is rejected");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json", "dsh/node_modules/@deepseek-ai/dsh/package.json");
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? noBridge)
+    && noBridge != null && noBridge.Contains("ACP"), "a desktop app without the ACP bundle is reported as too old");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json", "dsh/node_modules/@deepseek-ai/dsh/package.json", "dsh/node_modules/@deepseek-ai/dsh-acp-app/package.json");
+Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? noEntry)
+    && noEntry != null && noEntry.Contains("入口"), "an asar without the bundled CLI entry is rejected as incomplete");
+WriteAsar(fakeArchive, "dsh/desktop-runtime.json", "dsh/node_modules/@deepseek-ai/dsh/package.json", "dsh/node_modules/@deepseek-ai/dsh-acp-app/package.json", desktopHarness.DesktopBundle!);
+Check(HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out string? accepted) && accepted == null, "a complete desktop archive is accepted");
+foreach (string malformed in new[] { "[]", "{\"files\":{\"dsh\":[]}}", "{\"files\":{\"dsh\":{\"files\":{\"desktop-runtime.json\":{\"size\":-1}}}}}" })
+{
+    byte[] json = Encoding.UTF8.GetBytes(malformed);
+    using (var writer = new BinaryWriter(File.Create(fakeArchive)))
+    { writer.Write(4u); writer.Write((uint)(json.Length + 8)); writer.Write((uint)(json.Length + 4)); writer.Write((uint)json.Length); writer.Write(json); }
+    Check(!HarnessDesktopLocator.TryValidate(fakeExecutable, desktopHarness.DesktopBundle!, out _), "malformed desktop ASAR structure degrades to not detected without throwing");
+}
 Check(HarnessCatalog.Get("kimi").Arguments.SequenceEqual(["acp"]), "Kimi native ACP launch");
 Check(HarnessCatalog.Get("codex").AdapterPackage != null && HarnessCatalog.Get("claude").AdapterPackage != null && HarnessCatalog.Get("pi").AdapterPackage != null, "three explicit ACP adapters");
 Check(HarnessCatalog.FindExecutable("fish-no-such-cli", root) == null, "missing CLI is not invented");
@@ -78,6 +111,7 @@ AgentCoordinator? host = null;
 var said = new List<string>(); int permissions = 0, authentications = 0;
 using var server = new ControlServer((name, values, token) => {
     if (name == "say") { host?.MarkSpoken(); lock (said) said.Add(values.GetProperty("text").GetString()!); return Task.FromResult(ControlTools.Text(new { displayed = true })); }
+    if (name == "say_next") return Task.FromResult(ControlTools.Text(new { pending = true }));
     return Task.FromResult(ControlTools.Text(host!.ExecuteTool(name, values)));
 }, pipe);
 try
@@ -95,6 +129,32 @@ try
     host.Configure("opencode", new(true, false, false));
     await Until(() => host.Connected, "ACP initialize + session/new from actual subprocess");
     string firstSession = host.SessionId;
+    int OwnedPid()
+    {
+        var connection = typeof(AgentCoordinator).GetField("connection", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(host)!;
+        return ((Process)typeof(AcpConnection).GetField("process", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(connection)!).Id;
+    }
+    bool Gone(int pid) { try { using var p = Process.GetProcessById(pid); return p.HasExited; } catch (ArgumentException) { return true; } }
+    using (var unrelated = Process.Start(AgentProcess.StartInfo(Environment.ProcessPath!, ["--fixture"], root))!)
+    {
+        try
+        {
+            Check(host.SendUser("wait"), "power test starts a real ACP turn");
+            await Until(() => host.Busy, "power test has an active turn");
+            Check(host.SendUser("queued before power pause"), "power test queues a second request");
+            int ownedPid = OwnedPid();
+            host.SetPowerPaused(true);
+            await Until(() => Gone(ownedPid) && !host.Busy, "power pause closes the fish-owned process and active turn");
+            Check(!unrelated.HasExited, "power pause preserves separately started user Agent process");
+            Check(!host.SendUser("blocked") && !host.ManualSpeech(false) && !host.ManualSpeech(true) && !host.Reconnect() && !host.NewConversation(), "power pause blocks dialogue, tests, weather and reconnect");
+            host.Tick(DateTimeOffset.Now.AddHours(2), true); await Task.Delay(250);
+            Check(host.PowerPaused && !host.Connected && said.Count == 0, "timer cannot reconnect or drain queued requests while power paused");
+            host.SetPowerPaused(false);
+            await Until(() => host.Connected && !host.Busy, "power restoration reconnects the owned Agent");
+            Check(host.SessionId == firstSession && said.Count == 0, "power restoration preserves conversation and discards abandoned queue");
+        }
+        finally { if (!unrelated.HasExited) unrelated.Kill(entireProcessTree: true); }
+    }
     Check(host.Configuration.Options.Length == 4, "Agent session exposes live model mode thought and boolean options");
     await host.SetConfiguration("model", "accurate");
     Check(host.CurrentModel == "accurate" && host.Configuration.Options.Single(o => o.Id == "thought").Choices.Length == 3, "model ACK updates dependent reasoning choices");
@@ -268,6 +328,55 @@ try
         Check(File.ReadAllText(Path.Combine(terminalWorkspace, "fixture-terminal-authenticated")) == "terminal-test", "terminal login preserves configured entry cwd and passes args plus environment");
         Check(!File.Exists(Path.Combine(terminalWorkspace, "fixture-authenticated")), "terminal method never sent to authenticate");
     }
+    string noticeWorkspace = Path.Combine(root, "notice-workspace"); Directory.CreateDirectory(noticeWorkspace);
+    var notices = new System.Collections.Concurrent.ConcurrentQueue<AgentNotice>();
+    host.Notice += notices.Enqueue;
+    host.Configure("opencode", new(true, false, true));
+    await host.OpenWorkspace(noticeWorkspace);
+    await Until(() => host.Connected && !host.Busy, "notice tests use a separate connected workspace");
+    string noticeMode = Path.Combine(noticeWorkspace, "fixture-notice-mode");
+    int originalSaid = said.Count;
+    File.WriteAllText(noticeMode, "silent");
+    host.SendUser("silent task");
+    await Until(() => notices.Count == 1 && !host.Busy, "completed turn without say emits one visible missing reply notice");
+    var firstNotice = notices.Single();
+    Check(firstNotice.Text == "主人，Agent结束工作了但没有给予回复。" && host.CanDisplayNotice(firstNotice), "notice has fixed text and current request identity");
+    Check(said.Count == originalSaid, "ordinary assistant output never substitutes for say or counts as a reply");
+    string sentPrompt = File.ReadAllText(Path.Combine(noticeWorkspace, "fixture-last-prompt.txt"));
+    Check(sentPrompt.Contains("长任务开始前") && sentPrompt.Contains("完成后再次用 say") && sentPrompt.Contains("say_next 也不能替代"), "every user turn requires start progress and completion reports via say");
+    host.Interaction("click", new { });
+    await Until(() => !host.CanDisplayNotice(firstNotice) && !host.Busy, "new turn invalidates delayed notices");
+    Check(notices.Count == 1, "silent optional interaction does not produce an error");
+    File.WriteAllText(noticeMode, "error");
+    host.SendUser("API failure");
+    await Until(() => notices.Count == 2 && !host.Busy, "explicit ACP request error without say emits a missing reply notice");
+    Check(host.Connected, "API request error is distinguished from a lost connection");
+    File.WriteAllText(noticeMode, "pending");
+    host.SendUser("delayed speech only");
+    await Until(() => notices.Count == 3 && !host.Busy, "say_next alone does not count as an immediate response");
+    File.WriteAllText(noticeMode, "progress-error");
+    host.SendUser("progress before failure");
+    await Until(() => said.Count == originalSaid + 1 && !host.Busy, "visible progress is a real Agent utterance");
+    Check(notices.Count == 3, "existing Agent speech is not overwritten with a false no reply notice");
+    File.WriteAllText(noticeMode, "disconnect");
+    host.SendUser("connection loss");
+    await Until(() => notices.Count == 4 && !host.Busy && !host.Connected, "process loss during prompt emits one disconnected notice");
+    Check(notices.Last().Text == "主人，Agent连接断开了。", "disconnect uses its own fixed bubble text");
+    File.Delete(noticeMode); host.Reconnect();
+    await Until(() => host.Connected && !host.Busy, "recover connection after notice");
+    host.SendUser("wait");
+    await Until(() => host.Busy && File.ReadAllText(Path.Combine(noticeWorkspace, "fixture-last-prompt.txt")).Contains("\"wait\""), "running request remains without an early error");
+    Check(notices.Count == 4, "working Agent is not prematurely declared finished");
+    host.Cancel(); await Until(() => !host.Busy, "explicit cancellation completes");
+    Check(notices.Count == 4, "deliberate cancellation does not emit a failure bubble");
+    host.Reconnect(); await Until(() => host.Connected && !host.Busy, "idle disconnect fixture reconnected");
+    Process.GetProcessById(int.Parse(File.ReadAllText(Path.Combine(noticeWorkspace, "fixture-pid")))).Kill();
+    await Until(() => notices.Count == 5 && !host.Connected, "unexpected idle disconnect also becomes visible once");
+    var idleNotice = notices.Last();
+    host.SetPowerPaused(true);
+    Check(!host.CanDisplayNotice(idleNotice) && notices.Count == 5, "power pause invalidates queued notices and does not add an error");
+    host.SetPowerPaused(false);
+    await Until(() => host.Connected && !host.Busy, "resume after notification power test");
     string cancelledWorkspace = Path.Combine(root, "auth-cancel-workspace"); Directory.CreateDirectory(cancelledWorkspace);
     File.WriteAllText(Path.Combine(cancelledWorkspace, "fixture-auth-methods"), ""); File.WriteAllText(Path.Combine(cancelledWorkspace, "fixture-auth-cancel"), "");
     await host.OpenWorkspace(cancelledWorkspace);
@@ -278,6 +387,43 @@ try
 }
 finally { host?.Dispose(); Environment.SetEnvironmentVariable("PATH", oldPath); }
 Console.WriteLine($"RESULT {passed} Agent checks passed; fixtures are not real model compatibility evidence.");
+
+static void WriteAsar(string path, params string[] entries)
+{
+    var root = new Dictionary<string, object> { ["files"] = new Dictionary<string, object>() };
+    foreach (string entry in entries)
+    {
+        var directory = (Dictionary<string, object>)root["files"];
+        string[] segments = entry.Split('/');
+        for (int index = 0; index < segments.Length; index++)
+        {
+            if (!directory.TryGetValue(segments[index], out object? node))
+            {
+                node = index == segments.Length - 1
+                    ? new Dictionary<string, object> { ["size"] = 0, ["offset"] = "0" }
+                    : new Dictionary<string, object> { ["files"] = new Dictionary<string, object>() };
+                directory[segments[index]] = node;
+            }
+            if (index < segments.Length - 1 && node is Dictionary<string, object> folder)
+                directory = (Dictionary<string, object>)folder["files"];
+        }
+    }
+    byte[] json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(root));
+    int padding = (4 - json.Length % 4) % 4;
+    int payloadSize = 4 + json.Length + padding;
+    using var stream = File.Create(path);
+    var prefix = new byte[8];
+    BinaryPrimitives.WriteUInt32LittleEndian(prefix, 4);
+    BinaryPrimitives.WriteUInt32LittleEndian(prefix.AsSpan(4), (uint)(payloadSize + 4));
+    stream.Write(prefix);
+    var sizes = new byte[8];
+    BinaryPrimitives.WriteUInt32LittleEndian(sizes, (uint)payloadSize);
+    BinaryPrimitives.WriteUInt32LittleEndian(sizes.AsSpan(4), (uint)json.Length);
+    stream.Write(sizes);
+    stream.Write(json);
+    stream.Write(new byte[padding]);
+}
+
 
 static class Fixture
 {
@@ -314,6 +460,7 @@ static class Fixture
     }
     public static async Task Run()
     {
+        File.WriteAllText("fixture-pid", Environment.ProcessId.ToString());
         string session = ""; bool authenticated = false;
         while (await Console.In.ReadLineAsync() is string line)
         {
@@ -357,6 +504,17 @@ static class Fixture
                     if (File.Exists("fixture-reject-images") && p.GetProperty("prompt").EnumerateArray().Any(b => b.GetProperty("type").GetString() == "image"))
                     { await Send(new { jsonrpc = "2.0", id, error = new { code = -32602, message = "Upstream model does not support image content blocks" } }); break; }
                     string text = p.GetProperty("prompt")[0].GetProperty("text").GetString()!;
+                    if (File.Exists("fixture-notice-mode"))
+                    {
+                        string behavior = File.ReadAllText("fixture-notice-mode");
+                        if (behavior == "disconnect") Environment.Exit(0);
+                        if (behavior == "pending") await Tool("say_next", new { text = "pending only" });
+                        if (behavior == "progress-error") await Tool("say", new { text = "starting task" });
+                        await Send(new { jsonrpc = "2.0", method = "session/update", @params = new { sessionId = session, update = new { sessionUpdate = "agent_message_chunk", content = new { type = "text", text = "ordinary internal answer" } } } });
+                        if (behavior is "error" or "progress-error") await Send(new { jsonrpc = "2.0", id, error = new { code = -32603, message = "fixture API request failed" } });
+                        else await Send(new { jsonrpc = "2.0", id, result = new { stopReason = "end_turn" } });
+                        break;
+                    }
                     if (text.Contains("permission"))
                     {
                         await Send(new { jsonrpc = "2.0", id = "permission-1", method = "session/request_permission", @params = new { sessionId = session, toolCall = new { title = "fixture permission", rawInput = new { command = "fixture" } }, options = new[] { new { optionId = "once", name = "允许一次", kind = "allow_once" } } } });

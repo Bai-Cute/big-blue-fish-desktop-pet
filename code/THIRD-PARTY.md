@@ -21,3 +21,5 @@
 
 
 * Lemi Xiao Nai Pao Ti (乐米小奶泡体), version 1.000: font by 乐米字库 / 乐米品牌. It is embedded for companion speech bubbles according to the free commercial use terms published on the font source page: https://www.maoken.com/freefonts/27620.html . The supplied license note is retained in licenses/Lemi-Xiao-Nai-PaoTi.txt.
+
+* Pet pointer icons: Lucide `hand` and `hand-grab`, https://lucide.dev/icons/hand and https://lucide.dev/icons/hand-grab , ISC, copyright (c) 2026 Lucide Icons and Contributors. The source SVGs are kept in code/BigBlueFish.Windows/Res/Cursor; they are rasterized offline into the multi-size Palm.cur and PalmGrab.cur resources, with the enclosed body filled white so the pointer stays legible on both light and dark desktops. The icons are otherwise unmodified. License text is in licenses/Lucide-ISC.txt.

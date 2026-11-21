@@ -5,13 +5,13 @@
       "bigbluefish.agent": {
         "type": "Project",
         "dependencies": {
-          "BigBlueFish.Diagnostics": "[1.1.1, )"
+          "BigBlueFish.Diagnostics": "[1.1.4, )"
         }
       },
       "bigbluefish.control": {
         "type": "Project",
         "dependencies": {
-          "BigBlueFish.Diagnostics": "[1.1.1, )"
+          "BigBlueFish.Diagnostics": "[1.1.4, )"
         }
       },
       "bigbluefish.diagnostics": {

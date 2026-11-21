@@ -1,5 +1,7 @@
+using System;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -7,8 +9,40 @@ namespace BigBlueFish.Windows;
 internal sealed class CompanionSpriteImage : Image
 {
     internal const byte AlphaThreshold = 8;
+    private static readonly Cursor palm = LoadCursor("Palm");
+    private static readonly Cursor palmGrab = LoadCursor("PalmGrab");
     private byte[]? framePixels;
     private int frameWidth, frameHeight;
+
+    internal CompanionSpriteImage() => Cursor = palm;
+
+    internal static Cursor PalmGrab => palmGrab;
+
+    /// <summary>Open palm while hovering, closed palm while the button is down.</summary>
+    internal void SetPressed(bool pressed)
+    {
+        var next = pressed ? palmGrab : palm;
+        if (!ReferenceEquals(Cursor, next)) Cursor = next;
+        // WPF only re-evaluates the pointer shape on the next mouse move; without this the
+        // grip would not show until the user moved while holding the button.
+        Mouse.UpdateCursor();
+    }
+
+    // The cursors ship as resources, so a missing one is a packaging bug rather than a user
+    // condition; --cursor verification fails if this falls back. Falling back to the system
+    // hand keeps the pet usable if a trimmed build drops the resource.
+    private static Cursor LoadCursor(string name)
+    {
+        try
+        {
+            var part = Application.GetResourceStream(new Uri($"/BigBlueFish;component/Res/Cursor/{name}.cur", UriKind.Relative));
+            if (part != null) using (var stream = part.Stream) return new Cursor(stream);
+        }
+        catch (Exception)
+        {
+        }
+        return Cursors.Hand;
+    }
 
     internal void UpdatePixels(byte[]? pixels, int width, int height)
     {

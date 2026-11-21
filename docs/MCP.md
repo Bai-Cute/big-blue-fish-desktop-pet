@@ -24,8 +24,9 @@
 | GpuEnabled | bool | 本地推理启用GPU |
 | PublicInfo | bool | 内置天气、新闻 |
 | ForegroundEnabled | bool | 内置模型读屏及 Agent 日常关心附图；不控制显式截图工具 |
-| StopModelOnBattery | bool | 离电暂停并卸载内置模型 |
+| StopModelOnBattery | bool | 拔电暂停鱼鱼的AI功能：卸载内置模型，关闭鱼鱼自己的Agent进程，暂停日常关心、主动对话、手动天气和吐字测试；插电后恢复 |
 | HideOnFullscreen | bool | 外部全屏时自动隐藏 |
+| HideFromCapture | bool | Windows 将角色、气泡和对话输入框排除出支持该机制的截图与录屏；其他平台仅保存 |
 | CheckUpdatesOnStartup | bool | 启动检查更新 |
 | WeatherRegionCode | 字符串 | 内置叶级地点代码：中国六位区县代码、美国 US-加五位县 FIPS，其他地点为国家代码-GeoNames 城市 ID，例如340104、US-06037、JP-1850147 |
 | Scale / BubbleScale | 0.5–2的有限数 | 角色／独立气泡倍率 |

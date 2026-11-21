@@ -306,6 +306,26 @@ internal static class Program
             acceptPrivacy.Tick += (_, _) => { var confirmation = app.Windows.OfType<Window>().FirstOrDefault(w => w.Title == "连接本机 Agent"); if (confirmation == null) return; acceptPrivacy.Stop(); Descendants<Button>(confirmation).Single(b => b.Content?.ToString() == "了解并开启").RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); };
             acceptPrivacy.Start(); toggle.IsChecked = true; toggle.RaiseEvent(new RoutedEventArgs(CheckBox.ClickEvent));
             Wait(() => pet.GetType().GetField("agent", Access)!.GetValue(pet) is AgentCoordinator { Connected: true }, 15, "Actual fixture ACP connection ready");
+            if (args.Contains("--agent-notices")) {
+                var coordinator = (AgentCoordinator)Read("agent");
+                string fixtureMode = Path.Combine(coordinator.Workspaces.Current, "fixture-notice-mode");
+                var text = (TextBlock)Read("bubbleText");
+                long spoken = (long)coordinator.GetType().GetField("spoken", Access)!.GetValue(coordinator)!;
+                File.WriteAllText(fixtureMode, "silent"); coordinator.SendUser("silent task");
+                Wait(() => !coordinator.Busy && text.Text == "主人，Agent结束工作了但没有给予回复。", 15, "Stopped silent Agent produces the actual typed bubble");
+                Check((long)coordinator.GetType().GetField("spoken", Access)!.GetValue(coordinator)! == spoken, "Host notice does not count as Agent speech");
+                Check(((Border)Read("bubble")).Visibility == Visibility.Visible, "Notice is visible through the normal bubble path");
+                Render((Visual)Read("bubble"), "agent-missing-reply.png", (int)((Border)Read("bubble")).ActualWidth, (int)((Border)Read("bubble")).ActualHeight);
+                Check(File.ReadAllText("chat-log.json").Contains("Agent"), "Notice is recorded in persistent fish chat history");
+                File.WriteAllText(fixtureMode, "pending"); coordinator.SendUser("pending only");
+                Wait(() => !coordinator.Busy && coordinator.Detail.Contains("未调用说话工具"), 15, "Delayed-only answer is not counted as an immediate reply");
+                Check((long)coordinator.GetType().GetField("spoken", Access)!.GetValue(coordinator)! == spoken, "say_next does not advance immediate speech counter");
+                File.WriteAllText(fixtureMode, "disconnect"); coordinator.SendUser("disconnect task");
+                Wait(() => !coordinator.Busy && text.Text == "主人，Agent连接断开了。", 15, "Actual process disconnect displays the distinct typed bubble");
+                Render((Visual)Read("bubble"), "agent-disconnected.png", (int)((Border)Read("bubble")).ActualWidth, (int)((Border)Read("bubble")).ActualHeight);
+                File.Delete(fixtureMode);
+                Field("exitReady", true); pet.Close(); Console.WriteLine($"Agent notice actual WPF: {checks} checks passed."); return 0;
+            }
             if (args.Contains("--speech-routing-settings")) { VerifySpeechRoutingSettings(settings); Field("exitReady", true); pet.Close(); Console.WriteLine($"Speech routing/settings actual WPF: {checks} checks passed."); return 0; }
             if (args.Contains("--workspace-settings")) { VerifyAgentWorkspaceSettings(settings); Field("exitReady", true); pet.Close(); Console.WriteLine($"Agent workspace/settings actual WPF: {checks} checks passed."); return 0; }
             settings.Close(); Pump();

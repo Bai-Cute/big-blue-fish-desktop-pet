@@ -22,6 +22,7 @@ public partial class MainWindow
 #if COMPANION_SAFE
     private bool AgentDailyActive => false;
     private void TickAgent(DateTime now) { }
+    private void UpdateAgentPowerPolicy() { }
     private bool DispatchAgentDaily() => false;
     private bool McpInputAvailable => false;
     private bool PuppetActive => false;
@@ -42,7 +43,7 @@ public partial class MainWindow
     private bool mcpConsentOpen;
     private Window? mcpConsentWindow;
     private Window? mcpInput;
-    private bool McpInputAvailable => preferences.AgentEnabled;
+    private bool McpInputAvailable => preferences.AgentEnabled && !preferences.AiPausedOnBattery;
     private bool PuppetActive => preferences.AgentEnabled && preferences.PuppetMode;
     private bool HasScheduledMcpSpeech => mcpNextSpeech != null;
     private bool AgentDailyActive => preferences.AgentEnabled && preferences.AgentDailySpeech;
@@ -97,12 +98,22 @@ public partial class MainWindow
 
     private void ConfigureAgent()
     {
+        UpdateAgentPowerPolicy();
         agent?.Configure(preferences.AgentHarnessId, new(preferences.AgentEnabled, preferences.PuppetMode, preferences.AgentDailySpeech));
         if (!AgentDailyActive) nextWarmup = DateTime.MinValue;
     }
     private bool agentLoading;
+    private bool agentPowerPaused;
+    private void UpdateAgentPowerPolicy()
+    {
+        bool paused = preferences.AiPausedOnBattery;
+        if (paused && !agentPowerPaused) { mcpActions.Clear(); mcpNextSpeech = null; mcpInput?.Hide(); }
+        agentPowerPaused = paused;
+        agent?.SetPowerPaused(paused);
+    }
     private void TickAgent(DateTime now)
     {
+        UpdateAgentPowerPolicy();
         agent?.Tick(new DateTimeOffset(now), !hiddenByUser && !fullscreenHidden && !dragging && !exitAnimation && !companionClosed);
         bool loading = agent?.AwaitingSpeech == true && !hiddenByUser && !fullscreenHidden;
         if (loading != agentLoading || loading && loadingIndicator.Visibility != Visibility.Visible)
@@ -114,6 +125,7 @@ public partial class MainWindow
     private bool DispatchAgentDaily()
     {
         if (!AgentDailyActive) return false;
+        if (preferences.AiPausedOnBattery) return true;
         nextSpeech = DateTime.UtcNow.Add(preferences.NextSpeechDelay(companionRandom));
         agent?.DailyCare(); return true;
     }
@@ -121,9 +133,17 @@ public partial class MainWindow
     {
         if (!preferences.AgentEnabled) return;
         mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
-        agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"),
-            Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe"), agentPipe, RequestAgentPermission,
-            App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+        if (agent == null)
+        {
+            var coordinator = new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"),
+                Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp.exe"), agentPipe, RequestAgentPermission,
+                App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+            agent = coordinator;
+            coordinator.Notice += notice => Dispatcher.BeginInvoke(() => {
+                if (agent == coordinator && coordinator.CanDisplayNotice(notice) && !companionClosed && !exitAnimation)
+                    ShowMcpSpeech(notice.Text, false);
+            });
+        }
         if (!HarnessCatalog.All.Any(x => x.Id == preferences.AgentHarnessId)) preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.InvokeAsync(() => RequestAgentLocalSpeech(token)).Task.Unwrap();
         agent.SpeechBrief = (kind, allowImages, token) => Dispatcher.InvokeAsync(() => BuildAgentSpeechBrief(kind, allowImages, token)).Task.Unwrap();
@@ -182,9 +202,9 @@ public partial class MainWindow
         if (companionContextMenu != null) foreach (int index in new[] { 1, 2 }) if (companionContextMenu.Items[index] is MenuItem item) item.IsEnabled = true;
         if (notifyIcon?.ContextMenuStrip != null) foreach (int index in new[] { 2, 3 }) notifyIcon.ContextMenuStrip.Items[index].Enabled = true;
     }
-    private void ShowMcpSpeech(string text)
+    private void ShowMcpSpeech(string text, bool agentReply = true)
     {
-        agent?.MarkSpoken();
+        if (agentReply) agent?.MarkSpoken();
         InvalidateSpeechRequests(); EndGreetingNotice();
         externalBubble = true;
         bubbleIsModelReply = false;
@@ -207,6 +227,8 @@ public partial class MainWindow
         {
             token.ThrowIfCancellationRequested();
             if (!preferences.McpEnabled || companionClosed || exitAnimation) throw new InvalidOperationException("MCP 接口已关闭或桌宠正在退出。");
+            UpdateAgentPowerPolicy();
+            if (preferences.AiPausedOnBattery && name != "get_settings") throw new InvalidOperationException("鱼鱼的 AI 功能已按供电设置暂停。");
             switch (name)
             {
                 case "get_settings":
@@ -250,7 +272,6 @@ public partial class MainWindow
                     return ControlTools.Text(new { action, started = name == "interrupt_action" || animationPhase == "External" && currentAction == action, queued = mcpActions.Count });
                 case "say": case "say_next":
                     var text = ControlTools.RequiredText(args, "text");
-                    agent?.MarkSpoken();
                     if (name == "say") ShowMcpSpeech(text); else mcpNextSpeech = text;
                     return ControlTools.Text(new { displayed = name == "say", pending = name == "say_next", text });
                 case "get_operation_guide": case "get_wakeups": case "schedule_wakeup": case "cancel_wakeup":
@@ -308,6 +329,7 @@ public partial class MainWindow
         brain.UseGpu = preferences.GpuEnabled; brain.WeatherRegionCode = preferences.WeatherRegionCode;
         if (oldRegion != preferences.WeatherRegionCode) InvalidateSpeechRequests();
         ApplyCompanionPowerPolicy(); ApplyCompanionScale(false); ApplyCompanionBubbleScale(false);
+        CompanionCaptureVisibility.Refresh();
         if (values.TryGetValue("Left", out var left) && left is double x) Left = x;
         if (values.TryGetValue("Top", out var top) && top is double y) Top = y;
         ClampCompanion(); anchor = new(Left, Top);
@@ -368,6 +390,7 @@ public partial class MainWindow
         var window = new Window { Title = "蓝色大肥鱼 · 输入", Width = 354, Height = 120, WindowStyle = WindowStyle.None,
             AllowsTransparency = true, Background = Brushes.Transparent, ResizeMode = ResizeMode.NoResize,
             ShowInTaskbar = false, ShowActivated = false, Topmost = true, Owner = this, Content = frame, FontFamily = new FontFamily("Microsoft YaHei UI") };
+        CompanionCaptureVisibility.Track(window, () => preferences.HideFromCapture);
         using (var theme = typeof(ModernWindow).Assembly.GetManifestResourceStream("BigBlueFish.ModernTheme.xaml")!)
         {
             var resources = (ResourceDictionary)System.Windows.Markup.XamlReader.Load(theme);

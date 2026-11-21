@@ -17,8 +17,8 @@ public enum DiagnosticEvent
     RunnerStarting, RunnerReady, RunnerStopped, RunnerFailed, RunnerCpuFallback,
     WeatherRefresh, WeatherCached, WeatherFailed, NewsFetch, NewsSelected, NewsFailed,
     AgentConnecting, AgentConnected, AgentDisconnected, AgentRequest, AgentMaterials, AgentReply,
-    AgentCancelled, AgentFailed, AgentPermission, AgentConfiguration, AgentWorkspace, McpTool,
-    LogExported, LogExportFailed
+    AgentCancelled, AgentFailed, AgentPermission, AgentConfiguration, AgentWorkspace, AgentNotice, McpTool,
+    LogExported, LogExportFailed, CaptureVisibility
 }
 
 public sealed record DiagnosticEntry(long Sequence, DateTimeOffset Time, string Level, string Code, string Message, string Details)
@@ -42,10 +42,10 @@ public static class DiagnosticLog
         + "Standard Safe OCR Vision Windows Linux Preview timeout first_content hardware_fallback notice manual busy power model_missing puppet "
         + "get_settings update_settings list_actions capture_foreground capture_screen play_action interrupt_action say say_next request_local_speech "
         + "get_operation_guide get_wakeups schedule_wakeup cancel_wakeup terminal oauth restored created "
-        + "claude codex gemini dsh kimi qwen antigravity copilot cursor opencode cline codebuddy qoder trae kiro pi devin grok hermes openclaw minimax").Split(' ', StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+        + "claude codex gemini dsh dsh-desktop kimi qwen antigravity copilot cursor opencode cline codebuddy qoder trae kiro pi devin grok hermes openclaw minimax").Split(' ', StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
     static readonly HashSet<string> actions = LoadActions();
     static readonly Dictionary<string, string> previousSettings = new();
-    static readonly HashSet<string> settingNames = new(("ModelEnabled GpuEnabled PublicInfo ForegroundEnabled StopModelOnBattery HideOnFullscreen HighQualityAnimation CheckUpdatesOnStartup "
+    static readonly HashSet<string> settingNames = new(("ModelEnabled GpuEnabled PublicInfo ForegroundEnabled StopModelOnBattery HideOnFullscreen HideFromCapture HighQualityAnimation CheckUpdatesOnStartup "
         + "AgentEnabled AgentHarnessId AgentDailySpeech PuppetMode AgentRespondToClick AgentRespondToDrag WeatherRegionCode Scale BubbleScale SpeechMinMinutes BubbleDurationIndex "
         + "AnimationIntervalSeconds BreakfastHour LunchHour DinnerHour LastBrushDate Left Top StartupEnabled "
         + "McpEnabled McpDoubleClickChat McpWakeEnabled McpWakeOnText McpWakeOnClick McpWakeOnDrag AgentWorkspaceId").Split(' '), StringComparer.Ordinal);
@@ -166,7 +166,9 @@ public static class DiagnosticLog
         DiagnosticEvent.AgentConnecting => "开始连接 Agent", DiagnosticEvent.AgentConnected => "Agent 会话已连接", DiagnosticEvent.AgentDisconnected => "Agent 连接已关闭",
         DiagnosticEvent.AgentRequest => "向 Agent 提交事件", DiagnosticEvent.AgentMaterials => "准备或送交 Agent 资料", DiagnosticEvent.AgentReply => "Agent 本轮处理结束",
         DiagnosticEvent.AgentCancelled => "Agent 请求已取消", DiagnosticEvent.AgentFailed => "Agent 请求失败", DiagnosticEvent.AgentPermission => "Agent 请求权限或认证",
+        DiagnosticEvent.AgentNotice => "Agent 未回复或断开，显示提示",
         DiagnosticEvent.AgentConfiguration => "调整 Agent 会话配置", DiagnosticEvent.AgentWorkspace => "Agent 工作区状态变化", DiagnosticEvent.McpTool => "收到 MCP 工具调用",
-        DiagnosticEvent.LogExported => "排障日志已保存为 TXT", DiagnosticEvent.LogExportFailed => "排障日志保存失败", _ => code.ToString()
+        DiagnosticEvent.LogExported => "排障日志已保存为 TXT", DiagnosticEvent.LogExportFailed => "排障日志保存失败",
+        DiagnosticEvent.CaptureVisibility => "截屏隐藏状态", _ => code.ToString()
     };
 }

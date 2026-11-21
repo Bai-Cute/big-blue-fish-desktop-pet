@@ -18,6 +18,7 @@ internal sealed partial class LinuxPetWindow
     bool AgentDailyActive => false;
     void TickAgent(DateTime now) { }
     void ConfigureAgent() { }
+    void UpdateAgentPowerPolicy() { }
     bool DispatchAgentDaily() => false;
     void InitializeMcp() { Preferences.McpEnabled = false; Preferences.PuppetMode = false; Preferences.McpWakeEnabled = false; }
     void StopMcp() { }
@@ -67,25 +68,42 @@ internal sealed partial class LinuxPetWindow
         catch (IOException) { return new(material.Text + "\n本轮未取得有效前台截图，按已有情境自然关心主人。"); }
     }
 
-    void ConfigureAgent() { agent?.Configure(Preferences.AgentHarnessId, new(Preferences.AgentEnabled, Preferences.PuppetMode, Preferences.AgentDailySpeech)); if (!AgentDailyActive) nextWarmup = DateTime.MinValue; }
+    void ConfigureAgent() { UpdateAgentPowerPolicy(); agent?.Configure(Preferences.AgentHarnessId, new(Preferences.AgentEnabled, Preferences.PuppetMode, Preferences.AgentDailySpeech)); if (!AgentDailyActive) nextWarmup = DateTime.MinValue; }
+    bool agentPowerPaused;
+    void UpdateAgentPowerPolicy()
+    {
+        bool paused = Preferences.AiPausedOnBattery;
+        if (paused && !agentPowerPaused) { externalActions.Clear(); nextExternalText = null; mcpInput?.Hide(); }
+        agentPowerPaused = paused;
+        agent?.SetPowerPaused(paused);
+    }
     void TickAgent(DateTime now)
     {
+        UpdateAgentPowerPolicy();
         agent?.Tick(new DateTimeOffset(now), !hidden && !fullscreenHidden && !dragging && !closed && phase != "Exit");
         if (!generating && !agentWeatherPending) loading.IsVisible = agent?.AwaitingSpeech == true && !hidden && !fullscreenHidden;
     }
     bool DispatchAgentDaily()
     {
         if (!AgentDailyActive) return false;
+        if (Preferences.AiPausedOnBattery) return true;
         nextSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random)); agent?.DailyCare(); return true;
     }
     Window? mcpInput;
-    bool McpInputAvailable => Preferences.AgentEnabled;
+    bool McpInputAvailable => Preferences.AgentEnabled && !Preferences.AiPausedOnBattery;
     void InitializeMcp()
     {
         if (!Preferences.AgentEnabled) return;
         mcpServer ??= new ControlServer(ExecuteMcp, agentPipe);
-        agent ??= new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"), Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), agentPipe, RequestAgentPermission,
-            App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+        if (agent == null)
+        {
+            var coordinator = new AgentCoordinator(Path.Combine(Environment.CurrentDirectory, "agent"), Path.Combine(AppContext.BaseDirectory, "BigBlueFish.Mcp"), agentPipe, RequestAgentPermission,
+                App.Args.Contains("--test-mode") ? Path.Combine(Environment.CurrentDirectory, "agent-test-workspace") : null);
+            agent = coordinator;
+            coordinator.Notice += notice => Dispatcher.UIThread.Post(() => {
+                if (agent == coordinator && coordinator.CanDisplayNotice(notice)) SayExternal(notice.Text);
+            });
+        }
         if (!HarnessCatalog.All.Any(x => x.Id == Preferences.AgentHarnessId)) Preferences.AgentHarnessId = "codex";
         agent.LocalSpeechRequested = token => Dispatcher.UIThread.InvokeAsync(() => RequestAgentLocalSpeech(token));
         agent.SpeechBrief = (kind, allowImages, token) => Dispatcher.UIThread.InvokeAsync(() => BuildAgentSpeechBrief(kind, allowImages, token));
@@ -126,6 +144,8 @@ internal sealed partial class LinuxPetWindow
         return await Dispatcher.UIThread.InvokeAsync(async () => {
             token.ThrowIfCancellationRequested();
             if (closed || phase == "Exit" || !Preferences.McpEnabled) throw new InvalidOperationException("MCP 接口已关闭或桌宠正在退出。");
+            UpdateAgentPowerPolicy();
+            if (Preferences.AiPausedOnBattery && name != "get_settings") throw new InvalidOperationException("鱼鱼的 AI 功能已按供电设置暂停。");
             switch (name)
             {
                 case "get_settings": return ControlTools.Text(new { settings = CurrentSettings(), state = new { visible = IsVisible, hiddenByUser = hidden, fullscreenHidden, action = currentAction, animationPhase = phase, queuedActions = externalActions.ToArray(), queuedSpeech = nextExternalText, connections = mcpServer?.Connections ?? 0, inputOpen = mcpInput?.IsVisible == true, inputAvailable = McpInputAvailable, agentConnected = agent?.Connected == true, agentStatus = agent?.Status, agentSession = agent?.SessionId, nextWake = agent?.NextWake, modelAvailable = brain.ModelAvailable, modelBusy = brain.Busy, modelStatus = brain.Status } });
@@ -148,8 +168,7 @@ internal sealed partial class LinuxPetWindow
                     return ControlTools.Text(new { action, started = name == "interrupt_action", queued = externalActions.Count });
                 case "say": case "say_next":
                     string text = ControlTools.RequiredText(args, "text");
-                    agent?.MarkSpoken();
-                    if (name == "say") SayExternal(text); else nextExternalText = text;
+                    if (name == "say") { SayExternal(text); agent?.MarkSpoken(); } else nextExternalText = text;
                     return ControlTools.Text(new { displayed = name == "say", pending = name == "say_next", text });
                 case "get_operation_guide": case "get_wakeups": case "schedule_wakeup": case "cancel_wakeup":
                     return ControlTools.Text(agent?.ExecuteTool(name, args) ?? throw new InvalidOperationException("Agent 尚未连接。"));

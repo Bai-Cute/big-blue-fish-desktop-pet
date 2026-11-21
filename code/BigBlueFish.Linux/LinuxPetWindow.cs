@@ -262,7 +262,7 @@ internal sealed partial class LinuxPetWindow : Window
             if (count == textBoundaries.Length) { typing = false; ResetDwell(); }
         }
         if (now >= bubbleUntil) bubbleWindow.Hide();
-        if (Puppet || dragging || settings != null || modelInstalling || now < nextSpeech) return;
+        if (Preferences.AiPausedOnBattery || Puppet || dragging || settings != null || modelInstalling || now < nextSpeech) return;
         if (nextExternalText == null && !AgentDailyActive && (generating || brain.Busy || !Preferences.ModelEnabled || !brain.ModelAvailable || !brain.CanRunOnCurrentPower)) return;
         if (CompanionNative.IdleSeconds < 8 || CompanionNative.IdleSeconds > 600) { nextSpeech = now.AddSeconds(30); return; }
         if (nextExternalText != null) { string text = nextExternalText; nextExternalText = null; SayExternal(text); nextSpeech = now.Add(Preferences.NextSpeechDelay(random)); }
@@ -274,7 +274,7 @@ internal sealed partial class LinuxPetWindow : Window
         if (Puppet && !agentTriggered || generating || closed || phase == "Exit" || modelInstalling) { DiagnosticLog.Write(DiagnosticEvent.SpeechSkipped, state: "blocked"); return; }
         if (!brain.ModelAvailable) { await InstallModel(); return; }
         if (!Preferences.ModelEnabled) { ShowText("主人，请先在设置里启用本地大模型哦~", false); return; }
-        if (!brain.CanRunOnCurrentPower) { ShowText("主人，当前设置为笔记本离电暂停模型，可以在设置里调节哦。", false); return; }
+        if (!brain.CanRunOnCurrentPower) { ShowText("主人，当前设置为拔电时暂停鱼鱼的AI功能，可以在设置里调节哦。", false); return; }
         generating = true; long version = ++speechVersion; streamed = false; loading.IsVisible = true;
         try
         {
@@ -293,6 +293,7 @@ internal sealed partial class LinuxPetWindow : Window
     async Task SpeakManual(bool weather)
     {
         if (closed || phase == "Exit") return;
+        if (Preferences.AiPausedOnBattery) { UpdateAgentPowerPolicy(); ShowText("主人，当前设置为拔电时暂停鱼鱼的AI功能，可以在设置里调节哦。", false); return; }
         if (weather && agentWeatherPending) return;
         DiagnosticLog.Write(DiagnosticEvent.SpeechRequested, kind: weather ? "weather" : "test");
         if (hidden || fullscreenHidden) { hidden = false; fullscreenHidden = false; Show(); }
