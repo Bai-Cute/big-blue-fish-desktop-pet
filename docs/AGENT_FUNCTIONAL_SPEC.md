@@ -23,6 +23,7 @@ Windows 使用 `Local\BlueWhaleCompanion` 互斥量限制同一登录会话中�
 | StopModelOnBattery | true | “拔电时暂停鱼鱼的AI功能”：离电取消推理并卸载本地模型，关闭鱼鱼启动的 Agent 进程，暂停日常关心、主动对话、手动天气与吐字测试；插电后恢复 |
 | HideOnFullscreen | true | 检测到外部前台全屏时自动隐藏桌宠 |
 | HideFromCapture | false | Windows 将角色、气泡及对话输入框排除出支持该机制的截图与录屏；Linux/macOS 仅保存该字段 |
+| HighQualityAnimation | true | 仅 macOS：“高清动画”；VideoToolbox 支持 VP9 硬件解码时播放1280×720、60帧/秒片段，关闭后从下一段动作开始播放640×360、24帧/秒兼容片段；不支持硬解时该选项不可用；Windows/Linux 不含该字段 |
 | CheckUpdatesOnStartup | true | 启动后检查新版本 |
 | AgentEnabled | false | 连接本机CLI Harness；仅用户界面可修改 |
 | AgentHarnessId | codex | 首选Harness的目录id；未知id在初始化连接时归到codex |
