@@ -50,6 +50,11 @@
           "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/libgstreamer-1.0.0.dylib",
           "target": "lib/libgstreamer-1.0.0.dylib",
           "sha256": "3af556688ae5800f71f840fd10d4eb68a4b9223cf2d0ca9bb305698d3e64705f"
+        },
+        {
+          "source": "gstreamer_plugins-1.29.2a0.data/purelib/gstreamer_plugins/lib/gstreamer-1.0/libgstapplemedia.dylib",
+          "target": "plugins/libgstapplemedia.dylib",
+          "sha256": "7bf5e143bceecc70b9788355d4ed36ff8fe9cd51d5cbd163f8c29ca85bdf267d"
         }
       ]
     },
@@ -142,6 +147,21 @@
           "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libz.1.dylib",
           "target": "lib/libz.1.dylib",
           "sha256": "dfff49663a8b04874a86b83e50308cc78789d5b0a3d01c2da765fee219166189"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstgl-1.0.0.dylib",
+          "target": "lib/libgstgl-1.0.0.dylib",
+          "sha256": "bbd33a8e94614b8ce649d32ed4deb3af86282a18d99cf9d161a714d03a73bf85"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstiosurface-1.0.0.dylib",
+          "target": "lib/libgstiosurface-1.0.0.dylib",
+          "sha256": "c9d9d986dfa52bf8397052ab3716180e09a061397f3eb21220ba413226b3716f"
+        },
+        {
+          "source": "gstreamer_libs-1.29.2a0.data/purelib/gstreamer_libs/lib/libgstvulkan-1.0.0.dylib",
+          "target": "lib/libgstvulkan-1.0.0.dylib",
+          "sha256": "8f7981fbb588c039abcaeed05e35c31ff9a1abf856157123d3eb022cfca4a937"
         }
       ]
     },
@@ -154,6 +174,11 @@
           "source": "gstreamer_plugins_libs-1.29.2a0.data/purelib/gstreamer_plugins_libs/lib/libvpx.9.dylib",
           "target": "lib/libvpx.9.dylib",
           "sha256": "5c23eb4fc7a6e644e86f801c96b4e9ece97cd72f4928ada7f96876e064e10fb8"
+        },
+        {
+          "source": "gstreamer_plugins_libs-1.29.2a0.data/purelib/gstreamer_plugins_libs/lib/libMoltenVK.dylib",
+          "target": "lib/libMoltenVK.dylib",
+          "sha256": "e50581be09547002fef15d4fa01ffd277e8726eb76969f338215770792e70eb8"
         }
       ]
     }

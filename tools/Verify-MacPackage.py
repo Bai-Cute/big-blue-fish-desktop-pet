@@ -43,6 +43,22 @@ for name in ["BigBlueFish.Mcp", "BigBlueFish.Control.dll", "BigBlueFish.Agent.dl
     check((payload / name).is_file() == (args.edition == "Standard"), "edition isolation: " + name)
 check(len(list((payload / "assets/fish").glob("*.webm"))) == 106, "106 enhanced clips")
 check(len(list((payload / "assets/fish/compat").glob("*.webm"))) == 106, "106 compatibility clips")
+# The 1280x720, 60 fps clips play through VideoToolbox (the applemedia plugin and the libraries it loads).
+for name in ["plugins/libgstapplemedia.dylib", "lib/libgstgl-1.0.0.dylib", "lib/libgstvulkan-1.0.0.dylib", "lib/libgstiosurface-1.0.0.dylib", "lib/libMoltenVK.dylib"]:
+    check((payload / "media/gstreamer" / name).is_file(), "hardware video decoding: " + name)
+for name in ["MoltenVK-LICENSE.txt", "glslang-LICENSE.txt", "cereal-LICENSE.txt"]:
+    check((payload / "licenses/gstreamer" / name).is_file(), "license of MoltenVK and what it contains: " + name)
+
+
+def hardware_vp9():
+    """Whether this Mac decodes VP9 on its media engine, as CompanionMedia asks VideoToolbox."""
+    import ctypes
+    toolbox = ctypes.CDLL("/System/Library/Frameworks/VideoToolbox.framework/VideoToolbox")
+    toolbox.VTRegisterSupplementalVideoDecoderIfAvailable(ctypes.c_uint32(0x76703039))
+    toolbox.VTIsHardwareDecodeSupported.restype = ctypes.c_bool
+    return bool(toolbox.VTIsHardwareDecodeSupported(ctypes.c_uint32(0x76703039)))
+
+
 native = list(payload.rglob("*.dylib")) + [payload / n for n in [
     "BigBlueFish.Mac", "runtime/llama-server", "runtime/BigBlueFish.RunnerGuard", "runtime/BigBlueFish.MacOcr"]]
 if args.edition == "Standard":
@@ -108,6 +124,9 @@ with tempfile.TemporaryDirectory(prefix="bbf-macos-verify-") as temporary:
             check(status is not None and status["phase"] != "Startup" and status["frames"] > 3,
                   "real application completes startup clip and presents subsequent decoded frames")
             check(status["McpAvailable"] == (args.edition == "Standard"), "running edition matches package")
+            expected = "GPU VP9 + alpha" if hardware_vp9() else "CPU VP9 + alpha (24 fps)"
+            check(status.get("animationBackend") == expected,
+                  "animation plays " + expected + " (VideoToolbox VP9: " + str(hardware_vp9()) + ", got " + str(status.get("animationBackend")) + ")")
             (data / "test-command.txt").write_text("render")
             deadline = time.monotonic() + 10
             while not (data / "pet.png").exists() and time.monotonic() < deadline:

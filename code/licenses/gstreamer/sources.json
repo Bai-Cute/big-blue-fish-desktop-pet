@@ -9,5 +9,8 @@
   "bzip2-LICENSE.txt": "https://sourceware.org/git/?p=bzip2.git;a=blob_plain;f=LICENSE;hb=HEAD",
   "orc-COPYING.txt": "https://raw.githubusercontent.com/GStreamer/orc/main/COPYING",
   "Real-ESRGAN-LICENSE.txt": "https://raw.githubusercontent.com/xinntao/Real-ESRGAN/master/LICENSE",
-  "RIFE-LICENSE.txt": "https://raw.githubusercontent.com/hzwer/ECCV2022-RIFE/main/LICENSE"
+  "RIFE-LICENSE.txt": "https://raw.githubusercontent.com/hzwer/ECCV2022-RIFE/main/LICENSE",
+  "MoltenVK-LICENSE.txt": "https://raw.githubusercontent.com/KhronosGroup/MoltenVK/main/LICENSE",
+  "glslang-LICENSE.txt": "https://raw.githubusercontent.com/KhronosGroup/glslang/main/LICENSE.txt",
+  "cereal-LICENSE.txt": "https://raw.githubusercontent.com/USCiLab/cereal/master/LICENSE"
 }
