@@ -15,7 +15,7 @@ MCP 的连接配置、工具字段、动作与文字调度、事件消费及错�
 
 默认可复用本机 `C:\Program Files\蓝色大肥鱼` 的运行依赖，也支持 `BLUE_WHALE_RUNTIME`、`BLUE_WHALE_MODELS`、`BLUE_WHALE_DOTNET` 环境变量。运行脚本通过目录连接复用模型，不把模型提交进仓库。SDK 可用 `-SdkPath` 指定。
 
-准备内置 4B 本地模型时，可以运行以下任一种命令。`DestinationDirectory` 是模型准备目录，脚本会在其下创建 `models` 并保存 `model-selection.json`；两个来源的模型有所不同，均适合本应用。
+准备内置 4B 本地模型时，可以运行以下任一种命令。`DestinationDirectory` 是模型准备目录，脚本会在其 `data` 子目录下创建 `models` 并保存 `model-selection.json`；两个来源的模型有所不同，均适合本应用。
 
 ```powershell
 ../tools/Setup-Model.ps1 -Source HuggingFace -DestinationDirectory "D:\BigBlueFish-local"
@@ -25,7 +25,7 @@ MCP 的连接配置、工具字段、动作与文字调度、事件消费及错�
 
 Hugging Face 为推荐来源，ModelScope 为国内稳定来源。手动安装保留文件的实际名称，检查 GGUF 文件头；SHA-256 不属于两个预设模型时，提示确认后仍可使用。自动化调用可用 `-AllowUnverifiedModel` 明确接受这一提示。OCR 模型准备只下载主模型。
 
-源码启动读取模型目录上一级的 `model-selection.json`，按选择记录复用实际文件名，也能识别两个来源的标准文件名。以上述目录为例，运行 `./run.ps1 -InputMode Ocr -ModelsDirectory "D:\BigBlueFish-local\models" -RuntimeDirectory "推理运行时目录"`。切换目录时，脚本会更新构建目录中的连接，保留原模型目录和设置。
+源码启动读取模型目录上一级的 `model-selection.json`，按选择记录复用实际文件名，也能识别两个来源的标准文件名。以上述目录为例，运行 `./run.ps1 -InputMode Ocr -ModelsDirectory "D:\BigBlueFish-local\data\models" -RuntimeDirectory "推理运行时目录"`。切换目录时，脚本会更新构建目录中的连接，保留原模型目录和设置。
 
 无模型启动使用 `./run.ps1 -InputMode Ocr -NoModel`，此时无需模型文件或推理运行时。也可先运行 `../tools/Setup-Model.ps1 -Source None -DestinationDirectory "D:\BigBlueFish-local"` 保存无模型选择，再用对应的 `-ModelsDirectory` 启动。内置模型可以暂不使用，欢迎与告别、动画和鼠标交互照常运行。
 
