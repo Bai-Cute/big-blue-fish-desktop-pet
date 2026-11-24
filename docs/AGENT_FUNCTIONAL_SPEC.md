@@ -23,6 +23,7 @@ Windows 使用 `Local\BlueWhaleCompanion` 互斥量限制同一登录会话中�
 | StopModelOnBattery | true | “拔电时暂停鱼鱼的AI功能”：离电取消推理并卸载本地模型，关闭鱼鱼启动的 Agent 进程，暂停日常关心、主动对话、手动天气与吐字测试；插电后恢复 |
 | HideOnFullscreen | true | 检测到外部前台全屏时自动隐藏桌宠 |
 | HideFromCapture | false | Windows 将角色、气泡及对话输入框排除出支持该机制的截图与录屏；Linux/macOS 仅保存该字段 |
+| HighQualityAnimation | true | 仅 macOS：“高清动画”；VideoToolbox 支持 VP9 硬件解码时播放1280×720、60帧/秒片段，关闭后从下一段动作开始播放640×360、24帧/秒兼容片段；不支持硬解时该选项不可用；Windows/Linux 不含该字段 |
 | CheckUpdatesOnStartup | true | 启动后检查新版本 |
 | AgentEnabled | false | 连接本机CLI Harness；仅用户界面可修改 |
 | AgentHarnessId | codex | 首选Harness的目录id；未知id在初始化连接时归到codex |
@@ -292,7 +293,7 @@ Linux 通过标准或无MCP版 .deb 安装到 /opt/bigbluefish，注册 bigbluef
 
 ## macOS 平台行为
 
-Apple Silicon macOS 入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠和共享行为代码，程序运行目录为自包含.app内部，数据目录为 ~/Library/Application Support/bigbluefish。从登录shell读取PATH以查找CLI；开机启动使用用户LaunchAgents，终端登录通过Terminal.app。窗口识别使用CoreGraphics与AppKit，截图通过系统screencapture，OCR通过随包Apple Vision小程序；截图临时文件读取后删除。进程退出保障使用kqueue监控宿主。动画使用随包GStreamer及原始兼容素材。标准版与无MCP版通过DMG安装镜像分发，镜像包含应用及Applications链接；应用使用临时签名，最低系统版本为macOS 14。原生进程守护与Apple Vision辅助程序以macOS 14为编译目标。更新检查引导打开发布页；用户以新版应用替换原应用，继续使用个人数据目录。
+Apple Silicon macOS 入口使用 BigBlueFish.Mac，链接 Avalonia 桌宠和共享行为代码，程序运行目录为自包含.app内部，数据目录为 ~/Library/Application Support/bigbluefish。从登录shell读取PATH以查找CLI；开机启动使用用户LaunchAgents，终端登录通过Terminal.app。窗口识别使用CoreGraphics与AppKit，截图通过系统screencapture，OCR通过随包Apple Vision小程序；截图临时文件读取后删除。进程退出保障使用kqueue监控宿主。动画使用随包GStreamer：VideoToolbox支持VP9硬件解码时，经vtdec分别解码1280×720、60帧/秒片段的颜色与透明度，以alphacombine合并后用Accelerate转为BGRA；不支持、硬解失败或在“桌宠与显示”中关闭“高清动画”时使用24帧/秒兼容片段。标准版与无MCP版通过DMG安装镜像分发，镜像包含应用及Applications链接；应用使用临时签名，最低系统版本为macOS 14。原生进程守护与Apple Vision辅助程序以macOS 14为编译目标。更新检查引导打开发布页；用户以新版应用替换原应用，继续使用个人数据目录。
 
 ## 版本与构建工具行为
 
