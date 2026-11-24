@@ -1,10 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="210" height="20" role="img" aria-label="GitHub最新正式Release的发行包累计下载次数：v1.1.5 · 5,702">
-  <title>GitHub最新正式Release的发行包累计下载次数：v1.1.5 · 5,702</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="210" height="20" role="img" aria-label="GitHub最新正式Release的发行包累计下载次数：v1.1.5 · 5,706">
+  <title>GitHub最新正式Release的发行包累计下载次数：v1.1.5 · 5,706</title>
   <linearGradient id="s" x2="0" y2="100%"><stop offset="0" stop-color="#fff" stop-opacity=".1"/><stop offset="1" stop-opacity=".1"/></linearGradient>
   <clipPath id="r"><rect width="210" height="20" rx="3" fill="#fff"/></clipPath>
   <g clip-path="url(#r)"><rect width="92" height="20" fill="#555"/><rect x="92" width="118" height="20" fill="#5c6bc0"/><rect width="210" height="20" fill="url(#s)"/></g>
   <g fill="#fff" text-anchor="middle" font-family="Verdana,Arial,DejaVu Sans,Microsoft YaHei,sans-serif" font-size="11">
     <text x="46.0" y="15" fill="#010101" fill-opacity=".3">最新版本下载</text><text x="46.0" y="14">最新版本下载</text>
-    <text x="151.0" y="15" fill="#010101" fill-opacity=".3">v1.1.5 · 5,702</text><text x="151.0" y="14">v1.1.5 · 5,702</text>
+    <text x="151.0" y="15" fill="#010101" fill-opacity=".3">v1.1.5 · 5,706</text><text x="151.0" y="14">v1.1.5 · 5,706</text>
   </g>
 </svg>
