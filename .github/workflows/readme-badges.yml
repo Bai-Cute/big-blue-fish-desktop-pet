@@ -1,0 +1,57 @@
+name: README badges
+
+on:
+  schedule:
+    - cron: '23 */6 * * *'
+  release:
+    types: [published, edited, deleted]
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['tools/Update-ReadmeBadges.py', '.github/workflows/readme-badges.yml']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: readme-badges
+  cancel-in-progress: false
+
+jobs:
+  update:
+    if: github.repository == 'Bai-Cute/big-blue-fish-desktop-pet'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare statistics branch
+        shell: bash
+        run: |
+          publish="$RUNNER_TEMP/readme-badges"
+          if git ls-remote --exit-code --heads origin readme-badges > "$RUNNER_TEMP/badge-ref"; then
+            git fetch --depth=1 origin refs/heads/readme-badges
+            git worktree add --detach "$publish" FETCH_HEAD
+          else
+            status=$?
+            if [ "$status" -ne 2 ]; then exit "$status"; fi
+            git worktree add --orphan -b readme-badges "$publish"
+          fi
+      - name: Update Release statistics
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/Update-ReadmeBadges.py --output "$RUNNER_TEMP/readme-badges"
+      - name: Commit changed badges
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/readme-badges"
+          git add -- '*.svg' stats.json
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'docs: refresh Release download badges'
+          git push origin HEAD:refs/heads/readme-badges

@@ -1,5 +1,23 @@
 # 蓝色大肥鱼桌宠 / Big Blue Fish Desktop Pet
 
+<p align="center">
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases"><img alt="总下载" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/downloads.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases"><img alt="Windows标准版下载" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/windows-standard-downloads.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases"><img alt="最高单版本下载" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/highest-release-downloads.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest"><img alt="最新版本下载" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/latest-release-downloads.svg"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest"><img alt="最新版" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/latest-version.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/stargazers"><img alt="Stars" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/stars.svg"></a>
+  <a href="LICENSE"><img alt="License" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/license.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet"><img alt="repo size" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/repo-size.svg"></a>
+  <br>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/latest"><img alt="release size" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/release-size.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/issues?q=is%3Aissue%20is%3Aopen"><img alt="issues open" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/issues-open.svg"></a>
+  <a href="https://github.com/Bai-Cute/big-blue-fish-desktop-pet/issues?q=is%3Aissue"><img alt="issues all" src="https://raw.githubusercontent.com/Bai-Cute/big-blue-fish-desktop-pet/refs/heads/readme-badges/issues-all.svg"></a>
+</p>
+
 蓝色大肥鱼是一款住在电脑桌面上的 AI 桌宠软件，支持 Windows、Linux 与 macOS。她是一位蓝发的小鲸鱼娘，形象来自对 DeepSeek 的二创虚拟形象“蓝色大肥鱼”。软件内置 4B 本地大模型，借助 OCR 技术读懂主人正在桌面上做的事情，每隔一段时间就从文字气泡里送来一句可爱的话，陪伴和关心主人；她还会查看天气、浏览科技新闻，再用自己的方式讲给主人听。
 
 鱼鱼准备了一百多种可爱的动作表情，平时会在桌面上呼吸、哼歌、伸懒腰、吃零食、玩耍，到了饭点会认真吃饭，到了节日会换上应景的小活动，被点一下、被拎起来时也有专门设计的反应。每次启动，她都会提起裙摆向主人行礼请安；关闭时，也会用同样的礼仪和主人道别。标准版还能通过 ACP 一键连接 21 款主流 CLI Agent，陪主人进行稳定的长对话。
