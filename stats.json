@@ -1,19 +1,19 @@
 {
   "repository": "Bai-Cute/big-blue-fish-desktop-pet",
-  "totalDownloads": 95516,
-  "windowsStandardDownloads": 61342,
+  "totalDownloads": 96209,
+  "windowsStandardDownloads": 61641,
   "highestRelease": {
     "id": 429397130,
     "tag": "v1.1.0",
-    "downloads": 26859,
-    "windowsStandardDownloads": 12667,
+    "downloads": 26892,
+    "windowsStandardDownloads": 12673,
     "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.0"
   },
   "latestRelease": {
     "id": 452414424,
     "tag": "v1.1.5",
-    "downloads": 6279,
-    "windowsStandardDownloads": 4305,
+    "downloads": 6877,
+    "windowsStandardDownloads": 4596,
     "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.5"
   },
   "latestWindowsStandard": {
@@ -103,15 +103,15 @@
     {
       "id": 425791618,
       "tag": "v1.0.5",
-      "downloads": 7049,
+      "downloads": 7051,
       "windowsStandardDownloads": 4937,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.0.5"
     },
     {
       "id": 429397130,
       "tag": "v1.1.0",
-      "downloads": 26859,
-      "windowsStandardDownloads": 12667,
+      "downloads": 26892,
+      "windowsStandardDownloads": 12673,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.0"
     },
     {
@@ -131,8 +131,8 @@
     {
       "id": 444167043,
       "tag": "v1.1.3",
-      "downloads": 14696,
-      "windowsStandardDownloads": 9418,
+      "downloads": 14753,
+      "windowsStandardDownloads": 9420,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.3"
     },
     {
@@ -145,22 +145,22 @@
     {
       "id": 451216547,
       "tag": "v1.1.4",
-      "downloads": 2067,
+      "downloads": 2070,
       "windowsStandardDownloads": 1392,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.4"
     },
     {
       "id": 452414424,
       "tag": "v1.1.5",
-      "downloads": 6279,
-      "windowsStandardDownloads": 4305,
+      "downloads": 6877,
+      "windowsStandardDownloads": 4596,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.5"
     }
   ],
-  "stars": 393,
+  "stars": 394,
   "license": "Apache-2.0",
-  "repositoryBytes": 1656077312,
+  "repositoryBytes": 1656080384,
   "openIssues": 1,
   "allIssues": 20,
-  "updatedAt": "2026-11-24T22:38:37+00:00"
+  "updatedAt": "2026-11-25T08:55:31+00:00"
 }
