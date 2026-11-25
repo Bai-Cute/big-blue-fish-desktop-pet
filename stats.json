@@ -1,19 +1,19 @@
 {
   "repository": "Bai-Cute/big-blue-fish-desktop-pet",
-  "totalDownloads": 96209,
-  "windowsStandardDownloads": 61641,
+  "totalDownloads": 97028,
+  "windowsStandardDownloads": 62105,
   "highestRelease": {
     "id": 429397130,
     "tag": "v1.1.0",
-    "downloads": 26892,
-    "windowsStandardDownloads": 12673,
+    "downloads": 26962,
+    "windowsStandardDownloads": 12675,
     "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.0"
   },
   "latestRelease": {
     "id": 452414424,
     "tag": "v1.1.5",
-    "downloads": 6877,
-    "windowsStandardDownloads": 4596,
+    "downloads": 7575,
+    "windowsStandardDownloads": 5052,
     "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.5"
   },
   "latestWindowsStandard": {
@@ -110,8 +110,8 @@
     {
       "id": 429397130,
       "tag": "v1.1.0",
-      "downloads": 26892,
-      "windowsStandardDownloads": 12673,
+      "downloads": 26962,
+      "windowsStandardDownloads": 12675,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.0"
     },
     {
@@ -124,14 +124,14 @@
     {
       "id": 436702797,
       "tag": "v1.1.2",
-      "downloads": 15015,
-      "windowsStandardDownloads": 9676,
+      "downloads": 15021,
+      "windowsStandardDownloads": 9682,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.2"
     },
     {
       "id": 444167043,
       "tag": "v1.1.3",
-      "downloads": 14753,
+      "downloads": 14798,
       "windowsStandardDownloads": 9420,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.3"
     },
@@ -152,15 +152,15 @@
     {
       "id": 452414424,
       "tag": "v1.1.5",
-      "downloads": 6877,
-      "windowsStandardDownloads": 4596,
+      "downloads": 7575,
+      "windowsStandardDownloads": 5052,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.5"
     }
   ],
   "stars": 394,
   "license": "Apache-2.0",
-  "repositoryBytes": 1656080384,
+  "repositoryBytes": 1656082432,
   "openIssues": 1,
   "allIssues": 20,
-  "updatedAt": "2026-11-25T08:55:31+00:00"
+  "updatedAt": "2026-11-25T21:52:08+00:00"
 }
