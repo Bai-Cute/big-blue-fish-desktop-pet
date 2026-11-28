@@ -1,19 +1,19 @@
 {
   "repository": "Bai-Cute/big-blue-fish-desktop-pet",
-  "totalDownloads": 99758,
-  "windowsStandardDownloads": 63587,
+  "totalDownloads": 100533,
+  "windowsStandardDownloads": 64033,
   "highestRelease": {
     "id": 429397130,
     "tag": "v1.1.0",
-    "downloads": 27192,
-    "windowsStandardDownloads": 12699,
+    "downloads": 27248,
+    "windowsStandardDownloads": 12700,
     "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.0"
   },
   "latestRelease": {
     "id": 452414424,
     "tag": "v1.1.5",
-    "downloads": 9832,
-    "windowsStandardDownloads": 6491,
+    "downloads": 10508,
+    "windowsStandardDownloads": 6935,
     "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.5"
   },
   "latestWindowsStandard": {
@@ -110,8 +110,8 @@
     {
       "id": 429397130,
       "tag": "v1.1.0",
-      "downloads": 27192,
-      "windowsStandardDownloads": 12699,
+      "downloads": 27248,
+      "windowsStandardDownloads": 12700,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.0"
     },
     {
@@ -124,14 +124,14 @@
     {
       "id": 436702797,
       "tag": "v1.1.2",
-      "downloads": 15035,
-      "windowsStandardDownloads": 9690,
+      "downloads": 15039,
+      "windowsStandardDownloads": 9691,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.2"
     },
     {
       "id": 444167043,
       "tag": "v1.1.3",
-      "downloads": 15007,
+      "downloads": 15046,
       "windowsStandardDownloads": 9420,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.3"
     },
@@ -152,15 +152,15 @@
     {
       "id": 452414424,
       "tag": "v1.1.5",
-      "downloads": 9832,
-      "windowsStandardDownloads": 6491,
+      "downloads": 10508,
+      "windowsStandardDownloads": 6935,
       "url": "https://github.com/Bai-Cute/big-blue-fish-desktop-pet/releases/tag/v1.1.5"
     }
   ],
-  "stars": 403,
+  "stars": 404,
   "license": "Apache-2.0",
-  "repositoryBytes": 1656095744,
+  "repositoryBytes": 1656097792,
   "openIssues": 1,
   "allIssues": 20,
-  "updatedAt": "2026-11-28T08:10:22+00:00"
+  "updatedAt": "2026-11-28T20:23:59+00:00"
 }
